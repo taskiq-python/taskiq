@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from functools import wraps
 from logging import getLogger
 from typing import (  # noqa: WPS235
     Any,
@@ -7,11 +8,14 @@ from typing import (  # noqa: WPS235
     Dict,
     Generic,
     Optional,
+    Set,
     TypeVar,
     Union,
     overload,
 )
+from uuid import uuid4
 
+from pydantic import BaseModel
 from typing_extensions import ParamSpec
 
 from taskiq.abc.result_backend import AsyncResultBackend, AsyncTaskiqTask
@@ -81,7 +85,47 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         logger.debug(
             f"Kicking {self.task_name} with args={args} and kwargs={kwargs}.",
         )
-        return await self.broker.kick(self.task_name, *args, **kwargs)
+        message = self._prepare_message(*args, **kwargs)
+        await self.broker.kick(message)
+        return self.broker.result_backend.generate_task(message.task_id)  # type: ignore
+
+    def __repr__(self) -> str:
+        return f"AsyncTaskiqDecoratedTask({self.task_name})"
+
+    @classmethod
+    def _prepare_arg(cls, arg: Any) -> Any:
+        if isinstance(arg, BaseModel):
+            arg = arg.dict()
+        return arg
+
+    def _prepare_message(  # noqa: WPS210
+        self,
+        *args: Any,
+        **kwargs: Any,
+    ) -> TaskiqMessage:
+        """
+        Create a message from args and kwargs.
+
+        :param args: function's args.
+        :param kwargs: function's kwargs.
+        :return: constructed message.
+        """
+        formatted_args = []
+        formatted_kwargs = {}
+        for arg in args:
+            formatted_args.append(self._prepare_arg(arg))
+        for kwarg_name, kwarg_val in kwargs.items():
+            formatted_kwargs[kwarg_name] = self._prepare_arg(kwarg_val)
+
+        task_id = uuid4().hex
+
+        return TaskiqMessage(
+            task_id=task_id,
+            task_name=self.task_name,
+            meta=self.labels,
+            args=formatted_args,
+            kwargs=formatted_kwargs,
+        )
 
 
 class AsyncBroker(ABC):
@@ -100,6 +144,8 @@ class AsyncBroker(ABC):
         if result_backend is None:
             result_backend = DummyResultBackend()
         self.result_backend = result_backend
+        self.is_worker_process = False
+        self._related_tasks: Set[AsyncTaskiqDecoratedTask[..., Any]] = set()
 
     def close(self) -> None:
         """
@@ -112,23 +158,19 @@ class AsyncBroker(ABC):
     @abstractmethod
     async def kick(
         self,
-        task_name: str,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Any:
+        message: TaskiqMessage,
+    ) -> None:
         """
         This method is used to kick tasks out from current program.
 
         Using this method tasks are sent to
         workers.
 
-        :param task_name: name of a task.
-        :param args: positional arguments for task.
-        :param kwargs: key word arguments for task.
+        :param message: name of a task.
         """
 
     @abstractmethod
-    async def listen(self) -> AsyncGenerator[TaskiqMessage, None]:
+    def listen(self) -> AsyncGenerator[TaskiqMessage, None]:
         """
         This function listens to new messages and yields them.
 
@@ -197,14 +239,26 @@ class AsyncBroker(ABC):
             ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]:
                 nonlocal inner_task_name  # noqa: WPS420
                 if inner_task_name is None:
-                    inner_task_name = func.__name__  # noqa: WPS442
+                    inner_task_name = (  # noqa: WPS442
+                        f"{func.__module__}:{func.__name__}"
+                    )
+                wrapper = wraps(func)
 
-                return AsyncTaskiqDecoratedTask(
-                    broker=self,
-                    original_func=func,
-                    labels=inner_labels,
-                    task_name=inner_task_name,
+                decorated_task = wrapper(
+                    AsyncTaskiqDecoratedTask(
+                        broker=self,
+                        original_func=func,
+                        labels=inner_labels,
+                        task_name=inner_task_name,
+                    ),
                 )
+
+                # Adds this task to the list of tasks.
+                # This option is used by workers.
+                if self.is_worker_process:
+                    self._related_tasks.add(decorated_task)  # type: ignore
+
+                return decorated_task
 
             return inner
 

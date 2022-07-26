@@ -11,6 +11,7 @@ license = "MIT"
 [tool.poetry.dependencies]
 python = "^3.7"
 typing-extensions = ">=3.10.0.0"
+pydantic = "^1.6.2"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"
@@ -24,6 +25,9 @@ autoflake = "^1.4"
 wemake-python-styleguide = "^0.16.1"
 coverage = "^6.4.2"
 pytest-cov = "^3.0.0"
+
+[tool.poetry.scripts]
+taskiq = "taskiq.__main__:main"
 
 [tool.mypy]
 strict = true

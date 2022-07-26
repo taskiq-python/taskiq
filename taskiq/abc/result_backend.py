@@ -1,8 +1,7 @@
 import asyncio
 from abc import ABC, abstractmethod
 from time import time
-from typing import Any, Callable, Coroutine, Generic, TypeVar, overload
-from uuid import uuid4
+from typing import Any, Coroutine, Generic, TypeVar, overload
 
 from taskiq.exceptions import TaskiqResultTimeoutError
 
@@ -10,31 +9,35 @@ _T = TypeVar("_T")  # noqa: WPS111
 _ReturnType = TypeVar("_ReturnType")
 
 
-def default_id_generator() -> str:
-    """
-    Generates unique task identifiers.
+class TaskiqResult(Generic[_ReturnType]):
+    """Result of a remote task invocation."""
 
-    This function returns unique task
-    identifiers so we can easily find
-    results of a task by this string.
+    def __init__(self, is_err: bool, log: str, return_value: Any) -> None:
+        self.is_err = is_err
+        self._log = log
+        self._return_value = return_value
 
-    :return: unique string.
-    """
-    return f"{uuid4().hex}{time()}"
+    @overload
+    def value(self: "TaskiqResult[Coroutine[Any, Any, _T]]") -> _T:
+        ...
+
+    @overload
+    def value(self) -> _ReturnType:
+        ...
+
+    def value(self) -> Any:
+        """
+        Returns function's return value.
+
+        :return: function's value.
+        """
+        return self._return_value
 
 
 class AsyncResultBackend(ABC, Generic[_ReturnType]):
     """Async result backend."""
 
-    def __init__(
-        self,
-        id_generator: Callable[[], str] = default_id_generator,
-    ) -> None:
-        self.id_generator = id_generator
-
-    def generate_task(
-        self,
-    ) -> "AsyncTaskiqTask[_ReturnType]":
+    def generate_task(self, task_id: str) -> "AsyncTaskiqTask[_ReturnType]":
         """
         Generates new task.
 
@@ -42,12 +45,13 @@ class AsyncResultBackend(ABC, Generic[_ReturnType]):
         that returned to client after calling kiq
         method.
 
+        :param task_id: id of a task to save.
         :return: task object.
         """
-        return AsyncTaskiqTask(task_id=self.id_generator(), result_backend=self)
+        return AsyncTaskiqTask(task_id=task_id, result_backend=self)
 
     @abstractmethod
-    async def set_result(self, task_id: str, result: Any) -> None:
+    async def set_result(self, task_id: str, result: TaskiqResult[_ReturnType]) -> None:
         """
         Saves result to the result backend.
 
@@ -68,26 +72,17 @@ class AsyncResultBackend(ABC, Generic[_ReturnType]):
         :return: True if task is completed.
         """
 
-    @overload
-    async def get_result(  # noqa: D102
-        self: "AsyncResultBackend[Coroutine[Any, Any, _T]]",
-        task_id: str,
-    ) -> _T:
-        ...
-
-    @overload
-    async def get_result(  # noqa: D102
-        self: "AsyncResultBackend[_ReturnType]",
-        task_id: str,
-    ) -> _ReturnType:
-        ...
-
     @abstractmethod
-    async def get_result(self, task_id: str) -> Any:
+    async def get_result(
+        self,
+        task_id: str,
+        with_logs: bool = False,
+    ) -> TaskiqResult[_ReturnType]:
         """
         Gets result from the task.
 
         :param task_id: task's id.
+        :param with_logs: if True it will download task's logs.
         :return: task's return value.
         """
 
@@ -111,19 +106,7 @@ class AsyncTaskiqTask(Generic[_ReturnType]):
         """
         return await self.result_backend.is_result_ready(self.task_id)
 
-    @overload
-    async def get_result(  # noqa: D102
-        self: "AsyncTaskiqTask[Coroutine[Any, Any, _T]]",
-    ) -> _T:
-        ...
-
-    @overload
-    async def get_result(  # noqa: D102
-        self,
-    ) -> _ReturnType:
-        ...
-
-    async def get_result(self) -> Any:
+    async def get_result(self) -> TaskiqResult[_ReturnType]:
         """
         Get result of a task from result backend.
 
@@ -131,27 +114,11 @@ class AsyncTaskiqTask(Generic[_ReturnType]):
         """
         return await self.result_backend.get_result(self.task_id)
 
-    @overload
-    async def wait_result(  # noqa: D102
-        self: "AsyncTaskiqTask[Coroutine[Any, Any, _T]]",
-        check_interval: float = 0.1,
-        timeout: float = 5.0,
-    ) -> _T:
-        ...
-
-    @overload
-    async def wait_result(  # noqa: D102
-        self,
-        check_interval: float = 0.1,
-        timeout: float = 5.0,
-    ) -> _ReturnType:
-        ...
-
     async def wait_result(
         self,
         check_interval: float = 1.0,
         timeout: float = 5.0,
-    ) -> Any:
+    ) -> TaskiqResult[_ReturnType]:
         """
         Waits until result is ready.
 

@@ -1,9 +1,9 @@
-from dataclasses import dataclass
 from typing import Any, Dict, Tuple
 
+from pydantic import BaseModel
 
-@dataclass
-class TaskiqMessage:
+
+class TaskiqMessage(BaseModel):
     """
     Message abstractions.
 
@@ -12,8 +12,8 @@ class TaskiqMessage:
     recieve such messages.
     """
 
+    task_id: str
     task_name: str
-    headers: Dict[str, str]
     meta: Dict[str, str]
     args: Tuple[Any]
     kwargs: Dict[str, Any]

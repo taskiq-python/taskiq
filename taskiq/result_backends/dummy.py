@@ -32,7 +32,7 @@ class DummyResultBackend(AsyncResultBackend[_ReturnType]):
         """
         return True
 
-    def get_result(self, _id: str) -> Any:
+    def get_result(self, _id: str, _with_logs: bool = False) -> Any:
         """
         Returns None.
 

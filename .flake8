@@ -6,6 +6,8 @@ extend-ignore = E203
 docstring_style=sphinx
 
 ignore =
+  ; Found `%` string formatting
+  WPS323,
   ; Found multi-line function type annotation
   WPS320,
   ; Found statement that has no effect
