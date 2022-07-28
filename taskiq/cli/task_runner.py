@@ -169,6 +169,8 @@ async def async_listen_messages(  # noqa: C901, WPS210
     :param broker: broker to listen to.
     :param cli_args: CLI arguments for worker.
     """
+    logger.info("Runing startup event.")
+    await broker.startup()
     logger.info("Listening started.")
     task_registry: Dict[str, Callable[..., Any]] = {}
     task_signatures: Dict[str, inspect.Signature] = {}

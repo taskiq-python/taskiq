@@ -147,7 +147,10 @@ class AsyncBroker(ABC):
         self.is_worker_process = False
         self._related_tasks: Set[AsyncTaskiqDecoratedTask[..., Any]] = set()
 
-    def close(self) -> None:
+    async def startup(self) -> None:
+        """Do something when starting broker."""
+
+    async def shutdown(self) -> None:
         """
         Close the broker.
 

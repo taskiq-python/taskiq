@@ -44,6 +44,12 @@ class TaskiqResult(Generic[_ReturnType]):
 class AsyncResultBackend(ABC, Generic[_ReturnType]):
     """Async result backend."""
 
+    async def startup(self) -> None:
+        """Do something when starting broker."""
+
+    async def shutdown(self) -> None:
+        """Do something on shutdown."""
+
     def generate_task(self, task_id: str) -> "AsyncTaskiqTask[_ReturnType]":
         """
         Generates new task.
