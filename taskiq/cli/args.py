@@ -24,6 +24,7 @@ class TaskiqArgs:
     log_level: str
     workers: int
     log_collector_format: str
+    no_parse: bool
 
     @classmethod
     def from_cli(cls) -> "TaskiqArgs":
@@ -81,12 +82,21 @@ class TaskiqArgs:
             "-lcf",
             type=str,
             default=(
-                "|%(asctime)s"
-                "|%(levelname)8s"
-                "|%(module)s:%(funcName)s:%(lineno)d| :: "
+                "[%(asctime)s]"
+                "[%(levelname)-7s]"
+                "[%(module)s:%(funcName)s:%(lineno)d] "
                 "%(message)s"
             ),
             help="Format wich is used when collecting logs from function execution",
+        )
+        parser.add_argument(
+            "--no-parse",
+            action="store_true",
+            help=(
+                "If this parameter is on,"
+                " taskiq doesn't parse incoming parameters "
+                " with pydantic."
+            ),
         )
 
         namespace = parser.parse_args()

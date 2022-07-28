@@ -7,7 +7,7 @@ from typing import Any
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.cli.args import TaskiqArgs
-from taskiq.cli.runner import async_listen_messages
+from taskiq.cli.task_runner import async_listen_messages
 
 logger = getLogger("taskiq.worker")
 
@@ -95,13 +95,26 @@ async def run_worker(args: TaskiqArgs) -> None:
 
     :param args: CLI arguments.
     """
-    basicConfig(level=getLevelName(args.log_level))
+    basicConfig(
+        level=getLevelName(args.log_level),
+        format=("[%(asctime)s][%(levelname)-7s][%(processName)s] %(message)s"),
+    )
     logger.info("Starting %s worker processes." % args.workers)
     worker_processes = []
-    for _ in range(args.workers):
-        work_proc = Process(target=start_listen, kwargs={"args": args})
+    for worker_num in range(args.workers):
+        work_proc = Process(
+            target=start_listen,
+            kwargs={"args": args},
+            name=f"worker-{worker_num}",
+        )
         work_proc.start()
-        logger.debug("Started process with pid %s " % work_proc.pid)
+        logger.debug(
+            "Started process worker-%d with pid %s "
+            % (
+                worker_num,
+                work_proc.pid,
+            ),
+        )
         worker_processes.append(work_proc)
 
     for wp in worker_processes:

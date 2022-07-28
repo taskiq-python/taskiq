@@ -1,4 +1,4 @@
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List
 
 from pydantic import BaseModel
 
@@ -15,5 +15,5 @@ class TaskiqMessage(BaseModel):
     task_id: str
     task_name: str
     meta: Dict[str, str]
-    args: Tuple[Any]
+    args: List[Any]
     kwargs: Dict[str, Any]
