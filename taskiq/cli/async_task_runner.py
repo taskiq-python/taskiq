@@ -1,9 +1,12 @@
 import asyncio
 import inspect
 import io
+import signal
+import sys
+from concurrent.futures import Executor, ThreadPoolExecutor
 from logging import getLogger
 from time import time
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, NoReturn, Optional
 
 from pydantic import parse_obj_as
 
@@ -99,6 +102,7 @@ async def run_task(  # noqa: WPS210
     signature: Optional[inspect.Signature],
     message: TaskiqMessage,
     cli_args: TaskiqArgs,
+    executor: Optional[Executor] = None,
 ) -> TaskiqResult[Any]:
     """
     This function actually executes functions.
@@ -118,6 +122,7 @@ async def run_task(  # noqa: WPS210
     :param signature: signature of an original function.
     :param message: received message.
     :param cli_args: CLI arguments for worker.
+    :param executor: executor to run sync tasks.
     :return: result of execution.
     """
     loop = asyncio.get_running_loop()
@@ -133,7 +138,7 @@ async def run_task(  # noqa: WPS210
                 returned = await target(*message.args, **message.kwargs)
             else:
                 returned = await loop.run_in_executor(
-                    None,
+                    executor,
                     run_sync,
                     target,
                     message,
@@ -156,7 +161,64 @@ async def run_task(  # noqa: WPS210
     )
 
 
-async def async_listen_messages(  # noqa: C901, WPS210
+def exit_process(task: asyncio.Task[Any]) -> NoReturn:
+    """
+    This function exits from the current process.
+
+    It receives asyncio Task of broker.shutdown().
+    We check if there were an exception or returned value.
+
+    If the function raised an exception, we print it with stack trace.
+    If it returned a value, we log it.
+
+    After this, we cancel all current tasks in the loop
+    and exits.
+
+    :param task: broker.shutdown task.
+    """
+    exitcode = 0
+    try:
+        result = task.result()
+        if result is not None:
+            logger.info("Broker returned value on shutdown: '%s'" % str(result))
+    except Exception as exc:
+        logger.warning("Exception was found while shutting down!")
+        logger.warning(exc, exc_info=True)
+        exitcode = 1
+
+    loop = asyncio.get_event_loop()
+    for running_task in asyncio.all_tasks(loop):
+        running_task.cancel()
+
+    logger.info("Killing worker process.")
+    sys.exit(exitcode)
+
+
+def signal_handler(broker: AsyncBroker) -> None:
+    """
+    Exit signal handler.
+
+    This signal handler
+    calls _close_broker and after
+    the task is done it exits.
+
+    :param broker: current broker.
+    """
+    if getattr(broker, "_is_shutting_down", False):
+        # We're already shutting down the broker.
+        return
+
+    # We set this flag to not call this method twice.
+    # Since we add an asynchronous task in loop
+    # It can wait for execution for some time.
+    # We want to execute shutdown only once. Otherwise
+    # it would give us Undefined Behaviour.
+    broker._is_shutting_down = True  # type: ignore  # noqa: WPS437
+    task = asyncio.create_task(broker.shutdown())
+    task.add_done_callback(exit_process)
+
+
+async def async_listen_messages(  # noqa: C901, WPS210, WPS213
     broker: AsyncBroker,
     cli_args: TaskiqArgs,
 ) -> None:
@@ -169,8 +231,23 @@ async def async_listen_messages(  # noqa: C901, WPS210
     :param broker: broker to listen to.
     :param cli_args: CLI arguments for worker.
     """
+    loop = asyncio.get_event_loop()
+    loop.add_signal_handler(
+        signal.SIGTERM,
+        signal_handler,
+        broker,
+    )
+    loop.add_signal_handler(
+        signal.SIGINT,
+        signal_handler,
+        broker,
+    )
+
     logger.info("Runing startup event.")
     await broker.startup()
+    executor = ThreadPoolExecutor(
+        max_workers=cli_args.max_threadpool_threads,
+    )
     logger.info("Listening started.")
     task_registry: Dict[str, Callable[..., Any]] = {}
     task_signatures: Dict[str, inspect.Signature] = {}
@@ -197,6 +274,7 @@ async def async_listen_messages(  # noqa: C901, WPS210
             task_signatures.get(message.task_name),
             message,
             cli_args,
+            executor,
         )
         try:
             await broker.result_backend.set_result(message.task_id, result)

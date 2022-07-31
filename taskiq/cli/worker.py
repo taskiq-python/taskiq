@@ -1,13 +1,15 @@
 import asyncio
+import signal
 from importlib import import_module
 from logging import basicConfig, getLevelName, getLogger
 from multiprocessing import Process
 from pathlib import Path
-from typing import Any
+from time import sleep
+from typing import Any, List
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.cli.args import TaskiqArgs
-from taskiq.cli.task_runner import async_listen_messages
+from taskiq.cli.async_task_runner import async_listen_messages
 
 logger = getLogger("taskiq.worker")
 
@@ -86,7 +88,7 @@ def start_listen(args: TaskiqArgs) -> None:
         raise ValueError("Unknown broker type. Please use AsyncBroker instance.")
 
 
-async def run_worker(args: TaskiqArgs) -> None:
+def run_worker(args: TaskiqArgs) -> None:  # noqa: C901, WPS210, WPS213
     """
     This function starts worker processes.
 
@@ -100,22 +102,68 @@ async def run_worker(args: TaskiqArgs) -> None:
         format=("[%(asctime)s][%(levelname)-7s][%(processName)s] %(message)s"),
     )
     logger.info("Starting %s worker processes." % args.workers)
-    worker_processes = []
-    for worker_num in range(args.workers):
+    worker_processes: List[Process] = []
+    for process in range(args.workers):
         work_proc = Process(
             target=start_listen,
             kwargs={"args": args},
-            name=f"worker-{worker_num}",
+            name=f"worker-{process}",
         )
         work_proc.start()
         logger.debug(
             "Started process worker-%d with pid %s "
             % (
-                worker_num,
+                process,
                 work_proc.pid,
             ),
         )
         worker_processes.append(work_proc)
 
-    for wp in worker_processes:
-        wp.join()
+    # This flag signalizes that we do need to restart processes.
+    do_restarts = True
+
+    def signal_handler(_signal: int, _frame: Any) -> None:
+        """
+        This handler is used only by main process.
+
+        If the OS sent you SIGINT or SIGTERM,
+        we should kill all spawned processes.
+
+        :param _signal: incoming signal.
+        :param _frame: current execution frame.
+        """
+        nonlocal do_restarts  # noqa: WPS420
+        nonlocal worker_processes  # noqa: WPS420
+
+        do_restarts = False  # noqa: WPS442
+        for process in worker_processes:  # noqa: WPS442
+            # This is how we send SIGTERM to child
+            # processes.
+            process.terminate()
+            process.join()
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+    while worker_processes and do_restarts:
+        # List of processes to remove.
+        sleep(1)
+        process_to_remove = []
+        for worker_id, worker in enumerate(worker_processes):
+            if worker.is_alive():
+                continue
+            if worker.exitcode is not None and worker.exitcode > 0 and do_restarts:
+                logger.info("Trying to restart the worker-%s" % worker_id)
+                worker_processes[worker_id] = Process(
+                    target=start_listen,
+                    kwargs={"args": args},
+                    name=f"worker-{worker_id}",
+                )
+                worker_processes[worker_id].start()
+            else:
+                logger.info("Worker-%s has finished." % worker_id)
+                worker.join()
+                process_to_remove.append(worker)
+
+        for dead_process in process_to_remove:
+            worker_processes.remove(dead_process)

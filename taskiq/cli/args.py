@@ -1,6 +1,7 @@
 import enum
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from dataclasses import dataclass
+from typing import List, Optional
 
 
 class LogLevel(str, enum.Enum):  # noqa: WPS600
@@ -24,13 +25,15 @@ class TaskiqArgs:
     log_level: str
     workers: int
     log_collector_format: str
+    max_threadpool_threads: int
     no_parse: bool
 
     @classmethod
-    def from_cli(cls) -> "TaskiqArgs":
+    def from_cli(cls, args: Optional[List[str]] = None) -> "TaskiqArgs":  # noqa: WPS213
         """
         Construct TaskiqArgs instanc from CLI arguments.
 
+        :param args: list of args as for cli.
         :return: TaskiqArgs instance.
         """
         parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
@@ -98,6 +101,14 @@ class TaskiqArgs:
                 " with pydantic."
             ),
         )
+        parser.add_argument(
+            "--max-threadpool-threads",
+            type=int,
+            help="Maximum number of threads for executing sync functions.",
+        )
 
-        namespace = parser.parse_args()
+        if args is None:
+            namespace = parser.parse_args(args)
+        else:
+            namespace = parser.parse_args()
         return TaskiqArgs(**namespace.__dict__)
