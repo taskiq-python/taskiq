@@ -14,6 +14,31 @@ from taskiq.cli.async_task_runner import async_listen_messages
 logger = getLogger("taskiq.worker")
 
 
+restart_workers = True
+worker_processes: List[Process] = []
+
+
+def signal_handler(_signal: int, _frame: Any) -> None:
+    """
+    This handler is used only by main process.
+
+    If the OS sent you SIGINT or SIGTERM,
+    we should kill all spawned processes.
+
+    :param _signal: incoming signal.
+    :param _frame: current execution frame.
+    """
+    global restart_workers  # noqa: WPS420
+    global worker_processes  # noqa: WPS420
+
+    restart_workers = False  # noqa: WPS442
+    for process in worker_processes:
+        # This is how we send SIGTERM to child
+        # processes.
+        process.terminate()
+        process.join()
+
+
 def import_broker(broker_spec: str) -> Any:
     """
     It parses broker spec and imports it.
@@ -88,7 +113,43 @@ def start_listen(args: TaskiqArgs) -> None:
         raise ValueError("Unknown broker type. Please use AsyncBroker instance.")
 
 
-def run_worker(args: TaskiqArgs) -> None:  # noqa: C901, WPS210, WPS213
+def watch_workers_restarts(args: TaskiqArgs) -> None:
+    """
+    Infinate loop for main process.
+
+    This loop restarts worker processes
+    if they exit with error returncodes.
+
+    :param args: cli arguements.
+    """
+    global worker_processes  # noqa: WPS420
+    global restart_workers  # noqa: WPS420
+
+    while worker_processes and restart_workers:
+        # List of processes to remove.
+        sleep(1)
+        process_to_remove = []
+        for worker_id, worker in enumerate(worker_processes):
+            if worker.is_alive():
+                continue
+            if worker.exitcode is not None and worker.exitcode > 0 and restart_workers:
+                logger.info("Trying to restart the worker-%s" % worker_id)
+                worker_processes[worker_id] = Process(
+                    target=start_listen,
+                    kwargs={"args": args},
+                    name=f"worker-{worker_id}",
+                )
+                worker_processes[worker_id].start()
+            else:
+                logger.info("Worker-%s has finished." % worker_id)
+                worker.join()
+                process_to_remove.append(worker)
+
+        for dead_process in process_to_remove:
+            worker_processes.remove(dead_process)
+
+
+def run_worker(args: TaskiqArgs) -> None:
     """
     This function starts worker processes.
 
@@ -102,7 +163,9 @@ def run_worker(args: TaskiqArgs) -> None:  # noqa: C901, WPS210, WPS213
         format=("[%(asctime)s][%(levelname)-7s][%(processName)s] %(message)s"),
     )
     logger.info("Starting %s worker processes." % args.workers)
-    worker_processes: List[Process] = []
+
+    global worker_processes  # noqa: WPS420
+
     for process in range(args.workers):
         work_proc = Process(
             target=start_listen,
@@ -119,51 +182,7 @@ def run_worker(args: TaskiqArgs) -> None:  # noqa: C901, WPS210, WPS213
         )
         worker_processes.append(work_proc)
 
-    # This flag signalizes that we do need to restart processes.
-    do_restarts = True
-
-    def signal_handler(_signal: int, _frame: Any) -> None:
-        """
-        This handler is used only by main process.
-
-        If the OS sent you SIGINT or SIGTERM,
-        we should kill all spawned processes.
-
-        :param _signal: incoming signal.
-        :param _frame: current execution frame.
-        """
-        nonlocal do_restarts  # noqa: WPS420
-        nonlocal worker_processes  # noqa: WPS420
-
-        do_restarts = False  # noqa: WPS442
-        for process in worker_processes:  # noqa: WPS442
-            # This is how we send SIGTERM to child
-            # processes.
-            process.terminate()
-            process.join()
-
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    while worker_processes and do_restarts:
-        # List of processes to remove.
-        sleep(1)
-        process_to_remove = []
-        for worker_id, worker in enumerate(worker_processes):
-            if worker.is_alive():
-                continue
-            if worker.exitcode is not None and worker.exitcode > 0 and do_restarts:
-                logger.info("Trying to restart the worker-%s" % worker_id)
-                worker_processes[worker_id] = Process(
-                    target=start_listen,
-                    kwargs={"args": args},
-                    name=f"worker-{worker_id}",
-                )
-                worker_processes[worker_id].start()
-            else:
-                logger.info("Worker-%s has finished." % worker_id)
-                worker.join()
-                process_to_remove.append(worker)
-
-        for dead_process in process_to_remove:
-            worker_processes.remove(dead_process)
+    watch_workers_restarts(args=args)
