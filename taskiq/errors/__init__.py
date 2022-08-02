@@ -1,0 +1,1 @@
+"""Taskiq's errors."""
