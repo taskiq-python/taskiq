@@ -249,22 +249,19 @@ async def async_listen_messages(  # noqa: C901, WPS210, WPS213
         max_workers=cli_args.max_threadpool_threads,
     )
     logger.info("Listening started.")
-    task_registry: Dict[str, Callable[..., Any]] = {}
     task_signatures: Dict[str, inspect.Signature] = {}
-    for task in broker._related_tasks:  # noqa: WPS437
-        task_registry[task.task_name] = task.original_func
-        # If we need to parse parameters we remember all tasks signatures.
+    for task in broker.available_tasks.values():
         if not cli_args.no_parse:
             task_signatures[task.task_name] = inspect.signature(task.original_func)
     async for message in broker.listen():
         logger.debug(f"Received message: {message}")
-        if message.task_name not in task_registry:
+        if message.task_name not in broker.available_tasks:
             logger.warning(
                 'task "%s" is not found. Maybe you forgot to import it?',
                 message.task_name,
             )
             continue
-        func = task_registry[message.task_name]
+        func = broker.available_tasks[message.task_name]
         logger.debug(
             "Function for task %s is resolved. Executing...",
             message.task_name,

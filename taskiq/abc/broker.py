@@ -276,6 +276,8 @@ class AsyncBroker(ABC):
     in async mode.
     """
 
+    available_tasks: Dict[str, AsyncTaskiqDecoratedTask[Any, Any]] = {}
+
     def __init__(
         self,
         result_backend: Optional[AsyncResultBackend[_T]] = None,
@@ -284,7 +286,6 @@ class AsyncBroker(ABC):
             result_backend = DummyResultBackend()
         self.result_backend = result_backend
         self.is_worker_process = False
-        self._related_tasks: Set[AsyncTaskiqDecoratedTask[..., Any]] = set()
 
     async def startup(self) -> None:
         """Do something when starting broker."""
@@ -395,10 +396,7 @@ class AsyncBroker(ABC):
                     ),
                 )
 
-                # Adds this task to the list of tasks.
-                # This option is used by workers.
-                if self.is_worker_process:
-                    self._related_tasks.add(decorated_task)  # type: ignore
+                self.available_tasks[decorated_task.task_name] = decorated_task
 
                 return decorated_task
 

@@ -92,9 +92,9 @@ def start_listen(args: TaskiqArgs) -> None:
     This function starts actual listening process.
 
     It imports broker and all tasks.
-    Since tasks registers themselfs in broker
+    Since tasks registers themselfs in a global set,
     it's easy to just import module where you have decorated
-    function and they will be available in broker's `_related_tasks`
+    function and they will be available in broker's `available_tasks`
     field.
 
     :param args: CLI arguments.

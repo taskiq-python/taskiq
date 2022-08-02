@@ -6,6 +6,7 @@ from typing import AsyncGenerator, Optional, TypeVar
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.result_backend import AsyncResultBackend, TaskiqResult
 from taskiq.cli.async_task_runner import run_task
+from taskiq.exceptions import TaskiqError
 from taskiq.message import TaskiqMessage
 
 _ReturnType = TypeVar("_ReturnType")
@@ -87,18 +88,15 @@ class InMemoryBroker(AsyncBroker):
         sync_tasks_pool_size: int = 4,
         logs_format: Optional[str] = None,
         max_stored_results: int = 100,
+        cast_types: bool = True,
     ) -> None:
         super().__init__(
             InmemoryResultBackend(
                 max_stored_results=max_stored_results,
             ),
         )
-        # We mock as if it's a worker process.
-        # So every task call will add tasks in
-        # _related_tasks attribute.
-        self.is_worker_process = True
-        self.tasks_mapping = None
         self.executor = ThreadPoolExecutor(max_workers=sync_tasks_pool_size)
+        self.cast_types = cast_types
         if logs_format is None:
             logs_format = "%(levelname)s %(message)s"
         self.logs_format = logs_format
@@ -110,13 +108,11 @@ class InMemoryBroker(AsyncBroker):
         This method just executes given task.
 
         :param message: incomming message.
-        :raises ValueError: if someone wants to kick unknown task.
+        :raises TaskiqError: if someone wants to kick unknown task.
         """
-        for task in self._related_tasks:
-            if task.task_name == message.task_name:
-                target_task = task
+        target_task = self.available_tasks.get(message.task_name)
         if target_task is None:
-            raise ValueError("Unknown task.")
+            raise TaskiqError("Unknown task.")
         result = await run_task(
             target=target_task.original_func,
             signature=inspect.signature(target_task.original_func),
