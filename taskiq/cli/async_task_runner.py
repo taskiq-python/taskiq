@@ -101,7 +101,7 @@ async def run_task(  # noqa: WPS210
     target: Callable[..., Any],
     signature: Optional[inspect.Signature],
     message: TaskiqMessage,
-    cli_args: TaskiqArgs,
+    log_collector_format: str,
     executor: Optional[Executor] = None,
 ) -> TaskiqResult[Any]:
     """
@@ -121,7 +121,7 @@ async def run_task(  # noqa: WPS210
     :param target: function to execute.
     :param signature: signature of an original function.
     :param message: received message.
-    :param cli_args: CLI arguments for worker.
+    :param log_collector_format: Log format in wich logs are collected.
     :param executor: executor to run sync tasks.
     :return: result of execution.
     """
@@ -131,7 +131,7 @@ async def run_task(  # noqa: WPS210
     returned = None
     # Captures function's logs.
     parse_params(signature, message)
-    with LogsCollector(logs, cli_args.log_collector_format):
+    with LogsCollector(logs, log_collector_format):
         start_time = time()
         try:
             if asyncio.iscoroutinefunction(target):
@@ -273,7 +273,7 @@ async def async_listen_messages(  # noqa: C901, WPS210, WPS213
             func,
             task_signatures.get(message.task_name),
             message,
-            cli_args,
+            cli_args.log_collector_format,
             executor,
         )
         try:
