@@ -21,6 +21,7 @@ from pydantic import BaseModel
 from typing_extensions import ParamSpec
 
 from taskiq.abc.result_backend import AsyncResultBackend, AsyncTaskiqTask
+from taskiq.exceptions import SendTaskError
 from taskiq.message import TaskiqMessage
 from taskiq.result_backends.dummy import DummyResultBackend
 
@@ -121,13 +122,18 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         :param args: function's arguments.
         :param kwargs: function's key word arguments.
 
+        :raises SendTaskError: if we can't send task to the broker.
+
         :returns: taskiq task.
         """
         logger.debug(
             f"Kicking {self.task_name} with args={args} and kwargs={kwargs}.",
         )
         message = self._prepare_message(*args, **kwargs)
-        await self.broker.kick(message)
+        try:
+            await self.broker.kick(message)
+        except Exception as exc:
+            raise SendTaskError() from exc
         return self.broker.result_backend.generate_task(message.task_id)
 
     @classmethod
