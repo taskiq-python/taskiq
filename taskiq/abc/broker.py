@@ -6,6 +6,7 @@ from typing import (  # noqa: WPS235
     Any,
     AsyncGenerator,
     Callable,
+    Coroutine,
     Dict,
     Generic,
     Optional,
@@ -90,11 +91,27 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         self.broker = broker
         return self
 
+    @overload
+    async def kiq(  # noqa: D102
+        self: "AsyncKicker[_FuncParams, Coroutine[Any, Any, _T]]",
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> AsyncTaskiqTask[_T]:
+        ...
+
+    @overload
+    async def kiq(  # noqa: D102
+        self: "AsyncKicker[_FuncParams, _ReturnType]",
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> AsyncTaskiqTask[_ReturnType]:
+        ...
+
     async def kiq(
         self,
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
-    ) -> AsyncTaskiqTask[_ReturnType]:
+    ) -> Any:
         """
         This method sends function call over the network.
 
@@ -111,7 +128,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         )
         message = self._prepare_message(*args, **kwargs)
         await self.broker.kick(message)
-        return self.broker.result_backend.generate_task(message.task_id)  # type: ignore
+        return self.broker.result_backend.generate_task(message.task_id)
 
     @classmethod
     def _prepare_arg(cls, arg: Any) -> Any:
@@ -197,11 +214,27 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
     ) -> _ReturnType:
         return self.original_func(*args, **kwargs)
 
+    @overload
+    async def kiq(  # noqa: D102
+        self: "AsyncTaskiqDecoratedTask[_FuncParams, Coroutine[Any, Any, _T]]",
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> AsyncTaskiqTask[_T]:
+        ...
+
+    @overload
+    async def kiq(  # noqa: D102
+        self: "AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]",
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> AsyncTaskiqTask[_ReturnType]:
+        ...
+
     async def kiq(
         self,
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
-    ) -> AsyncTaskiqTask[_ReturnType]:
+    ) -> Any:
         """
         This method sends function call over the network.
 

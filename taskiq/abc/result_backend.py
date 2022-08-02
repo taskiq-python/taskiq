@@ -1,7 +1,9 @@
 import asyncio
 from abc import ABC, abstractmethod
 from time import time
-from typing import Any, Coroutine, Generic, Optional, TypeVar, overload
+from typing import Generic, Optional, TypeVar
+
+from pydantic.generics import GenericModel
 
 from taskiq.exceptions import TaskiqResultTimeoutError
 
@@ -9,36 +11,13 @@ _T = TypeVar("_T")  # noqa: WPS111
 _ReturnType = TypeVar("_ReturnType")
 
 
-class TaskiqResult(Generic[_ReturnType]):
+class TaskiqResult(GenericModel, Generic[_ReturnType]):
     """Result of a remote task invocation."""
 
-    def __init__(
-        self,
-        is_err: bool,
-        log: Optional[str],
-        return_value: Any,
-        execution_time: float,
-    ) -> None:
-        self.is_err = is_err
-        self.log = log
-        self._return_value = return_value
-        self.execution_time = execution_time
-
-    @overload
-    def value(self: "TaskiqResult[Coroutine[Any, Any, _T]]") -> _T:
-        ...
-
-    @overload
-    def value(self) -> _ReturnType:
-        ...
-
-    def value(self) -> Any:
-        """
-        Returns function's return value.
-
-        :return: function's value.
-        """
-        return self._return_value
+    is_err: bool
+    log: Optional[str]
+    return_value: _ReturnType
+    execution_time: float
 
 
 class AsyncResultBackend(ABC, Generic[_ReturnType]):
