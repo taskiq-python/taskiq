@@ -17,7 +17,6 @@ from typing import (  # noqa: WPS235
 )
 from uuid import uuid4
 
-from aiormq.exceptions import AMQPConnectionError
 from pydantic import BaseModel
 from typing_extensions import ParamSpec
 
@@ -133,7 +132,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         message = self._prepare_message(*args, **kwargs)
         try:
             await self.broker.kick(message)
-        except AMQPConnectionError as exc:
+        except Exception as exc:
             raise SendTaskError() from exc
         return self.broker.result_backend.generate_task(message.task_id)
 

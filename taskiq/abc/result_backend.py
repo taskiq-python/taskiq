@@ -4,7 +4,6 @@ from time import time
 from typing import Generic, Optional, TypeVar
 
 from pydantic.generics import GenericModel
-from redis.asyncio import ConnectionError
 
 from taskiq.exceptions import (
     ResultGetError,
@@ -105,7 +104,7 @@ class AsyncTaskiqTask(Generic[_ReturnType]):
         """
         try:
             return await self.result_backend.is_result_ready(self.task_id)
-        except ConnectionError as exc:
+        except Exception as exc:
             raise ResultIsReadyError() from exc
 
     async def get_result(self, with_logs: bool = False) -> TaskiqResult[_ReturnType]:
@@ -123,7 +122,7 @@ class AsyncTaskiqTask(Generic[_ReturnType]):
                 self.task_id,
                 with_logs=with_logs,
             )
-        except ConnectionError as exc:
+        except Exception as exc:
             raise ResultGetError() from exc
 
     async def wait_result(

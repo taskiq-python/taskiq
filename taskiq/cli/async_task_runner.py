@@ -9,7 +9,6 @@ from time import time
 from typing import Any, Callable, Dict, NoReturn, Optional
 
 from pydantic import parse_obj_as
-from redis.asyncio import ConnectionError
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.result_backend import TaskiqResult
@@ -279,7 +278,6 @@ async def async_listen_messages(  # noqa: C901, WPS210, WPS213
         )
         try:
             await broker.result_backend.set_result(message.task_id, result)
-        except ConnectionError as exc:
-            raise ResultSetError() from exc
         except Exception as exc:
             logger.exception(exc)
+            raise ResultSetError() from exc

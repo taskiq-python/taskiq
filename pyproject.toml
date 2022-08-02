@@ -12,8 +12,6 @@ license = "LICENSE"
 python = "^3.7"
 typing-extensions = ">=3.10.0.0"
 pydantic = "^1.6.2"
-redis = "^4.3.4"
-aio-pika = "^8.1.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"
@@ -41,10 +39,6 @@ show_error_codes = true
 implicit_reexport = true
 allow_untyped_decorators = true
 warn_return_any = false
-
-[[tool.mypy.overrides]]
-module = ['redis.asyncio']
-ignore_missing_imports = true
 
 [tool.isort]
 profile = "black"
