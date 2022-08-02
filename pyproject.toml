@@ -1,12 +1,12 @@
 [tool.poetry]
 name = "taskiq"
 version = "0.1.1"
-description = ""
+description = "Asynchronous task queue with async support"
 authors = ["Pavel Kirilin <win10@list.ru>"]
 maintainers = ["Pavel Kirilin <win10@list.ru>"]
 readme = "README.md"
 repository = "https://github.com/taskiq-python/taskiq"
-license = "MIT"
+license = "LICENSE"
 
 [tool.poetry.dependencies]
 python = "^3.7"
