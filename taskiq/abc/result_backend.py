@@ -4,8 +4,13 @@ from time import time
 from typing import Generic, Optional, TypeVar
 
 from pydantic.generics import GenericModel
+from redis.asyncio import ConnectionError
 
-from taskiq.exceptions import TaskiqResultTimeoutError
+from taskiq.exceptions import (
+    ResultGetError,
+    ResultIsReadyError,
+    TaskiqResultTimeoutError,
+)
 
 _T = TypeVar("_T")  # noqa: WPS111
 _ReturnType = TypeVar("_ReturnType")
@@ -94,18 +99,32 @@ class AsyncTaskiqTask(Generic[_ReturnType]):
         """
         Checks if task is completed.
 
+        :raises ResultIsReadyError: if we can't get info about task readyness.
+
         :return: True if task is completed.
         """
-        return await self.result_backend.is_result_ready(self.task_id)
+        try:
+            return await self.result_backend.is_result_ready(self.task_id)
+        except ConnectionError as exc:
+            raise ResultIsReadyError() from exc
 
     async def get_result(self, with_logs: bool = False) -> TaskiqResult[_ReturnType]:
         """
         Get result of a task from result backend.
 
         :param with_logs: whether you want to fetch logs from worker.
+
+        :raises ResultGetError: if we can't get result from ResultBackend.
+
         :return: task's return value.
         """
-        return await self.result_backend.get_result(self.task_id, with_logs=with_logs)
+        try:
+            return await self.result_backend.get_result(
+                self.task_id,
+                with_logs=with_logs,
+            )
+        except ConnectionError as exc:
+            raise ResultGetError() from exc
 
     async def wait_result(
         self,
