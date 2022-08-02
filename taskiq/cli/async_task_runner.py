@@ -261,13 +261,12 @@ async def async_listen_messages(  # noqa: C901, WPS210, WPS213
                 message.task_name,
             )
             continue
-        func = broker.available_tasks[message.task_name]
         logger.debug(
             "Function for task %s is resolved. Executing...",
             message.task_name,
         )
         result = await run_task(
-            func,
+            broker.available_tasks[message.task_name].original_func,
             task_signatures.get(message.task_name),
             message,
             cli_args.log_collector_format,
