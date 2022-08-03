@@ -275,4 +275,9 @@ async def async_listen_messages(  # noqa: C901, WPS210, WPS213
         try:
             await broker.result_backend.set_result(message.task_id, result)
         except Exception as exc:
-            logger.exception(exc)
+            logger.exception(
+                "Can't set result in {broker_name} broker: \n {exc}".format(
+                    broker_name=broker.__class__.__name__,
+                    exc=exc,
+                ),
+            )
