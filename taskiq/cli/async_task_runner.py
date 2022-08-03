@@ -64,7 +64,7 @@ def parse_params(  # noqa: C901
         argnum += 1
         annot = params_type.annotation
         value = None
-        logger.debug("Trying to parse %s as %s" % (param_name, params_type.annotation))
+        logger.debug("Trying to parse %s as %s", param_name, params_type.annotation)
         if argnum >= len(message.args):
             value = message.kwargs.get(param_name)
             if value is None:
@@ -146,7 +146,8 @@ async def run_task(  # noqa: WPS210
         except Exception as exc:
             is_err = True
             logger.error(
-                "Exception found while executing function: %s" % exc,
+                "Exception found while executing function: %s",
+                exc,
                 exc_info=True,
             )
         execution_time = time() - start_time
@@ -180,7 +181,7 @@ def exit_process(task: asyncio.Task[Any]) -> NoReturn:
     try:
         result = task.result()
         if result is not None:
-            logger.info("Broker returned value on shutdown: '%s'" % str(result))
+            logger.info("Broker returned value on shutdown: '%s'", str(result))
     except Exception as exc:
         logger.warning("Exception was found while shutting down!")
         logger.warning(exc, exc_info=True)

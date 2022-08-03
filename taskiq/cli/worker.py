@@ -133,7 +133,7 @@ def watch_workers_restarts(args: TaskiqArgs) -> None:
             if worker.is_alive():
                 continue
             if worker.exitcode is not None and worker.exitcode > 0 and restart_workers:
-                logger.info("Trying to restart the worker-%s" % worker_id)
+                logger.info("Trying to restart the worker-%s", worker_id)
                 worker_processes[worker_id] = Process(
                     target=start_listen,
                     kwargs={"args": args},
@@ -141,7 +141,7 @@ def watch_workers_restarts(args: TaskiqArgs) -> None:
                 )
                 worker_processes[worker_id].start()
             else:
-                logger.info("Worker-%s has finished." % worker_id)
+                logger.info("Worker-%s has finished.", worker_id)
                 worker.join()
                 process_to_remove.append(worker)
 
@@ -162,7 +162,7 @@ def run_worker(args: TaskiqArgs) -> None:
         level=getLevelName(args.log_level),
         format=("[%(asctime)s][%(levelname)-7s][%(processName)s] %(message)s"),
     )
-    logger.info("Starting %s worker processes." % args.workers)
+    logger.info("Starting %s worker processes.", args.workers)
 
     global worker_processes  # noqa: WPS420
 
@@ -174,11 +174,9 @@ def run_worker(args: TaskiqArgs) -> None:
         )
         work_proc.start()
         logger.debug(
-            "Started process worker-%d with pid %s "
-            % (
-                process,
-                work_proc.pid,
-            ),
+            "Started process worker-%d with pid %s ",
+            process,
+            work_proc.pid,
         )
         worker_processes.append(work_proc)
 

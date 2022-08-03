@@ -1,6 +1,7 @@
 from typing import Any, TypeVar
 
 from taskiq.abc.result_backend import AsyncResultBackend
+from taskiq.result import TaskiqResult
 
 _ReturnType = TypeVar("_ReturnType")
 
@@ -20,23 +21,31 @@ class DummyResultBackend(AsyncResultBackend[_ReturnType]):
         """
         return await super().set_result(task_id, result)
 
-    async def is_result_ready(self, _id: str) -> bool:
+    async def is_result_ready(self, task_id: str) -> bool:
         """
         Checks whether task is completed.
 
         Result is always ready,
         since it doesn't care about tasks.
 
-        :param _id: task's id.
+        :param task_id: task's id.
         :return: true.
         """
         return True
 
-    def get_result(self, _id: str, _with_logs: bool = False) -> Any:
+    async def get_result(self, task_id: str, with_logs: bool = False) -> Any:
         """
         Returns None.
 
         This result doesn't care about passed parameters.
 
-        :param _id: task's id.
+        :param task_id: task's id.
+        :param with_logs: wether to fetch logs.
+        :returns: TaskiqResult.
         """
+        return TaskiqResult(
+            is_err=False,
+            log=None,
+            return_value=None,
+            execution_time=0,
+        )

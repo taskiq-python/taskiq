@@ -31,6 +31,7 @@ class AsyncBroker(ABC):
             result_backend = DummyResultBackend()
         self.result_backend = result_backend
         self.is_worker_process = False
+        self.decorator_class = AsyncTaskiqDecoratedTask
 
     async def startup(self) -> None:
         """Do something when starting broker."""
@@ -133,7 +134,7 @@ class AsyncBroker(ABC):
                 wrapper = wraps(func)
 
                 decorated_task = wrapper(
-                    AsyncTaskiqDecoratedTask(
+                    self.decorator_class(
                         broker=self,
                         original_func=func,
                         labels=inner_labels,
