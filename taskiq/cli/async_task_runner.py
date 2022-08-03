@@ -11,10 +11,10 @@ from typing import Any, Callable, Dict, NoReturn, Optional
 from pydantic import parse_obj_as
 
 from taskiq.abc.broker import AsyncBroker
-from taskiq.abc.result_backend import TaskiqResult
 from taskiq.cli.args import TaskiqArgs
 from taskiq.cli.log_collector import LogsCollector
 from taskiq.message import TaskiqMessage
+from taskiq.result import TaskiqResult
 
 logger = getLogger("taskiq.worker")
 
