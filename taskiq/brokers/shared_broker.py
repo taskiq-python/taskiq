@@ -4,16 +4,16 @@ from taskiq.abc.broker import AsyncBroker
 from taskiq.decor import AsyncTaskiqDecoratedTask
 from taskiq.exceptions import TaskiqError
 from taskiq.kicker import AsyncKicker
-from taskiq.message import TaskiqMessage
-from taskiq.types_helpers import ReturnType_
+from taskiq.message import BrokerMessage
 
-Params_ = TypeVar("Params_")  # noqa: WPS120
+_ReturnType = TypeVar("_ReturnType")
+_Params = TypeVar("_Params")
 
 
-class SharedDecoratedTask(AsyncTaskiqDecoratedTask[Params_, ReturnType_]):
+class SharedDecoratedTask(AsyncTaskiqDecoratedTask[_Params, _ReturnType]):
     """Decorator that is used with shared broker."""
 
-    def kicker(self) -> AsyncKicker[Params_, ReturnType_]:
+    def kicker(self) -> AsyncKicker[_Params, _ReturnType]:
         """
         This method updates getting default kicker.
 
@@ -45,7 +45,7 @@ class AsyncSharedBroker(AsyncBroker):
         self._default_broker: Optional[AsyncBroker] = None
         self.decorator_class = SharedDecoratedTask
 
-    async def kick(self, message: TaskiqMessage) -> None:
+    async def kick(self, message: BrokerMessage) -> None:
         """
         Shared broker cannot kick tasks.
 
@@ -62,7 +62,7 @@ class AsyncSharedBroker(AsyncBroker):
         """
         self._default_broker = new_broker
 
-    async def listen(self) -> AsyncGenerator[TaskiqMessage, None]:  # type: ignore
+    async def listen(self) -> AsyncGenerator[BrokerMessage, None]:  # type: ignore
         """
         Shared broker cannot listen to tasks.
 

@@ -1,14 +1,28 @@
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, Generic, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Coroutine,
+    Dict,
+    Generic,
+    TypeVar,
+    overload,
+)
+
+from typing_extensions import ParamSpec
 
 from taskiq.kicker import AsyncKicker
 from taskiq.task import AsyncTaskiqTask
-from taskiq.types_helpers import T_, FuncParams_, ReturnType_
 
 if TYPE_CHECKING:
     from taskiq.abc.broker import AsyncBroker
 
+_T = TypeVar("_T")  # noqa: WPS111
+_FuncParams = ParamSpec("_FuncParams")
+_ReturnType = TypeVar("_ReturnType")
 
-class AsyncTaskiqDecoratedTask(Generic[FuncParams_, ReturnType_]):
+
+class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
     """
     Class for all task functions.
 
@@ -28,7 +42,7 @@ class AsyncTaskiqDecoratedTask(Generic[FuncParams_, ReturnType_]):
         self,
         broker: "AsyncBroker",
         task_name: str,
-        original_func: Callable[FuncParams_, ReturnType_],
+        original_func: Callable[_FuncParams, _ReturnType],
         labels: Dict[str, Any],
     ) -> None:
         self.broker = broker
@@ -40,31 +54,31 @@ class AsyncTaskiqDecoratedTask(Generic[FuncParams_, ReturnType_]):
     # your IDE resolve correct docs for it.
     def __call__(  # noqa: D102
         self,
-        *args: FuncParams_.args,
-        **kwargs: FuncParams_.kwargs,
-    ) -> ReturnType_:
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> _ReturnType:
         return self.original_func(*args, **kwargs)
 
     @overload
     async def kiq(  # noqa: D102
-        self: "AsyncTaskiqDecoratedTask[FuncParams_, Coroutine[Any, Any, T_]]",
-        *args: FuncParams_.args,
-        **kwargs: FuncParams_.kwargs,
-    ) -> AsyncTaskiqTask[T_]:
+        self: "AsyncTaskiqDecoratedTask[_FuncParams, Coroutine[Any, Any, _T]]",
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> AsyncTaskiqTask[_T]:
         ...
 
     @overload
     async def kiq(  # noqa: D102
-        self: "AsyncTaskiqDecoratedTask[FuncParams_, ReturnType_]",
-        *args: FuncParams_.args,
-        **kwargs: FuncParams_.kwargs,
-    ) -> AsyncTaskiqTask[ReturnType_]:
+        self: "AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]",
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> AsyncTaskiqTask[_ReturnType]:
         ...
 
     async def kiq(
         self,
-        *args: FuncParams_.args,
-        **kwargs: FuncParams_.kwargs,
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
     ) -> Any:
         """
         This method sends function call over the network.
@@ -79,7 +93,7 @@ class AsyncTaskiqDecoratedTask(Generic[FuncParams_, ReturnType_]):
         """
         return await self.kicker().kiq(*args, **kwargs)
 
-    def kicker(self) -> AsyncKicker[FuncParams_, ReturnType_]:
+    def kicker(self) -> AsyncKicker[_FuncParams, _ReturnType]:
         """
         This function returns kicker object.
 

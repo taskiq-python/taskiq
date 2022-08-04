@@ -1,26 +1,27 @@
 import asyncio
 from time import time
-from typing import TYPE_CHECKING, Generic
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 from taskiq.exceptions import (
     ResultGetError,
     ResultIsReadyError,
     TaskiqResultTimeoutError,
 )
-from taskiq.types_helpers import ReturnType_
 
 if TYPE_CHECKING:
     from taskiq.abc.result_backend import AsyncResultBackend
     from taskiq.result import TaskiqResult
 
+_ReturnType = TypeVar("_ReturnType")
 
-class AsyncTaskiqTask(Generic[ReturnType_]):
+
+class AsyncTaskiqTask(Generic[_ReturnType]):
     """AsyncTask for AsyncResultBackend."""
 
     def __init__(
         self,
         task_id: str,
-        result_backend: "AsyncResultBackend[ReturnType_]",
+        result_backend: "AsyncResultBackend[_ReturnType]",
     ) -> None:
         self.task_id = task_id
         self.result_backend = result_backend
@@ -38,7 +39,7 @@ class AsyncTaskiqTask(Generic[ReturnType_]):
         except Exception as exc:
             raise ResultIsReadyError() from exc
 
-    async def get_result(self, with_logs: bool = False) -> "TaskiqResult[ReturnType_]":
+    async def get_result(self, with_logs: bool = False) -> "TaskiqResult[_ReturnType]":
         """
         Get result of a task from result backend.
 
@@ -61,7 +62,7 @@ class AsyncTaskiqTask(Generic[ReturnType_]):
         check_interval: float = 1.0,
         timeout: float = 5.0,
         with_logs: bool = False,
-    ) -> "TaskiqResult[ReturnType_]":
+    ) -> "TaskiqResult[_ReturnType]":
         """
         Waits until result is ready.
 

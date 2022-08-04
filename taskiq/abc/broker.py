@@ -1,13 +1,29 @@
 from abc import ABC, abstractmethod
 from functools import wraps
 from logging import getLogger
-from typing import Any, AsyncGenerator, Callable, Dict, Optional, Union, overload
+from typing import (
+    Any,
+    AsyncGenerator,
+    Callable,
+    Dict,
+    Optional,
+    TypeVar,
+    Union,
+    overload,
+)
 
+from typing_extensions import ParamSpec
+
+from taskiq.abc.plugins.formatter import TaskiqFormatter
 from taskiq.abc.result_backend import AsyncResultBackend
 from taskiq.decor import AsyncTaskiqDecoratedTask
-from taskiq.message import TaskiqMessage
+from taskiq.message import BrokerMessage
+from taskiq.plugins.json_formatter import JSONFormatter
 from taskiq.result_backends.dummy import DummyResultBackend
-from taskiq.types_helpers import T_, FuncParams_, ReturnType_
+
+_T = TypeVar("_T")  # noqa: WPS111
+_FuncParams = ParamSpec("_FuncParams")
+_ReturnType = TypeVar("_ReturnType")
 
 logger = getLogger("taskiq")
 
@@ -25,13 +41,14 @@ class AsyncBroker(ABC):
 
     def __init__(
         self,
-        result_backend: Optional[AsyncResultBackend[T_]] = None,
+        result_backend: Optional[AsyncResultBackend[_T]] = None,
     ) -> None:
         if result_backend is None:
             result_backend = DummyResultBackend()
         self.result_backend = result_backend
         self.is_worker_process = False
         self.decorator_class = AsyncTaskiqDecoratedTask
+        self.formatter: TaskiqFormatter = JSONFormatter()
 
     async def startup(self) -> None:
         """Do something when starting broker."""
@@ -47,7 +64,7 @@ class AsyncBroker(ABC):
     @abstractmethod
     async def kick(
         self,
-        message: TaskiqMessage,
+        message: BrokerMessage,
     ) -> None:
         """
         This method is used to kick tasks out from current program.
@@ -59,7 +76,7 @@ class AsyncBroker(ABC):
         """
 
     @abstractmethod
-    def listen(self) -> AsyncGenerator[TaskiqMessage, None]:
+    def listen(self) -> AsyncGenerator[BrokerMessage, None]:
         """
         This function listens to new messages and yields them.
 
@@ -73,8 +90,8 @@ class AsyncBroker(ABC):
     @overload
     def task(
         self,
-        task_name: Callable[FuncParams_, ReturnType_],
-    ) -> AsyncTaskiqDecoratedTask[FuncParams_, ReturnType_]:
+        task_name: Callable[_FuncParams, _ReturnType],
+    ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]:
         ...
 
     @overload
@@ -83,8 +100,8 @@ class AsyncBroker(ABC):
         task_name: Optional[str] = None,
         **labels: Union[str, int],
     ) -> Callable[
-        [Callable[FuncParams_, ReturnType_]],
-        AsyncTaskiqDecoratedTask[FuncParams_, ReturnType_],
+        [Callable[_FuncParams, _ReturnType]],
+        AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType],
     ]:
         ...
 
@@ -120,12 +137,12 @@ class AsyncBroker(ABC):
             inner_labels: Dict[str, Union[str, int]],
             inner_task_name: Optional[str] = None,
         ) -> Callable[
-            [Callable[FuncParams_, ReturnType_]],
-            AsyncTaskiqDecoratedTask[FuncParams_, ReturnType_],
+            [Callable[_FuncParams, _ReturnType]],
+            AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType],
         ]:
             def inner(
-                func: Callable[FuncParams_, ReturnType_],
-            ) -> AsyncTaskiqDecoratedTask[FuncParams_, ReturnType_]:
+                func: Callable[_FuncParams, _ReturnType],
+            ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]:
                 nonlocal inner_task_name  # noqa: WPS420
                 if inner_task_name is None:
                     inner_task_name = (  # noqa: WPS442
