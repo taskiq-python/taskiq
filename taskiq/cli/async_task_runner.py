@@ -79,7 +79,7 @@ def parse_params(  # noqa: C901
                 continue
             try:
                 message.args[argnum] = parse_obj_as(annot, value)
-            except (ValueError, RuntimeError) as exc:  # noqa: WPS440
+            except (ValueError, RuntimeError) as exc:
                 logger.debug(exc, exc_info=True)
 
 
@@ -266,19 +266,44 @@ async def async_listen_messages(  # noqa: C901, WPS210, WPS213
             "Function for task %s is resolved. Executing...",
             message.task_name,
         )
+        try:
+            taskiq_msg = broker.formatter.loads(message=message)
+        except Exception as exc:
+            logger.warning(
+                "Cannot parse message: %s. Skipping execution.\n %s",
+                message,
+                exc,
+                exc_info=True,
+            )
+            continue
+        for middleware in broker.middlewares:
+            pre_ex_res = middleware.pre_execute(
+                taskiq_msg,
+                broker.available_tasks[message.task_name].labels,
+            )
+            if inspect.isawaitable(pre_ex_res):
+                taskiq_msg = await pre_ex_res
+            else:
+                taskiq_msg = pre_ex_res  # type: ignore
         result = await run_task(
             broker.available_tasks[message.task_name].original_func,
             task_signatures.get(message.task_name),
-            message,
+            taskiq_msg,
             cli_args.log_collector_format,
             executor,
         )
+        for middleware in broker.middlewares:
+            post_ex_res = middleware.post_execute(
+                result,
+                broker.available_tasks[message.task_name].labels,
+            )
+            if inspect.isawaitable(post_ex_res):
+                await post_ex_res
         try:
             await broker.result_backend.set_result(message.task_id, result)
         except Exception as exc:
             logger.exception(
-                "Can't set result in %s result backend: \n%s",
-                broker.result_backend.__class__.__name__,
+                "Can't set result in result backend. Cause: %s",
                 exc,
                 exc_info=True,
             )

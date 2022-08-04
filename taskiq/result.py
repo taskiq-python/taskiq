@@ -1,14 +1,14 @@
-from typing import Generic, Optional
+from typing import Generic, Optional, TypeVar
 
 from pydantic.generics import GenericModel
 
-from taskiq.types_helpers import ReturnType_
+_ReturnType = TypeVar("_ReturnType")
 
 
-class TaskiqResult(GenericModel, Generic[ReturnType_]):
+class TaskiqResult(GenericModel, Generic[_ReturnType]):
     """Result of a remote task invocation."""
 
     is_err: bool
     log: Optional[str]
-    return_value: ReturnType_
+    return_value: _ReturnType
     execution_time: float

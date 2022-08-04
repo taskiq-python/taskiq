@@ -8,6 +8,8 @@ docstring_style=sphinx
 ignore =
   ; Found `%` string formatting
   WPS323,
+  ; Found block variable overlap.
+  WPS440,
   ; Found multi-line function type annotation
   WPS320,
   ; Found statement that has no effect

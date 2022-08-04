@@ -17,3 +17,12 @@ class TaskiqMessage(BaseModel):
     meta: Dict[str, str]
     args: List[Any]
     kwargs: Dict[str, Any]
+
+
+class BrokerMessage(BaseModel):
+    """Format of messages for brokers."""
+
+    task_id: str
+    task_name: str
+    message: str
+    headers: Dict[str, Any]

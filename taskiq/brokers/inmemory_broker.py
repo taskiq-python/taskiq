@@ -7,7 +7,7 @@ from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.result_backend import AsyncResultBackend, TaskiqResult
 from taskiq.cli.async_task_runner import run_task
 from taskiq.exceptions import TaskiqError
-from taskiq.message import TaskiqMessage
+from taskiq.message import BrokerMessage
 
 _ReturnType = TypeVar("_ReturnType")
 
@@ -101,7 +101,7 @@ class InMemoryBroker(AsyncBroker):
             logs_format = "%(levelname)s %(message)s"
         self.logs_format = logs_format
 
-    async def kick(self, message: TaskiqMessage) -> None:
+    async def kick(self, message: BrokerMessage) -> None:
         """
         Kicking task.
 
@@ -111,18 +111,19 @@ class InMemoryBroker(AsyncBroker):
         :raises TaskiqError: if someone wants to kick unknown task.
         """
         target_task = self.available_tasks.get(message.task_name)
+        taskiq_message = self.formatter.loads(message=message)
         if target_task is None:
             raise TaskiqError("Unknown task.")
         result = await run_task(
             target=target_task.original_func,
             signature=inspect.signature(target_task.original_func),
-            message=message,
+            message=taskiq_message,
             log_collector_format=self.logs_format,
             executor=self.executor,
         )
         await self.result_backend.set_result(message.task_id, result)
 
-    async def listen(self) -> AsyncGenerator[TaskiqMessage, None]:  # type: ignore
+    async def listen(self) -> AsyncGenerator[BrokerMessage, None]:  # type: ignore
         """
         Inmemory broker cannot listen.
 

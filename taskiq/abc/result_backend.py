@@ -1,12 +1,12 @@
 from abc import ABC, abstractmethod
-from typing import Generic
+from typing import Generic, TypeVar
 
 from taskiq.result import TaskiqResult
-from taskiq.task import AsyncTaskiqTask
-from taskiq.types_helpers import ReturnType_
+
+_ReturnType = TypeVar("_ReturnType")
 
 
-class AsyncResultBackend(ABC, Generic[ReturnType_]):
+class AsyncResultBackend(ABC, Generic[_ReturnType]):
     """Async result backend."""
 
     async def startup(self) -> None:
@@ -15,21 +15,8 @@ class AsyncResultBackend(ABC, Generic[ReturnType_]):
     async def shutdown(self) -> None:
         """Do something on shutdown."""
 
-    def generate_task(self, task_id: str) -> "AsyncTaskiqTask[ReturnType_]":
-        """
-        Generates new task.
-
-        This function creates new AsyncTaskiqTask
-        that returned to client after calling kiq
-        method.
-
-        :param task_id: id of a task to save.
-        :return: task object.
-        """
-        return AsyncTaskiqTask(task_id=task_id, result_backend=self)
-
     @abstractmethod
-    async def set_result(self, task_id: str, result: TaskiqResult[ReturnType_]) -> None:
+    async def set_result(self, task_id: str, result: TaskiqResult[_ReturnType]) -> None:
         """
         Saves result to the result backend.
 
@@ -55,7 +42,7 @@ class AsyncResultBackend(ABC, Generic[ReturnType_]):
         self,
         task_id: str,
         with_logs: bool = False,
-    ) -> TaskiqResult[ReturnType_]:
+    ) -> TaskiqResult[_ReturnType]:
         """
         Gets result from the task.
 
