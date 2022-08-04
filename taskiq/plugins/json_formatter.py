@@ -1,6 +1,6 @@
 from typing import Any, Dict
 
-from taskiq.abc.plugins.formatter import TaskiqFormatter
+from taskiq.abc.formatter import TaskiqFormatter
 from taskiq.message import BrokerMessage, TaskiqMessage
 
 

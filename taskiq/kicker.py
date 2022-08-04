@@ -1,6 +1,16 @@
 from dataclasses import asdict, is_dataclass
+from inspect import isawaitable
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, Coroutine, Dict, Generic, TypeVar, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Coroutine,
+    Dict,
+    Generic,
+    TypeVar,
+    Union,
+    overload,
+)
 from uuid import uuid4
 
 from pydantic import BaseModel
@@ -27,38 +37,27 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         self,
         task_name: str,
         broker: "AsyncBroker",
-        labels: Dict[str, Any],
+        labels: Dict[
+            str,
+            Union[
+                str,
+                int,
+                float,
+            ],
+        ],
     ) -> None:
         self.task_name = task_name
         self.broker = broker
         self.labels = labels
 
-    def with_label(
-        self,
-        label_name: str,
-        value: Any,
-    ) -> "AsyncKicker[_FuncParams, _ReturnType]":
-        """
-        Update one single label.
-
-        This method is used to update
-        task's labels before sending.
-
-        :param label_name: name of the label to update.
-        :param value: label's value.
-        :return: kicker object with new labels.
-        """
-        self.labels[label_name] = value
-        return self
-
     def with_labels(
         self,
-        labels: Dict[str, Any],
+        **labels: Union[str, int, float],
     ) -> "AsyncKicker[_FuncParams, _ReturnType]":
         """
         Update function's labels before sending.
 
-        :param labels: dict with new labels.
+        :param labels: new labels.
         :return: kicker with new labels.
         """
         self.labels.update(labels)
@@ -96,7 +95,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
     ) -> AsyncTaskiqTask[_ReturnType]:
         ...
 
-    async def kiq(
+    async def kiq(  # noqa: C901
         self,
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
@@ -118,11 +117,24 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
             f"Kicking {self.task_name} with args={args} and kwargs={kwargs}.",
         )
         message = self._prepare_message(*args, **kwargs)
+        for middleware in self.broker.middlewares:
+            pre_send_res = middleware.pre_send(message, self.labels)
+            if isawaitable(pre_send_res):
+                message = await pre_send_res
+            else:
+                message = pre_send_res  # type: ignore
         try:
             await self.broker.kick(self.broker.formatter.dumps(message, self.labels))
         except Exception as exc:
             raise SendTaskError() from exc
-        return self.broker.result_backend.generate_task(message.task_id)
+        for middleware in self.broker.middlewares:
+            post_send_res = middleware.post_send(message, self.labels)
+            if isawaitable(post_send_res):
+                await post_send_res
+        return AsyncTaskiqTask(
+            task_id=message.task_id,
+            result_backend=self.broker.result_backend,
+        )
 
     @classmethod
     def _prepare_arg(cls, arg: Any) -> Any:

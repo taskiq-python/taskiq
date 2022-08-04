@@ -21,15 +21,9 @@ class SharedDecoratedTask(AsyncTaskiqDecoratedTask[_Params, _ReturnType]):
         our shared broker and send task to it, instead
         of shared_broker.
 
-        :raises TaskiqError: if _default_broker is not set.
         :return: new kicker.
         """
-        broker = getattr(self.broker, "_default_broker", None)
-        if broker is None:
-            raise TaskiqError(
-                "You cannot use kiq directly on shared task "
-                "without setting the default_broker.",
-            )
+        broker = getattr(self.broker, "_default_broker", None) or self.broker
         return AsyncKicker(
             task_name=self.task_name,
             broker=broker,
@@ -45,15 +39,6 @@ class AsyncSharedBroker(AsyncBroker):
         self._default_broker: Optional[AsyncBroker] = None
         self.decorator_class = SharedDecoratedTask
 
-    async def kick(self, message: BrokerMessage) -> None:
-        """
-        Shared broker cannot kick tasks.
-
-        :param message: message to send.
-        :raises TaskiqError: if called.
-        """
-        raise TaskiqError("Shared broker cannot kick tasks.")
-
     def default_broker(self, new_broker: AsyncBroker) -> None:
         """
         Updates default broker.
@@ -61,6 +46,18 @@ class AsyncSharedBroker(AsyncBroker):
         :param new_broker: new async broker to kick tasks with.
         """
         self._default_broker = new_broker
+
+    async def kick(self, message: BrokerMessage) -> None:
+        """
+        Shared broker cannot kick tasks.
+
+        :param message: message to send.
+        :raises TaskiqError: if called.
+        """
+        raise TaskiqError(
+            "You cannot use kiq directly on shared task "
+            "without setting the default_broker.",
+        )
 
     async def listen(self) -> AsyncGenerator[BrokerMessage, None]:  # type: ignore
         """

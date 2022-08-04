@@ -1,11 +1,13 @@
 from abc import ABC, abstractmethod
 from functools import wraps
 from logging import getLogger
-from typing import (
+from typing import (  # noqa: WPS235
+    TYPE_CHECKING,
     Any,
     AsyncGenerator,
     Callable,
     Dict,
+    List,
     Optional,
     TypeVar,
     Union,
@@ -14,12 +16,15 @@ from typing import (
 
 from typing_extensions import ParamSpec
 
-from taskiq.abc.plugins.formatter import TaskiqFormatter
-from taskiq.abc.result_backend import AsyncResultBackend
 from taskiq.decor import AsyncTaskiqDecoratedTask
 from taskiq.message import BrokerMessage
 from taskiq.plugins.json_formatter import JSONFormatter
 from taskiq.result_backends.dummy import DummyResultBackend
+
+if TYPE_CHECKING:
+    from taskiq.abc.formatter import TaskiqFormatter
+    from taskiq.abc.middleware import TaskiqMiddleware
+    from taskiq.abc.result_backend import AsyncResultBackend
 
 _T = TypeVar("_T")  # noqa: WPS111
 _FuncParams = ParamSpec("_FuncParams")
@@ -41,14 +46,28 @@ class AsyncBroker(ABC):
 
     def __init__(
         self,
-        result_backend: Optional[AsyncResultBackend[_T]] = None,
+        result_backend: "Optional[AsyncResultBackend[_T]]" = None,
     ) -> None:
         if result_backend is None:
             result_backend = DummyResultBackend()
+        self.middlewares: "List[TaskiqMiddleware]" = []
         self.result_backend = result_backend
         self.is_worker_process = False
         self.decorator_class = AsyncTaskiqDecoratedTask
-        self.formatter: TaskiqFormatter = JSONFormatter()
+        self.formatter: "TaskiqFormatter" = JSONFormatter()
+
+    def add_middlewares(self, middlewares: "List[TaskiqMiddleware]") -> None:
+        """
+        Add a list of middlewares.
+
+        You should call this method to set middlewares,
+        since it saves current broker in all middlewares.
+
+        :param middlewares: list of middlewares.
+        """
+        for middleware in middlewares:
+            middleware.set_broker(self)
+            self.middlewares.append(middleware)
 
     async def startup(self) -> None:
         """Do something when starting broker."""

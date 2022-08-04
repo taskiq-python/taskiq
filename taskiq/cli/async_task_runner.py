@@ -276,6 +276,15 @@ async def async_listen_messages(  # noqa: C901, WPS210, WPS213
                 exc_info=True,
             )
             continue
+        for middleware in broker.middlewares:
+            pre_ex_res = middleware.pre_execute(
+                taskiq_msg,
+                broker.available_tasks[message.task_name].labels,
+            )
+            if inspect.isawaitable(pre_ex_res):
+                taskiq_msg = await pre_ex_res
+            else:
+                taskiq_msg = pre_ex_res  # type: ignore
         result = await run_task(
             broker.available_tasks[message.task_name].original_func,
             task_signatures.get(message.task_name),
@@ -283,6 +292,13 @@ async def async_listen_messages(  # noqa: C901, WPS210, WPS213
             cli_args.log_collector_format,
             executor,
         )
+        for middleware in broker.middlewares:
+            post_ex_res = middleware.post_execute(
+                result,
+                broker.available_tasks[message.task_name].labels,
+            )
+            if inspect.isawaitable(post_ex_res):
+                await post_ex_res
         try:
             await broker.result_backend.set_result(message.task_id, result)
         except Exception as exc:
