@@ -20,7 +20,7 @@ class TaskiqArgs:
 
     broker: str
     tasks_pattern: str
-    modules: list[str]
+    modules: List[str]
     fs_discover: bool
     log_level: str
     workers: int

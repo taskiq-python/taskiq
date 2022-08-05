@@ -98,7 +98,12 @@ class InMemoryBroker(AsyncBroker):
         self.executor = ThreadPoolExecutor(max_workers=sync_tasks_pool_size)
         self.cast_types = cast_types
         if logs_format is None:
-            logs_format = "%(levelname)s %(message)s"
+            logs_format = (
+                "[%(asctime)s]"
+                "[%(levelname)-7s]"
+                "[%(module)s:%(funcName)s:%(lineno)d] "
+                "%(message)s"
+            )
         self.logs_format = logs_format
 
     async def kick(self, message: BrokerMessage) -> None:
