@@ -191,32 +191,50 @@ def exit_process(task: asyncio.Task[Any]) -> NoReturn:
     for running_task in asyncio.all_tasks(loop):
         running_task.cancel()
 
-    logger.info("Killing worker process.")
+    logger.info("Worker process killed.")
     sys.exit(exitcode)
 
 
-def signal_handler(broker: AsyncBroker) -> None:
+def signal_handlera(broker: AsyncBroker) -> Callable[[int, Any], None]:
     """
-    Exit signal handler.
+    Signal handler.
 
-    This signal handler
-    calls _close_broker and after
-    the task is done it exits.
+    This function is used to generate
+    real signal handler using closures.
+
+    It takes current broker as an argument
+    and returns function that shuts it down.
 
     :param broker: current broker.
+    :returns: signal handler function.
     """
-    if getattr(broker, "_is_shutting_down", False):
-        # We're already shutting down the broker.
-        return
 
-    # We set this flag to not call this method twice.
-    # Since we add an asynchronous task in loop
-    # It can wait for execution for some time.
-    # We want to execute shutdown only once. Otherwise
-    # it would give us Undefined Behaviour.
-    broker._is_shutting_down = True  # type: ignore  # noqa: WPS437
-    task = asyncio.create_task(broker.shutdown())
-    task.add_done_callback(exit_process)
+    def _handler(signum: int, _frame: Any) -> None:
+        """
+        Exit signal handler.
+
+        This signal handler
+        calls shutdown for broker and after
+        the task is done it exits process with 0 status code.
+
+        :param signum: received signal.
+        :param _frame: current execution frame.
+        """
+        if getattr(broker, "_is_shutting_down", False):
+            # We're already shutting down the broker.
+            return
+
+        # We set this flag to not call this method twice.
+        # Since we add an asynchronous task in loop
+        # It can wait for execution for some time.
+        # We want to execute shutdown only once. Otherwise
+        # it would give us Undefined Behaviour.
+        broker._is_shutting_down = True  # type: ignore  # noqa: WPS437
+        logger.info(f"Got {signum} signal. Shutting down worker process.")
+        task = asyncio.create_task(broker.shutdown())
+        task.add_done_callback(exit_process)
+
+    return _handler
 
 
 async def async_listen_messages(  # noqa: C901, WPS210, WPS213
@@ -232,16 +250,13 @@ async def async_listen_messages(  # noqa: C901, WPS210, WPS213
     :param broker: broker to listen to.
     :param cli_args: CLI arguments for worker.
     """
-    loop = asyncio.get_event_loop()
-    loop.add_signal_handler(
+    signal.signal(
         signal.SIGTERM,
-        signal_handler,
-        broker,
+        signal_handlera(broker),
     )
-    loop.add_signal_handler(
+    signal.signal(
         signal.SIGINT,
-        signal_handler,
-        broker,
+        signal_handlera(broker),
     )
 
     logger.info("Runing startup event.")
