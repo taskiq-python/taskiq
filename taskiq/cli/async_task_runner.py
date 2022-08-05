@@ -6,11 +6,12 @@ import sys
 from concurrent.futures import Executor, ThreadPoolExecutor
 from logging import getLogger
 from time import time
-from typing import Any, Callable, Dict, NoReturn, Optional
+from typing import Any, Callable, Dict, List, NoReturn, Optional
 
 from pydantic import parse_obj_as
 
 from taskiq.abc.broker import AsyncBroker
+from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.cli.args import TaskiqArgs
 from taskiq.cli.log_collector import log_collector
 from taskiq.message import TaskiqMessage
@@ -97,12 +98,13 @@ def run_sync(target: Callable[..., Any], message: TaskiqMessage) -> Any:
     return target(*message.args, **message.kwargs)
 
 
-async def run_task(  # noqa: WPS210
+async def run_task(  # noqa: C901, WPS210, WPS211
     target: Callable[..., Any],
     signature: Optional[inspect.Signature],
     message: TaskiqMessage,
     log_collector_format: str,
     executor: Optional[Executor] = None,
+    middlewares: Optional[List[TaskiqMiddleware]] = None,
 ) -> TaskiqResult[Any]:
     """
     This function actually executes functions.
@@ -123,12 +125,16 @@ async def run_task(  # noqa: WPS210
     :param message: received message.
     :param log_collector_format: Log format in wich logs are collected.
     :param executor: executor to run sync tasks.
+    :param middlewares: list of broker's middlewares in case of errors.
     :return: result of execution.
     """
+    if middlewares is None:
+        middlewares = []
+
     loop = asyncio.get_running_loop()
     logs = io.StringIO()
-    is_err = False
     returned = None
+    found_exception = None
     # Captures function's logs.
     parse_params(signature, message)
     with log_collector(logs, log_collector_format):
@@ -144,7 +150,7 @@ async def run_task(  # noqa: WPS210
                     message,
                 )
         except Exception as exc:
-            is_err = True
+            found_exception = exc
             logger.error(
                 "Exception found while executing function: %s",
                 exc,
@@ -154,12 +160,23 @@ async def run_task(  # noqa: WPS210
 
     raw_logs = logs.getvalue()
     logs.close()
-    return TaskiqResult(
-        is_err=is_err,
+    result: "TaskiqResult[Any]" = TaskiqResult(
+        is_err=found_exception is not None,
         log=raw_logs,
         return_value=returned,
         execution_time=execution_time,
     )
+    if found_exception is not None:
+        for middleware in middlewares:
+            err_handler = middleware.on_error(
+                message,
+                result,
+                found_exception,
+            )
+            if inspect.isawaitable(err_handler):
+                await err_handler
+
+    return result
 
 
 def exit_process(task: "asyncio.Task[Any]") -> NoReturn:
@@ -301,11 +318,12 @@ async def async_listen_messages(  # noqa: C901, WPS210, WPS213
             else:
                 taskiq_msg = pre_ex_res  # type: ignore
         result = await run_task(
-            broker.available_tasks[message.task_name].original_func,
-            task_signatures.get(message.task_name),
-            taskiq_msg,
-            cli_args.log_collector_format,
-            executor,
+            target=broker.available_tasks[message.task_name].original_func,
+            signature=task_signatures.get(message.task_name),
+            message=taskiq_msg,
+            log_collector_format=cli_args.log_collector_format,
+            executor=executor,
+            middlewares=broker.middlewares,
         )
         for middleware in broker.middlewares:
             post_ex_res = middleware.post_execute(

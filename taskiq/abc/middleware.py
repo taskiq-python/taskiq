@@ -83,3 +83,17 @@ class TaskiqMiddleware:
         :param result: result of execution for current task.
         :param labels: task's labels. Without user-supplied labels.
         """
+
+    def on_error(
+        self,
+        message: "TaskiqMessage",
+        result: "TaskiqResult[Any]",
+        exception: Exception,
+    ) -> "Union[None, Coroutine[Any, Any, None]]":
+        """
+        This function is called when exception is found.
+
+        :param message: incoming message.
+        :param result: returned value.
+        :param exception: found exception.
+        """
