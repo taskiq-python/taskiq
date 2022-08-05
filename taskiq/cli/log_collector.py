@@ -1,10 +1,14 @@
 import logging
 import sys
-from contextlib import AbstractContextManager
-from typing import Any, List, TextIO
+from contextlib import contextmanager
+from typing import Generator, List, TextIO
 
 
-class LogsCollector(AbstractContextManager[TextIO]):
+@contextmanager
+def log_collector(
+    new_target: TextIO,
+    custom_format: str,
+) -> "Generator[TextIO, None, None]":
     """
     Context manager to collect logs.
 
@@ -15,27 +19,29 @@ class LogsCollector(AbstractContextManager[TextIO]):
     It can be used like this:
 
     >>> logs = io.StringIO()
-    >>> with LogsCollector(logs):
+    >>> with log_collector(logs, "%(levelname)s %(message)s"):
     >>>     print("A")
     >>>
     >>> print(f"Collected logs: {logs.get_value()}")
+
+    :param new_target: new target for logs. All
+        logs are written in new_target.
+    :param custom_format: custom format for
+        collected logging calls.
+    :yields: new target.
     """
+    old_targets: "List[TextIO]" = []
+    log_handler = logging.StreamHandler(new_target)
+    log_handler.setFormatter(logging.Formatter(custom_format))
 
-    def __init__(self, new_target: TextIO, custom_format: str):
-        self._new_target = new_target
-        self._old_targets: List[TextIO] = []
-        self._log_handler = logging.StreamHandler(new_target)
-        self._log_handler.setFormatter(logging.Formatter(custom_format))
+    old_targets.extend([sys.stdout, sys.stderr])
+    logging.root.addHandler(log_handler)
+    sys.stdout = new_target
+    sys.stderr = new_target
 
-    def __enter__(self) -> TextIO:
-        self._old_targets.append(sys.stdout)
-        self._old_targets.append(sys.stderr)
-        logging.root.addHandler(self._log_handler)
-        sys.stdout = self._new_target
-        sys.stderr = self._new_target
-        return self._new_target
-
-    def __exit__(self, *_args: Any, **_kwargs: Any) -> None:
-        sys.stderr = self._old_targets.pop()
-        sys.stdout = self._old_targets.pop()
-        logging.root.removeHandler(self._log_handler)
+    try:
+        yield new_target
+    finally:
+        sys.stderr = old_targets.pop()
+        sys.stdout = old_targets.pop()
+        logging.root.removeHandler(log_handler)

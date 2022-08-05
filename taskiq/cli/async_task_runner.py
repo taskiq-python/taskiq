@@ -12,7 +12,7 @@ from pydantic import parse_obj_as
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.cli.args import TaskiqArgs
-from taskiq.cli.log_collector import LogsCollector
+from taskiq.cli.log_collector import log_collector
 from taskiq.message import TaskiqMessage
 from taskiq.result import TaskiqResult
 
@@ -131,7 +131,7 @@ async def run_task(  # noqa: WPS210
     returned = None
     # Captures function's logs.
     parse_params(signature, message)
-    with LogsCollector(logs, log_collector_format):
+    with log_collector(logs, log_collector_format):
         start_time = time()
         try:
             if asyncio.iscoroutinefunction(target):
@@ -162,7 +162,7 @@ async def run_task(  # noqa: WPS210
     )
 
 
-def exit_process(task: asyncio.Task[Any]) -> NoReturn:
+def exit_process(task: "asyncio.Task[Any]") -> NoReturn:
     """
     This function exits from the current process.
 
