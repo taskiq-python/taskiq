@@ -1,11 +1,14 @@
 import asyncio
+import os
 import signal
+import sys
+from contextlib import contextmanager
 from importlib import import_module
 from logging import basicConfig, getLevelName, getLogger
 from multiprocessing import Process
 from pathlib import Path
 from time import sleep
-from typing import Any, List
+from typing import Any, Generator, List
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.cli.args import TaskiqArgs
@@ -39,6 +42,32 @@ def signal_handler(_signal: int, _frame: Any) -> None:
         process.join()
 
 
+@contextmanager
+def add_cwd_in_path() -> Generator[None, None, None]:
+    """
+    Adds current directory in python path.
+
+    This context manager adds current directory in sys.path,
+    so all python files are discoverable now, without installing
+    current project.
+
+    :yield: none
+    """
+    cwd = os.getcwd()
+    if cwd in sys.path:
+        yield
+    else:
+        logger.debug(f"Inserting {cwd} in sys.path")
+        sys.path.insert(0, cwd)
+        try:
+            yield
+        finally:
+            try:  # noqa: WPS505
+                sys.path.remove(cwd)
+            except ValueError:
+                logger.warning(f"Cannot remove '{cwd}' from sys.path")
+
+
 def import_broker(broker_spec: str) -> Any:
     """
     It parses broker spec and imports it.
@@ -50,7 +79,8 @@ def import_broker(broker_spec: str) -> Any:
     import_spec = broker_spec.split(":")
     if len(import_spec) != 2:
         raise ValueError("You should provide broker in `module:variable` format.")
-    module = import_module(import_spec[0])
+    with add_cwd_in_path():
+        module = import_module(import_spec[0])
     return getattr(module, import_spec[1])
 
 
@@ -63,7 +93,8 @@ def import_from_modules(modules: list[str]) -> None:
     for module in modules:
         try:
             logger.info(f"Importing tasks from module {module}")
-            import_module(module)
+            with add_cwd_in_path():
+                import_module(module)
         except ImportError:
             logger.warning(f"Cannot import {module}")
 

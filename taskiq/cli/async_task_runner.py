@@ -195,7 +195,7 @@ def exit_process(task: "asyncio.Task[Any]") -> NoReturn:
     sys.exit(exitcode)
 
 
-def signal_handlera(broker: AsyncBroker) -> Callable[[int, Any], None]:
+def signal_handler(broker: AsyncBroker) -> Callable[[int, Any], None]:
     """
     Signal handler.
 
@@ -252,11 +252,11 @@ async def async_listen_messages(  # noqa: C901, WPS210, WPS213
     """
     signal.signal(
         signal.SIGTERM,
-        signal_handlera(broker),
+        signal_handler(broker),
     )
     signal.signal(
         signal.SIGINT,
-        signal_handlera(broker),
+        signal_handler(broker),
     )
 
     logger.info("Runing startup event.")
