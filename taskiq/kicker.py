@@ -168,7 +168,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
             labels[label] = str(label_val)
 
         return TaskiqMessage(
-            task_id=self.broker.id_generator,
+            task_id=self.broker.id_generator(),
             task_name=self.task_name,
             labels=labels,
             args=formatted_args,
