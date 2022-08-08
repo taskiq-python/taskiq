@@ -1,12 +1,12 @@
 import inspect
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
-from typing import AsyncGenerator, Optional, TypeVar
+from typing import Any, AsyncGenerator, Callable, Optional, TypeVar
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.result_backend import AsyncResultBackend, TaskiqResult
 from taskiq.cli.async_task_runner import run_task
-from taskiq.exceptions import TaskiqError
+from taskiq.exceptions import ResultSetError, TaskiqError
 from taskiq.message import BrokerMessage
 
 _ReturnType = TypeVar("_ReturnType")
@@ -83,17 +83,22 @@ class InMemoryBroker(AsyncBroker):
     It's useful for local development, if you don't want to setup real broker.
     """
 
-    def __init__(
+    def __init__(  # noqa: WPS211
         self,
         sync_tasks_pool_size: int = 4,
         logs_format: Optional[str] = None,
         max_stored_results: int = 100,
         cast_types: bool = True,
+        result_backend: Optional[AsyncResultBackend[Any]] = None,
+        task_id_generator: Optional[Callable[[], str]] = None,
     ) -> None:
-        super().__init__(
-            InmemoryResultBackend(
+        if result_backend is None:
+            result_backend = InmemoryResultBackend(
                 max_stored_results=max_stored_results,
-            ),
+            )
+        super().__init__(
+            result_backend=result_backend,
+            task_id_generator=task_id_generator,
         )
         self.executor = ThreadPoolExecutor(max_workers=sync_tasks_pool_size)
         self.cast_types = cast_types
@@ -113,6 +118,8 @@ class InMemoryBroker(AsyncBroker):
         This method just executes given task.
 
         :param message: incomming message.
+
+        :raises ResultSetError: if cannot save results in result backend.
         :raises TaskiqError: if someone wants to kick unknown task.
         """
         target_task = self.available_tasks.get(message.task_name)
@@ -127,7 +134,10 @@ class InMemoryBroker(AsyncBroker):
             executor=self.executor,
             middlewares=self.middlewares,
         )
-        await self.result_backend.set_result(message.task_id, result)
+        try:
+            await self.result_backend.set_result(message.task_id, result)
+        except Exception as exc:
+            raise ResultSetError("Cannot set result.") from exc
 
     async def listen(self) -> AsyncGenerator[BrokerMessage, None]:  # type: ignore
         """

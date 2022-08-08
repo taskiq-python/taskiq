@@ -7,6 +7,21 @@ maintainers = ["Pavel Kirilin <win10@list.ru>"]
 readme = "README.md"
 repository = "https://github.com/taskiq-python/taskiq"
 license = "LICENSE"
+classifiers = [
+    "Typing :: Typed",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Utilities",
+    "Topic :: System :: Networking",
+    "Operating System :: OS Independent",
+]
+homepage = "https://github.com/taskiq-python/taskiq"
+keywords = ["taskiq", "tasks", "distributed", "async"]
 
 [tool.poetry.dependencies]
 python = "^3.7"
