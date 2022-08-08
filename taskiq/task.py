@@ -1,12 +1,14 @@
 import asyncio
+from abc import ABC, abstractmethod
 from time import time
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Coroutine, Generic, TypeVar, Union
 
 from taskiq.exceptions import (
     ResultGetError,
     ResultIsReadyError,
     TaskiqResultTimeoutError,
 )
+from taskiq.utils import run_sync
 
 if TYPE_CHECKING:
     from taskiq.abc.result_backend import AsyncResultBackend
@@ -15,7 +17,111 @@ if TYPE_CHECKING:
 _ReturnType = TypeVar("_ReturnType")
 
 
-class AsyncTaskiqTask(Generic[_ReturnType]):
+class _Task(ABC, Generic[_ReturnType]):
+    """TaskiqTask interface."""
+
+    @abstractmethod
+    def is_ready(self) -> Union[bool, Coroutine[Any, Any, bool]]:
+        """
+        Method to check wether result is ready.
+
+        :return: True if result is ready.
+        """
+
+    @abstractmethod
+    def get_result(  # noqa: WPS234
+        self,
+        with_logs: bool = False,
+    ) -> Union[
+        "TaskiqResult[_ReturnType]",
+        Coroutine[Any, Any, "TaskiqResult[_ReturnType]"],
+    ]:
+        """
+        Get actual execution result.
+
+        :param with_logs: wether you want to fetch logs.
+        :return: TaskiqResult.
+        """
+
+    @abstractmethod
+    def wait_result(  # noqa: WPS234
+        self,
+        check_interval: float = 0.2,
+        timeout: float = -1.0,
+        with_logs: bool = False,
+    ) -> Union[
+        "TaskiqResult[_ReturnType]",
+        Coroutine[Any, Any, "TaskiqResult[_ReturnType]"],
+    ]:
+        """
+        Wait for result to become ready and get it.
+
+        This function constantly checks wheter result is ready
+        and fetches it when it becomes available.
+
+        :param check_interval: how ofen availability is checked.
+        :param timeout: maximum amount of time it will wait
+            before raising TaskiqResultTimeoutError.
+        :param with_logs: whether you need to download logs.
+        :return: TaskiqResult.
+        """
+
+
+class SyncTaskiqTask(_Task[_ReturnType]):
+    """Sync wrapper over AsyncTaskiqTask."""
+
+    def __init__(self, async_task: "AsyncTaskiqTask[_ReturnType]") -> None:
+        self.async_task = async_task
+
+    def is_ready(self) -> bool:
+        """
+        Checks if task is completed.
+
+        :return: True if task is completed.
+        """
+        return run_sync(self.async_task.is_ready())
+
+    def get_result(self, with_logs: bool = False) -> "TaskiqResult[_ReturnType]":
+        """
+        Get result of a task from result backend.
+
+        :param with_logs: whether you want to fetch logs from worker.
+
+        :return: task's return value.
+        """
+        return run_sync(self.async_task.get_result(with_logs=with_logs))
+
+    def wait_result(
+        self,
+        check_interval: float = 0.2,
+        timeout: float = -1,
+        with_logs: bool = False,
+    ) -> "TaskiqResult[_ReturnType]":
+        """
+        Waits until result is ready.
+
+        This method just checks whether the task is
+        ready. And if it is it returns the result.
+
+        It may throw TaskiqResultTimeoutError if
+        task didn't became ready in provided
+        period of time.
+
+        :param check_interval: How often checks are performed.
+        :param timeout: timeout for the result.
+        :param with_logs: whether you want to fetch logs from worker.
+        :return: task's return value.
+        """
+        return run_sync(
+            self.async_task.wait_result(
+                check_interval=check_interval,
+                timeout=timeout,
+                with_logs=with_logs,
+            ),
+        )
+
+
+class AsyncTaskiqTask(_Task[_ReturnType]):
     """AsyncTask for AsyncResultBackend."""
 
     def __init__(
@@ -59,8 +165,8 @@ class AsyncTaskiqTask(Generic[_ReturnType]):
 
     async def wait_result(
         self,
-        check_interval: float = 1.0,
-        timeout: float = 5.0,
+        check_interval: float = 0.2,
+        timeout: float = -1.0,
         with_logs: bool = False,
     ) -> "TaskiqResult[_ReturnType]":
         """
@@ -83,6 +189,6 @@ class AsyncTaskiqTask(Generic[_ReturnType]):
         start_time = time()
         while not await self.is_ready():
             await asyncio.sleep(check_interval)
-            if time() - start_time > timeout:
+            if 0 < timeout < time() - start_time:
                 raise TaskiqResultTimeoutError()
         return await self.get_result(with_logs=with_logs)

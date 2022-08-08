@@ -16,6 +16,7 @@ from taskiq.cli.args import TaskiqArgs
 from taskiq.cli.log_collector import log_collector
 from taskiq.message import TaskiqMessage
 from taskiq.result import TaskiqResult
+from taskiq.utils import maybe_awaitable
 
 logger = getLogger("taskiq.worker")
 
@@ -168,13 +169,13 @@ async def run_task(  # noqa: C901, WPS210, WPS211
     )
     if found_exception is not None:
         for middleware in middlewares:
-            err_handler = middleware.on_error(
-                message,
-                result,
-                found_exception,
+            await maybe_awaitable(
+                middleware.on_error(
+                    message,
+                    result,
+                    found_exception,
+                ),
             )
-            if inspect.isawaitable(err_handler):
-                await err_handler
 
     return result
 
@@ -309,13 +310,12 @@ async def async_listen_messages(  # noqa: C901, WPS210, WPS213
             )
             continue
         for middleware in broker.middlewares:
-            pre_ex_res = middleware.pre_execute(
-                taskiq_msg,
+            taskiq_msg = await maybe_awaitable(
+                middleware.pre_execute(
+                    taskiq_msg,
+                ),
             )
-            if inspect.isawaitable(pre_ex_res):
-                taskiq_msg = await pre_ex_res
-            else:
-                taskiq_msg = pre_ex_res  # type: ignore
+
         result = await run_task(
             target=broker.available_tasks[message.task_name].original_func,
             signature=task_signatures.get(message.task_name),
@@ -325,9 +325,7 @@ async def async_listen_messages(  # noqa: C901, WPS210, WPS213
             middlewares=broker.middlewares,
         )
         for middleware in broker.middlewares:
-            post_ex_res = middleware.post_execute(taskiq_msg, result)
-            if inspect.isawaitable(post_ex_res):
-                await post_ex_res
+            await maybe_awaitable(middleware.post_execute(taskiq_msg, result))
         try:
             await broker.result_backend.set_result(message.task_id, result)
         except Exception as exc:

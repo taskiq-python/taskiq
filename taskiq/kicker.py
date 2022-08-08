@@ -1,5 +1,4 @@
 from dataclasses import asdict, is_dataclass
-from inspect import isawaitable
 from logging import getLogger
 from typing import (
     TYPE_CHECKING,
@@ -17,7 +16,8 @@ from typing_extensions import ParamSpec
 
 from taskiq.exceptions import SendTaskError
 from taskiq.message import TaskiqMessage
-from taskiq.task import AsyncTaskiqTask
+from taskiq.task import AsyncTaskiqTask, SyncTaskiqTask
+from taskiq.utils import maybe_awaitable, run_sync
 
 if TYPE_CHECKING:
     from taskiq.abc.broker import AsyncBroker
@@ -87,7 +87,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
     ) -> AsyncTaskiqTask[_ReturnType]:
         ...
 
-    async def kiq(  # noqa: C901
+    async def kiq(
         self,
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
@@ -110,23 +110,54 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         )
         message = self._prepare_message(*args, **kwargs)
         for middleware in self.broker.middlewares:
-            pre_send_res = middleware.pre_send(message)
-            if isawaitable(pre_send_res):
-                message = await pre_send_res
-            else:
-                message = pre_send_res  # type: ignore
+            message = await maybe_awaitable(middleware.pre_send(message))
+
         try:
             await self.broker.kick(self.broker.formatter.dumps(message))
         except Exception as exc:
             raise SendTaskError() from exc
+
         for middleware in self.broker.middlewares:
-            post_send_res = middleware.post_send(message)
-            if isawaitable(post_send_res):
-                await post_send_res
+            await maybe_awaitable(middleware.post_send(message))
+
         return AsyncTaskiqTask(
             task_id=message.task_id,
             result_backend=self.broker.result_backend,
         )
+
+    @overload
+    def kiq_sync(
+        self: "AsyncKicker[_FuncParams, Coroutine[Any, Any, _T]]",
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> SyncTaskiqTask[_T]:
+        ...
+
+    @overload
+    def kiq_sync(
+        self: "AsyncKicker[_FuncParams, _ReturnType]",
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> SyncTaskiqTask[_ReturnType]:
+        ...
+
+    def kiq_sync(
+        self,
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> Any:
+        """
+        This method sends function call over the network.
+
+        It just wraps async kiq call in run_sync
+        funcion.
+
+        :param args: function's arguments.
+        :param kwargs: function's key word arguments.
+
+        :returns: sync taskiq task.
+        """
+        return SyncTaskiqTask(run_sync(self.kiq(*args, **kwargs)))
 
     @classmethod
     def _prepare_arg(cls, arg: Any) -> Any:
