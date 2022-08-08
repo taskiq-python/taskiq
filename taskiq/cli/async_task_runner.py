@@ -311,7 +311,6 @@ async def async_listen_messages(  # noqa: C901, WPS210, WPS213
         for middleware in broker.middlewares:
             pre_ex_res = middleware.pre_execute(
                 taskiq_msg,
-                broker.available_tasks[message.task_name].labels,
             )
             if inspect.isawaitable(pre_ex_res):
                 taskiq_msg = await pre_ex_res
@@ -326,10 +325,7 @@ async def async_listen_messages(  # noqa: C901, WPS210, WPS213
             middlewares=broker.middlewares,
         )
         for middleware in broker.middlewares:
-            post_ex_res = middleware.post_execute(
-                result,
-                broker.available_tasks[message.task_name].labels,
-            )
+            post_ex_res = middleware.post_execute(taskiq_msg, result)
             if inspect.isawaitable(post_ex_res):
                 await post_ex_res
         try:
