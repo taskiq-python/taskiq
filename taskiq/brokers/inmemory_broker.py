@@ -125,6 +125,7 @@ class InMemoryBroker(AsyncBroker):
             message=taskiq_message,
             log_collector_format=self.logs_format,
             executor=self.executor,
+            middlewares=self.middlewares,
         )
         await self.result_backend.set_result(message.task_id, result)
 

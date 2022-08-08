@@ -11,7 +11,6 @@ from typing import (
     Union,
     overload,
 )
-from uuid import uuid4
 
 from pydantic import BaseModel
 from typing_extensions import ParamSpec
@@ -37,14 +36,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         self,
         task_name: str,
         broker: "AsyncBroker",
-        labels: Dict[
-            str,
-            Union[
-                str,
-                int,
-                float,
-            ],
-        ],
+        labels: Dict[str, Any],
     ) -> None:
         self.task_name = task_name
         self.broker = broker
@@ -118,17 +110,17 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         )
         message = self._prepare_message(*args, **kwargs)
         for middleware in self.broker.middlewares:
-            pre_send_res = middleware.pre_send(message, self.labels)
+            pre_send_res = middleware.pre_send(message)
             if isawaitable(pre_send_res):
                 message = await pre_send_res
             else:
                 message = pre_send_res  # type: ignore
         try:
-            await self.broker.kick(self.broker.formatter.dumps(message, self.labels))
+            await self.broker.kick(self.broker.formatter.dumps(message))
         except Exception as exc:
             raise SendTaskError() from exc
         for middleware in self.broker.middlewares:
-            post_send_res = middleware.post_send(message, self.labels)
+            post_send_res = middleware.post_send(message)
             if isawaitable(post_send_res):
                 await post_send_res
         return AsyncTaskiqTask(
@@ -167,17 +159,18 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         """
         formatted_args = []
         formatted_kwargs = {}
+        labels = {}
         for arg in args:
             formatted_args.append(self._prepare_arg(arg))
         for kwarg_name, kwarg_val in kwargs.items():
             formatted_kwargs[kwarg_name] = self._prepare_arg(kwarg_val)
-
-        task_id = uuid4().hex
+        for label, label_val in self.labels.items():
+            labels[label] = str(label_val)
 
         return TaskiqMessage(
-            task_id=task_id,
+            task_id=self.broker.id_generator,
             task_name=self.task_name,
-            meta=self.labels,
+            labels=labels,
             args=formatted_args,
             kwargs=formatted_kwargs,
         )

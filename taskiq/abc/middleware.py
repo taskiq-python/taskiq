@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Coroutine, Dict, Union
+from typing import TYPE_CHECKING, Any, Coroutine, Union
 
 if TYPE_CHECKING:
     from taskiq.abc.broker import AsyncBroker
@@ -20,10 +20,12 @@ class TaskiqMiddleware:
         """
         self.broker = broker
 
+    def shutdown(self) -> Union[None, Coroutine[Any, Any, None]]:
+        """This function is used to do some work on shutdown."""
+
     def pre_send(
         self,
         message: "TaskiqMessage",
-        labels: Dict[str, Any],
     ) -> "Union[TaskiqMessage, Coroutine[Any, Any, TaskiqMessage]]":
         """
         Hook that executes before sending the task to worker.
@@ -32,7 +34,6 @@ class TaskiqMiddleware:
         the message is sent to broker.
 
         :param message: message to send.
-        :param labels: task's labels.
         :return: modified message.
         """
         return message
@@ -40,7 +41,6 @@ class TaskiqMiddleware:
     def post_send(
         self,
         message: "TaskiqMessage",
-        labels: Dict[str, Any],
     ) -> "Union[None, Coroutine[Any, Any, None]]":
         """
         This hook is executed right after the task is sent.
@@ -49,13 +49,11 @@ class TaskiqMiddleware:
         after the messages is kicked in broker.
 
         :param message: kicked message.
-        :param labels: labels for a message.
         """
 
     def pre_execute(
         self,
         message: "TaskiqMessage",
-        labels: Dict[str, Any],
     ) -> "Union[TaskiqMessage, Coroutine[Any, Any, TaskiqMessage]]":
         """
         This hook is called before executing task.
@@ -64,15 +62,14 @@ class TaskiqMiddleware:
         executes in the worker process.
 
         :param message: incoming parsed taskiq message.
-        :param labels: task's labels without user-supplied lables.
         :return: modified message.
         """
         return message
 
     def post_execute(
         self,
+        message: "TaskiqMessage",
         result: "TaskiqResult[Any]",
-        labels: Dict[str, Any],
     ) -> "Union[None, Coroutine[Any, Any, None]]":
         """
         This hook executes after task is complete.
@@ -80,6 +77,20 @@ class TaskiqMiddleware:
         This is a worker-side hook. It's called
         in worker process.
 
+        :param message: incoming message.
         :param result: result of execution for current task.
-        :param labels: task's labels. Without user-supplied labels.
+        """
+
+    def on_error(
+        self,
+        message: "TaskiqMessage",
+        result: "TaskiqResult[Any]",
+        exception: Exception,
+    ) -> "Union[None, Coroutine[Any, Any, None]]":
+        """
+        This function is called when exception is found.
+
+        :param message: incoming message.
+        :param result: returned value.
+        :param exception: found exception.
         """

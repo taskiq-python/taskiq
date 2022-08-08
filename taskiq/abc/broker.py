@@ -1,3 +1,4 @@
+import inspect
 from abc import ABC, abstractmethod
 from functools import wraps
 from logging import getLogger
@@ -13,12 +14,13 @@ from typing import (  # noqa: WPS235
     Union,
     overload,
 )
+from uuid import uuid4
 
 from typing_extensions import ParamSpec
 
 from taskiq.decor import AsyncTaskiqDecoratedTask
+from taskiq.formatters.json_formatter import JSONFormatter
 from taskiq.message import BrokerMessage
-from taskiq.plugins.json_formatter import JSONFormatter
 from taskiq.result_backends.dummy import DummyResultBackend
 
 if TYPE_CHECKING:
@@ -31,6 +33,18 @@ _FuncParams = ParamSpec("_FuncParams")
 _ReturnType = TypeVar("_ReturnType")
 
 logger = getLogger("taskiq")
+
+
+def default_id_generator() -> str:
+    """
+    Default task_id generator.
+
+    This function is used to generate id's
+    for tasks.
+
+    :return: new task_id.
+    """
+    return uuid4().hex
 
 
 class AsyncBroker(ABC):
@@ -47,14 +61,18 @@ class AsyncBroker(ABC):
     def __init__(
         self,
         result_backend: "Optional[AsyncResultBackend[_T]]" = None,
+        task_id_generator: Optional[Callable[[], str]] = None,
     ) -> None:
         if result_backend is None:
             result_backend = DummyResultBackend()
+        if task_id_generator is None:
+            task_id_generator = default_id_generator
         self.middlewares: "List[TaskiqMiddleware]" = []
         self.result_backend = result_backend
         self.is_worker_process = False
         self.decorator_class = AsyncTaskiqDecoratedTask
         self.formatter: "TaskiqFormatter" = JSONFormatter()
+        self.id_generator = task_id_generator
 
     def add_middlewares(self, middlewares: "List[TaskiqMiddleware]") -> None:
         """
@@ -79,6 +97,10 @@ class AsyncBroker(ABC):
         This method is called,
         when broker is closig.
         """
+        for middleware in self.middlewares:
+            middleware_shutdown = middleware.shutdown()
+            if inspect.isawaitable(middleware_shutdown):
+                await middleware_shutdown
 
     @abstractmethod
     async def kick(
