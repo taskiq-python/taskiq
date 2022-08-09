@@ -172,14 +172,13 @@ def start_listen(args: TaskiqArgs) -> None:
     AsyncBroker.is_worker_process = True
     broker = import_broker(args.broker)
     import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
-    loop = asyncio.get_event_loop()
     if not isinstance(broker, AsyncBroker):
         raise ValueError("Unknown broker type. Please use AsyncBroker instance.")
     try:
-        loop.run_until_complete(async_listen_messages(broker, args))
+        asyncio.run(async_listen_messages(broker, args))
     except (KeyboardInterrupt, Exception):
         logger.warning("Terminating process!")
-    loop.run_until_complete(broker.shutdown())
+    asyncio.run(broker.shutdown())
 
 
 def watch_workers_restarts(args: TaskiqArgs) -> None:
