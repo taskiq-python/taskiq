@@ -149,6 +149,22 @@ async def shutdown_broker(broker: AsyncBroker) -> None:
         )
 
 
+async def async_listen_wrapper(broker: AsyncBroker, args: TaskiqArgs) -> None:
+    """
+    This tiny wrapper wraps listening task.
+
+    This function is used to cathc exceptions globally,
+    and shutting down broker gracefully.
+
+    :param broker: current broker.
+    :param args: cli arguments.
+    """
+    try:
+        await async_listen_messages(broker, args)
+    except KeyboardInterrupt:
+        await shutdown_broker(broker)
+
+
 def start_listen(args: TaskiqArgs) -> None:
     """
     This function starts actual listening process.
@@ -174,11 +190,8 @@ def start_listen(args: TaskiqArgs) -> None:
     import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
     if not isinstance(broker, AsyncBroker):
         raise ValueError("Unknown broker type. Please use AsyncBroker instance.")
-    try:
-        asyncio.run(async_listen_messages(broker, args))
-    except (KeyboardInterrupt, Exception):
-        logger.warning("Terminating process!")
-    asyncio.run(broker.shutdown())
+
+    asyncio.run(async_listen_wrapper(broker, args))
 
 
 def watch_workers_restarts(args: TaskiqArgs) -> None:
