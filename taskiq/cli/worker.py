@@ -14,6 +14,12 @@ from taskiq.abc.broker import AsyncBroker
 from taskiq.cli.args import TaskiqArgs
 from taskiq.cli.async_task_runner import async_listen_messages
 
+try:
+    import uvloop  # noqa: WPS433
+except ImportError:
+    uvloop = None  # type: ignore
+
+
 logger = getLogger("taskiq.worker")
 
 
@@ -36,10 +42,12 @@ def signal_handler(_signal: int, _frame: Any) -> None:
 
     restart_workers = False  # noqa: WPS442
     for process in worker_processes:
-        # This is how we send SIGTERM to child
-        # processes.
-        process.terminate()
-        process.join()
+        # This is how we kill children,
+        # by sending SIGINT to child processes.
+        if process.pid is None:
+            process.kill()
+        else:
+            os.kill(process.pid, signal.SIGINT)
 
 
 @contextmanager
@@ -118,6 +126,29 @@ def import_tasks(modules: list[str], pattern: str, fs_discover: bool) -> None:
     import_from_modules(modules)
 
 
+async def shutdown_broker(broker: AsyncBroker) -> None:
+    """
+    This function used to shutdown broker.
+
+    Broker can throw erorrs during shutdown,
+    or it may return some value.
+
+    We need to handle such situations.
+
+    :param broker: current broker.
+    """
+    try:
+        ret_val = await broker.shutdown()  # type: ignore
+        if ret_val is not None:
+            logger.info("Broker returned value on shutdown: '%s'", str(ret_val))
+    except Exception as exc:
+        logger.warning(
+            "Exception found while terminating: %s",
+            exc,
+            exc_info=True,
+        )
+
+
 def start_listen(args: TaskiqArgs) -> None:
     """
     This function starts actual listening process.
@@ -131,17 +162,24 @@ def start_listen(args: TaskiqArgs) -> None:
     :param args: CLI arguments.
     :raises ValueError: if broker is not an AsyncBroker instance.
     """
-    broker = import_broker(args.broker)
+    if uvloop is not None:
+        logger.debug("UVLOOP found. Installing policy.")
+        uvloop.install()
     # This option signals that current
     # broker is running as a worker.
     # We must set this field before importing tasks,
     # so broker will remember all tasks it's related to.
-    broker.is_worker_process = True
+    AsyncBroker.is_worker_process = True
+    broker = import_broker(args.broker)
     import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
-    if isinstance(broker, AsyncBroker):
-        asyncio.run(async_listen_messages(broker, args))
-    else:
+    loop = asyncio.get_event_loop()
+    if not isinstance(broker, AsyncBroker):
         raise ValueError("Unknown broker type. Please use AsyncBroker instance.")
+    try:
+        loop.run_until_complete(async_listen_messages(broker, args))
+    except (KeyboardInterrupt, Exception):
+        logger.warning("Terminating process!")
+    loop.run_until_complete(broker.shutdown())
 
 
 def watch_workers_restarts(args: TaskiqArgs) -> None:
@@ -172,7 +210,7 @@ def watch_workers_restarts(args: TaskiqArgs) -> None:
                 )
                 worker_processes[worker_id].start()
             else:
-                logger.info("Worker-%s has finished.", worker_id)
+                logger.info("Worker-%s terminated.", worker_id)
                 worker.join()
                 process_to_remove.append(worker)
 

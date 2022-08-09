@@ -1,12 +1,10 @@
 import asyncio
 import inspect
 import io
-import signal
-import sys
 from concurrent.futures import Executor, ThreadPoolExecutor
 from logging import getLogger
 from time import time
-from typing import Any, Callable, Dict, List, NoReturn, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from pydantic import parse_obj_as
 
@@ -180,81 +178,6 @@ async def run_task(  # noqa: C901, WPS210, WPS211
     return result
 
 
-def exit_process(task: "asyncio.Task[Any]") -> NoReturn:
-    """
-    This function exits from the current process.
-
-    It receives asyncio Task of broker.shutdown().
-    We check if there were an exception or returned value.
-
-    If the function raised an exception, we print it with stack trace.
-    If it returned a value, we log it.
-
-    After this, we cancel all current tasks in the loop
-    and exits.
-
-    :param task: broker.shutdown task.
-    """
-    exitcode = 0
-    try:
-        result = task.result()
-        if result is not None:
-            logger.info("Broker returned value on shutdown: '%s'", str(result))
-    except Exception as exc:
-        logger.warning("Exception was found while shutting down!")
-        logger.warning(exc, exc_info=True)
-        exitcode = 1
-
-    loop = asyncio.get_event_loop()
-    for running_task in asyncio.all_tasks(loop):
-        running_task.cancel()
-
-    logger.info("Worker process killed.")
-    sys.exit(exitcode)
-
-
-def signal_handler(broker: AsyncBroker) -> Callable[[int, Any], None]:
-    """
-    Signal handler.
-
-    This function is used to generate
-    real signal handler using closures.
-
-    It takes current broker as an argument
-    and returns function that shuts it down.
-
-    :param broker: current broker.
-    :returns: signal handler function.
-    """
-
-    def _handler(signum: int, _frame: Any) -> None:
-        """
-        Exit signal handler.
-
-        This signal handler
-        calls shutdown for broker and after
-        the task is done it exits process with 0 status code.
-
-        :param signum: received signal.
-        :param _frame: current execution frame.
-        """
-        if getattr(broker, "_is_shutting_down", False):
-            # We're already shutting down the broker.
-            return
-
-        # We set this flag to not call this method twice.
-        # Since we add an asynchronous task in loop
-        # It can wait for execution for some time.
-        # We want to execute shutdown only once. Otherwise
-        # it would give us Undefined Behaviour.
-        broker._is_shutting_down = True  # type: ignore  # noqa: WPS437
-        logger.info(f"Got {signum} signal. Shutting down worker process.")
-        task = asyncio.create_task(broker.shutdown())
-        task.add_done_callback(exit_process)
-
-    return _handler
-
-
 async def async_listen_messages(  # noqa: C901, WPS210, WPS213
     broker: AsyncBroker,
     cli_args: TaskiqArgs,
@@ -268,15 +191,6 @@ async def async_listen_messages(  # noqa: C901, WPS210, WPS213
     :param broker: broker to listen to.
     :param cli_args: CLI arguments for worker.
     """
-    signal.signal(
-        signal.SIGTERM,
-        signal_handler(broker),
-    )
-    signal.signal(
-        signal.SIGINT,
-        signal_handler(broker),
-    )
-
     logger.info("Runing startup event.")
     await broker.startup()
     executor = ThreadPoolExecutor(
