@@ -14,6 +14,12 @@ from taskiq.abc.broker import AsyncBroker
 from taskiq.cli.args import TaskiqArgs
 from taskiq.cli.async_task_runner import async_listen_messages
 
+try:
+    import uvloop  # noqa: WPS433
+except ImportError:
+    uvloop = None  # type: ignore
+
+
 logger = getLogger("taskiq.worker")
 
 
@@ -36,10 +42,12 @@ def signal_handler(_signal: int, _frame: Any) -> None:
 
     restart_workers = False  # noqa: WPS442
     for process in worker_processes:
-        # This is how we send SIGTERM to child
-        # processes.
-        process.terminate()
-        process.join()
+        # This is how we kill children,
+        # by sending SIGINT to child processes.
+        if process.pid is None:
+            process.kill()
+        else:
+            os.kill(process.pid, signal.SIGINT)
 
 
 @contextmanager
@@ -118,7 +126,34 @@ def import_tasks(modules: list[str], pattern: str, fs_discover: bool) -> None:
     import_from_modules(modules)
 
 
-def start_listen(args: TaskiqArgs) -> None:
+async def shutdown_broker(broker: AsyncBroker, timeout: float) -> None:
+    """
+    This function used to shutdown broker.
+
+    Broker can throw erorrs during shutdown,
+    or it may return some value.
+
+    We need to handle such situations.
+
+    :param broker: current broker.
+    :param timeout: maximum amout of time to shutdown the broker.
+    """
+    logger.warning("Shutting down the broker.")
+    try:
+        ret_val = await asyncio.wait_for(broker.shutdown(), timeout)  # type: ignore
+        if ret_val is not None:
+            logger.info("Broker returned value on shutdown: '%s'", str(ret_val))
+    except asyncio.TimeoutError:
+        logger.warning("Cannot shutdown broker gracefully. Timed out.")
+    except Exception as exc:
+        logger.warning(
+            "Exception found while terminating: %s",
+            exc,
+            exc_info=True,
+        )
+
+
+def start_listen(args: TaskiqArgs) -> None:  # noqa: C901, WPS213
     """
     This function starts actual listening process.
 
@@ -131,17 +166,52 @@ def start_listen(args: TaskiqArgs) -> None:
     :param args: CLI arguments.
     :raises ValueError: if broker is not an AsyncBroker instance.
     """
-    broker = import_broker(args.broker)
+    if uvloop is not None:
+        logger.debug("UVLOOP found. Installing policy.")
+        uvloop.install()
     # This option signals that current
     # broker is running as a worker.
     # We must set this field before importing tasks,
     # so broker will remember all tasks it's related to.
-    broker.is_worker_process = True
+    AsyncBroker.is_worker_process = True
+    broker = import_broker(args.broker)
     import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
-    if isinstance(broker, AsyncBroker):
-        asyncio.run(async_listen_messages(broker, args))
-    else:
+    if not isinstance(broker, AsyncBroker):
         raise ValueError("Unknown broker type. Please use AsyncBroker instance.")
+
+    # Here how we manage interruptions.
+    # We have to remember shutting_down state,
+    # because KeyboardInterrupt can be send multiple
+    # times. And it may interrupt the broker's shutdown process.
+    shutting_down = False
+
+    def interrupt_handler(_signum: int, _frame: Any) -> None:
+        """
+        Signal handler.
+
+        This handler checks if process is already
+        terminating and if it's true, it does nothing.
+
+        :param _signum: received signal number.
+        :param _frame: current execution frame.
+        :raises KeyboardInterrupt: if termiation hasn't begun.
+        """
+        nonlocal shutting_down  # noqa: WPS420
+        if shutting_down:
+            return
+        shutting_down = True  # noqa: WPS442
+        raise KeyboardInterrupt
+
+    signal.signal(signal.SIGINT, interrupt_handler)
+
+    loop = asyncio.get_event_loop()
+    try:
+        loop.run_until_complete(async_listen_messages(broker, args))
+    except KeyboardInterrupt:
+        logger.warning("Worker process interrupted.")
+    except Exception as exc:
+        logger.error("Exception found: %s", exc, exc_info=True)
+    loop.run_until_complete(shutdown_broker(broker, args.shutdown_timeout))
 
 
 def watch_workers_restarts(args: TaskiqArgs) -> None:
@@ -172,7 +242,7 @@ def watch_workers_restarts(args: TaskiqArgs) -> None:
                 )
                 worker_processes[worker_id].start()
             else:
-                logger.info("Worker-%s has finished.", worker_id)
+                logger.info("Worker-%s terminated.", worker_id)
                 worker.join()
                 process_to_remove.append(worker)
 
