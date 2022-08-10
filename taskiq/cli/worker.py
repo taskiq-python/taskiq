@@ -153,7 +153,7 @@ async def shutdown_broker(broker: AsyncBroker, timeout: float) -> None:
         )
 
 
-def start_listen(args: TaskiqArgs) -> None:  # noqa: C901, WPS213
+def start_listen(args: TaskiqArgs) -> None:  # noqa: C901
     """
     This function starts actual listening process.
 
@@ -209,9 +209,7 @@ def start_listen(args: TaskiqArgs) -> None:  # noqa: C901, WPS213
         loop.run_until_complete(async_listen_messages(broker, args))
     except KeyboardInterrupt:
         logger.warning("Worker process interrupted.")
-    except Exception as exc:
-        logger.error("Exception found: %s", exc, exc_info=True)
-    loop.run_until_complete(shutdown_broker(broker, args.shutdown_timeout))
+        loop.run_until_complete(shutdown_broker(broker, args.shutdown_timeout))
 
 
 def watch_workers_restarts(args: TaskiqArgs) -> None:
