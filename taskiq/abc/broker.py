@@ -1,4 +1,6 @@
 import inspect
+import os
+import sys
 from abc import ABC, abstractmethod
 from functools import wraps
 from logging import getLogger
@@ -187,9 +189,18 @@ class AsyncBroker(ABC):
             ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]:
                 nonlocal inner_task_name  # noqa: WPS420
                 if inner_task_name is None:
-                    inner_task_name = (  # noqa: WPS442
-                        f"{func.__module__}:{func.__name__}"
-                    )
+                    fmodule = func.__module__
+                    if fmodule == "__main__":
+                        fmodule = ".".join(  # noqa: WPS220
+                            sys.argv[0]
+                            .removesuffix(
+                                ".py",
+                            )
+                            .split(
+                                os.path.sep,
+                            ),
+                        )
+                    inner_task_name = f"{fmodule}:{func.__name__}"  # noqa: WPS442
                 wrapper = wraps(func)
 
                 decorated_task = wrapper(
