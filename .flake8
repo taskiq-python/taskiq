@@ -6,6 +6,8 @@ extend-ignore = E203
 docstring_style=sphinx
 
 ignore =
+  ; `noqa` comments overuse ))))
+  WPS402,
   ; Found `%` string formatting
   WPS323,
   ; Found block variable overlap.
