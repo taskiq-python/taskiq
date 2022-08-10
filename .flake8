@@ -6,6 +6,8 @@ extend-ignore = E203
 docstring_style=sphinx
 
 ignore =
+  ; Found a line that starts with a dot
+  WPS348,
   ; `noqa` comments overuse ))))
   WPS402,
   ; Found `%` string formatting
