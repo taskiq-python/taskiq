@@ -137,6 +137,7 @@ async def shutdown_broker(broker: AsyncBroker) -> None:
 
     :param broker: current broker.
     """
+    logger.warning("Shutting down the broker.")
     try:
         ret_val = await broker.shutdown()  # type: ignore
         if ret_val is not None:
