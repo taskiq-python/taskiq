@@ -27,6 +27,7 @@ class TaskiqArgs:
     log_collector_format: str
     max_threadpool_threads: int
     no_parse: bool
+    shutdown_timeout: float
 
     @classmethod
     def from_cli(cls, args: Optional[List[str]] = None) -> "TaskiqArgs":  # noqa: WPS213
@@ -105,6 +106,12 @@ class TaskiqArgs:
             "--max-threadpool-threads",
             type=int,
             help="Maximum number of threads for executing sync functions.",
+        )
+        parser.add_argument(
+            "--shutdown-timeout",
+            type=float,
+            default=5,
+            help="Maximum amount of time for graceful broker's shutdown is seconds.",
         )
 
         if args is None:

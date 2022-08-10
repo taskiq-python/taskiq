@@ -57,6 +57,7 @@ class AsyncBroker(ABC):
     """
 
     available_tasks: Dict[str, AsyncTaskiqDecoratedTask[Any, Any]] = {}
+    is_worker_process: bool = False
 
     def __init__(
         self,
@@ -69,7 +70,6 @@ class AsyncBroker(ABC):
             task_id_generator = default_id_generator
         self.middlewares: "List[TaskiqMiddleware]" = []
         self.result_backend = result_backend
-        self.is_worker_process = False
         self.decorator_class = AsyncTaskiqDecoratedTask
         self.formatter: "TaskiqFormatter" = JSONFormatter()
         self.id_generator = task_id_generator
@@ -101,6 +101,7 @@ class AsyncBroker(ABC):
             middleware_shutdown = middleware.shutdown()
             if inspect.isawaitable(middleware_shutdown):
                 await middleware_shutdown
+        await self.result_backend.shutdown()
 
     @abstractmethod
     async def kick(

@@ -154,6 +154,8 @@ Or you can let taskiq find all python modules named tasks in current directory r
 taskiq test_project.broker:broker -fsd
 ```
 
+If you have uvloop installed, taskiq will automatically install new policies to event loop.
+
 You can always run `--help` to see all possible options.
 
 
@@ -262,3 +264,48 @@ async def main():
 asyncio.run(main())
 
 ```
+
+
+# Available Brokers
+
+Taskiq has several brokers out of the box:
+* InMemoryBroker
+* ZeroMQBroker
+
+## InMemoryBroker
+
+This broker is created for development purpose.
+You can easily use it without setting up workers for your project.
+
+It works the same as real brokers, but with some limitations.
+
+1. It cannot use `pre_execute` and `post_execute` hooks in middlewares.
+2. You cannot use it in multiprocessing applications without real result_backend.
+
+This broker is sutable for local development only.
+
+InMemoryBroker parameters:
+* `sync_tasks_pool_size` - number of threads for threadpool executor.
+    All sync functions are executed in threadpool.
+* `logs_format` - format which is used to collect logs from task execution.
+* `max_stored_results` - maximum number of results that is stored in memory. This number is used only if no custom result backend is provided.
+* `cast_types` - whether to use agressive type cast for types.
+* `result_backend` - custom result backend. By default
+    it uses `InmemoryResultBackend`.
+* `task_id_generator` - custom function to generate task ids.
+
+## ZeroMQBroker
+
+ZeroMQ is not available by default. To enable it. Please install [pyzmq](https://pypi.org/project/pyzmq/),
+or you can install `taskiq[zmq]`.
+
+This broker doesn't have limitations, but it requires you to set up a worker using taskiq CLI.
+Also please ensure that worker process is started after your application is ready.
+
+Because ZMQ publishes messages in socket and all worker processes will connect to it.
+
+ZeroMQBroker parameters:
+* `zmq_pub_host` - host that used to publish messages.
+* `zmq_sub_host` - host to subscribe to publisher.
+* `result_backend` - custom result backend.
+* `task_id_generator` - custom function to generate task ids.
