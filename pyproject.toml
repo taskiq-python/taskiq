@@ -16,9 +16,10 @@ classifiers = [
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
-    "Topic :: Utilities",
-    "Topic :: System :: Networking",
     "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+    "Topic :: System :: Networking",
+    "Development Status :: 3 - Alpha",
 ]
 homepage = "https://github.com/taskiq-python/taskiq"
 keywords = ["taskiq", "tasks", "distributed", "async"]
