@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "taskiq"
-version = "0.0.3"
-description = "Asynchronous task queue with async support"
+version = "0.0.4"
+description = "Distributed task queue with full async support"
 authors = ["Pavel Kirilin <win10@list.ru>"]
 maintainers = ["Pavel Kirilin <win10@list.ru>"]
 readme = "README.md"
@@ -30,6 +30,8 @@ typing-extensions = ">=3.10.0.0"
 pydantic = "^1.6.2"
 pyzmq = { version = "^23.2.0", optional = true }
 uvloop = { version = "^0.16.0", optional = true }
+watchdog = "^2.1.9"
+gitignore-parser = "^0.0.8"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"

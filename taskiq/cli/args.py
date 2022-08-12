@@ -28,6 +28,8 @@ class TaskiqArgs:
     max_threadpool_threads: int
     no_parse: bool
     shutdown_timeout: float
+    reload: bool
+    no_gitignore: bool
 
     @classmethod
     def from_cli(cls, args: Optional[List[str]] = None) -> "TaskiqArgs":  # noqa: WPS213
@@ -112,6 +114,18 @@ class TaskiqArgs:
             type=float,
             default=5,
             help="Maximum amount of time for graceful broker's shutdown is seconds.",
+        )
+        parser.add_argument(
+            "--reload",
+            "-r",
+            action="store_true",
+            help="Reload workers if file is changed.",
+        )
+        parser.add_argument(
+            "--do-not-use-gitignore",
+            action="store_true",
+            dest="no_gitignore",
+            help="Do not use gitignore to check for updated files.",
         )
 
         if args is None:
