@@ -30,7 +30,7 @@ logger = getLogger("taskiq.worker")
 restart_workers = True
 worker_processes: List[Process] = []
 observer = Observer()
-reload_queue: "Queue[int]" = Queue(-1)
+reload_queue: "Queue[bool]" = Queue(-1)
 
 
 def signal_handler(_signal: int, _frame: Any) -> None:
@@ -73,10 +73,8 @@ def schedule_workers_reload() -> None:
     global worker_processes  # noqa: WPS420
     global reload_queue  # noqa: WPS420
 
-    logger.info("Reloading workers")
-    for worker_id, _ in enumerate(worker_processes):
-        reload_queue.put(worker_id)
-        logger.info("Worker %s scheduled to reload", worker_id)
+    reload_queue.put(True)
+    logger.info("Scheduled workers reload.")
     reload_queue.join()
 
 
@@ -261,17 +259,20 @@ def watcher_loop(args: TaskiqArgs) -> None:  # noqa: C901, WPS213
         # List of processes to remove.
         sleep(1)
         process_to_remove = []
-        while not reload_queue.empty():
-            process_id = reload_queue.get()
-            worker_processes[process_id].terminate()
-            worker_processes[process_id].join()
-            worker_processes[process_id] = Process(
-                target=start_listen,
-                kwargs={"args": args},
-                name=f"worker-{process_id}",
-            )
-            worker_processes[process_id].start()
-            reload_queue.task_done()
+        if not reload_queue.empty():
+            while not reload_queue.empty():
+                reload_queue.get()
+                reload_queue.task_done()
+
+            for worker_id, worker in enumerate(worker_processes):
+                worker.terminate()
+                worker.join()
+                worker_processes[worker_id] = Process(
+                    target=start_listen,
+                    kwargs={"args": args},
+                    name=f"worker-{worker_id}",
+                )
+                worker_processes[worker_id].start()
 
         for worker_id, worker in enumerate(worker_processes):
             if worker.is_alive():
