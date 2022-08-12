@@ -7,12 +7,16 @@ from importlib import import_module
 from logging import basicConfig, getLevelName, getLogger
 from multiprocessing import Process
 from pathlib import Path
+from queue import Queue
 from time import sleep
 from typing import Any, Generator, List
+
+from watchdog.observers import Observer
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.cli.args import TaskiqArgs
 from taskiq.cli.async_task_runner import async_listen_messages
+from taskiq.cli.watcher import FileWatcher
 
 try:
     import uvloop  # noqa: WPS433
@@ -25,6 +29,8 @@ logger = getLogger("taskiq.worker")
 
 restart_workers = True
 worker_processes: List[Process] = []
+observer = Observer()
+reload_queue: "Queue[int]" = Queue(-1)
 
 
 def signal_handler(_signal: int, _frame: Any) -> None:
@@ -45,9 +51,33 @@ def signal_handler(_signal: int, _frame: Any) -> None:
         # This is how we kill children,
         # by sending SIGINT to child processes.
         if process.pid is None:
-            process.kill()
-        else:
+            continue
+        try:
             os.kill(process.pid, signal.SIGINT)
+        except ProcessLookupError:
+            continue
+        process.join()
+    if observer.is_alive():
+        observer.stop()
+        observer.join()
+
+
+def schedule_workers_reload() -> None:
+    """
+    Function to schedule workers to restart.
+
+    This function adds worker ids to the queue.
+
+    This queue is later read in watcher loop.
+    """
+    global worker_processes  # noqa: WPS420
+    global reload_queue  # noqa: WPS420
+
+    logger.info("Reloading workers")
+    for worker_id, _ in enumerate(worker_processes):
+        reload_queue.put(worker_id)
+        logger.info("Worker %s scheduled to reload", worker_id)
+    reload_queue.join()
 
 
 @contextmanager
@@ -212,12 +242,15 @@ def start_listen(args: TaskiqArgs) -> None:  # noqa: C901
         loop.run_until_complete(shutdown_broker(broker, args.shutdown_timeout))
 
 
-def watch_workers_restarts(args: TaskiqArgs) -> None:
+def watcher_loop(args: TaskiqArgs) -> None:  # noqa: C901, WPS213
     """
     Infinate loop for main process.
 
     This loop restarts worker processes
     if they exit with error returncodes.
+
+    Also it reads process ids from reload_queue
+    and reloads workers if they were scheduled to reload.
 
     :param args: cli arguements.
     """
@@ -228,6 +261,18 @@ def watch_workers_restarts(args: TaskiqArgs) -> None:
         # List of processes to remove.
         sleep(1)
         process_to_remove = []
+        while not reload_queue.empty():
+            process_id = reload_queue.get()
+            worker_processes[process_id].terminate()
+            worker_processes[process_id].join()
+            worker_processes[process_id] = Process(
+                target=start_listen,
+                kwargs={"args": args},
+                name=f"worker-{process_id}",
+            )
+            worker_processes[process_id].start()
+            reload_queue.task_done()
+
         for worker_id, worker in enumerate(worker_processes):
             if worker.is_alive():
                 continue
@@ -241,14 +286,13 @@ def watch_workers_restarts(args: TaskiqArgs) -> None:
                 worker_processes[worker_id].start()
             else:
                 logger.info("Worker-%s terminated.", worker_id)
-                worker.join()
                 process_to_remove.append(worker)
 
         for dead_process in process_to_remove:
             worker_processes.remove(dead_process)
 
 
-def run_worker(args: TaskiqArgs) -> None:
+def run_worker(args: TaskiqArgs) -> None:  # noqa: WPS213
     """
     This function starts worker processes.
 
@@ -279,7 +323,17 @@ def run_worker(args: TaskiqArgs) -> None:
         )
         worker_processes.append(work_proc)
 
+    if args.reload:
+        observer.schedule(
+            FileWatcher(
+                callback=schedule_workers_reload,
+                use_gitignore=not args.no_gitignore,
+            ),
+            path=".",
+            recursive=True,
+        )
+        observer.start()
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    watch_workers_restarts(args=args)
+    watcher_loop(args=args)

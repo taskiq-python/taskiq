@@ -365,6 +365,14 @@ python-versions = ">=3.6"
 smmap = ">=3.0.1,<6"
 
 [[package]]
+name = "gitignore-parser"
+version = "0.0.8"
+description = "A spec-compliant gitignore parser for Python 3.5+"
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "gitpython"
 version = "3.1.27"
 description = "GitPython is a python library used to interact with Git repositories"
@@ -799,6 +807,17 @@ docs = ["proselint (>=0.10.2)", "sphinx (>=3)", "sphinx-argparse (>=0.2.5)", "sp
 testing = ["coverage (>=4)", "coverage-enable-subprocess (>=1)", "flaky (>=3)", "packaging (>=20.0)", "pytest (>=4)", "pytest-env (>=0.6.2)", "pytest-freezegun (>=0.4.1)", "pytest-mock (>=2)", "pytest-randomly (>=1)", "pytest-timeout (>=1)"]
 
 [[package]]
+name = "watchdog"
+version = "2.1.9"
+description = "Filesystem events monitoring"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[package.extras]
+watchmedo = ["PyYAML (>=3.10)"]
+
+[[package]]
 name = "wemake-python-styleguide"
 version = "0.16.1"
 description = "The strictest and most opinionated python linter ever"
@@ -859,7 +878,7 @@ zmq = ["pyzmq"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "83f7d256e642da9a70ea6c5862da9f5b1a01b94e3197572cfb8ddb7ff4bd79d5"
+content-hash = "05d77d5422fbc72146b71980f56348c48ee125ea1acfc31ef2bc44ad1e3d97e0"
 
 [metadata.files]
 astor = [
@@ -1102,6 +1121,9 @@ flake8-string-format = [
 gitdb = [
     {file = "gitdb-4.0.9-py3-none-any.whl", hash = "sha256:8033ad4e853066ba6ca92050b9df2f89301b8fc8bf7e9324d412a63f8bf1a8fd"},
     {file = "gitdb-4.0.9.tar.gz", hash = "sha256:bac2fd45c0a1c9cf619e63a90d62bdc63892ef92387424b855792a6cabe789aa"},
+]
+gitignore-parser = [
+    {file = "gitignore_parser-0.0.8.tar.gz", hash = "sha256:b4e6e63d971810cbd2168bc02deddba719c07da655eaf56336d4bb0233ecef85"},
 ]
 gitpython = [
     {file = "GitPython-3.1.27-py3-none-any.whl", hash = "sha256:5b68b000463593e05ff2b261acff0ff0972df8ab1b70d3cdbd41b546c8b8fc3d"},
@@ -1433,6 +1455,33 @@ uvloop = [
 virtualenv = [
     {file = "virtualenv-20.16.2-py2.py3-none-any.whl", hash = "sha256:635b272a8e2f77cb051946f46c60a54ace3cb5e25568228bd6b57fc70eca9ff3"},
     {file = "virtualenv-20.16.2.tar.gz", hash = "sha256:0ef5be6d07181946891f5abc8047fda8bc2f0b4b9bf222c64e6e8963baee76db"},
+]
+watchdog = [
+    {file = "watchdog-2.1.9-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:a735a990a1095f75ca4f36ea2ef2752c99e6ee997c46b0de507ba40a09bf7330"},
+    {file = "watchdog-2.1.9-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:6b17d302850c8d412784d9246cfe8d7e3af6bcd45f958abb2d08a6f8bedf695d"},
+    {file = "watchdog-2.1.9-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:ee3e38a6cc050a8830089f79cbec8a3878ec2fe5160cdb2dc8ccb6def8552658"},
+    {file = "watchdog-2.1.9-cp36-cp36m-macosx_10_9_x86_64.whl", hash = "sha256:64a27aed691408a6abd83394b38503e8176f69031ca25d64131d8d640a307591"},
+    {file = "watchdog-2.1.9-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:195fc70c6e41237362ba720e9aaf394f8178bfc7fa68207f112d108edef1af33"},
+    {file = "watchdog-2.1.9-cp38-cp38-macosx_10_9_universal2.whl", hash = "sha256:bfc4d351e6348d6ec51df007432e6fe80adb53fd41183716017026af03427846"},
+    {file = "watchdog-2.1.9-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:8250546a98388cbc00c3ee3cc5cf96799b5a595270dfcfa855491a64b86ef8c3"},
+    {file = "watchdog-2.1.9-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:117ffc6ec261639a0209a3252546b12800670d4bf5f84fbd355957a0595fe654"},
+    {file = "watchdog-2.1.9-cp39-cp39-macosx_10_9_universal2.whl", hash = "sha256:97f9752208f5154e9e7b76acc8c4f5a58801b338de2af14e7e181ee3b28a5d39"},
+    {file = "watchdog-2.1.9-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:247dcf1df956daa24828bfea5a138d0e7a7c98b1a47cf1fa5b0c3c16241fcbb7"},
+    {file = "watchdog-2.1.9-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:226b3c6c468ce72051a4c15a4cc2ef317c32590d82ba0b330403cafd98a62cfd"},
+    {file = "watchdog-2.1.9-pp37-pypy37_pp73-macosx_10_9_x86_64.whl", hash = "sha256:d9820fe47c20c13e3c9dd544d3706a2a26c02b2b43c993b62fcd8011bcc0adb3"},
+    {file = "watchdog-2.1.9-pp38-pypy38_pp73-macosx_10_9_x86_64.whl", hash = "sha256:70af927aa1613ded6a68089a9262a009fbdf819f46d09c1a908d4b36e1ba2b2d"},
+    {file = "watchdog-2.1.9-pp39-pypy39_pp73-macosx_10_9_x86_64.whl", hash = "sha256:ed80a1628cee19f5cfc6bb74e173f1b4189eb532e705e2a13e3250312a62e0c9"},
+    {file = "watchdog-2.1.9-py3-none-manylinux2014_aarch64.whl", hash = "sha256:9f05a5f7c12452f6a27203f76779ae3f46fa30f1dd833037ea8cbc2887c60213"},
+    {file = "watchdog-2.1.9-py3-none-manylinux2014_armv7l.whl", hash = "sha256:255bb5758f7e89b1a13c05a5bceccec2219f8995a3a4c4d6968fe1de6a3b2892"},
+    {file = "watchdog-2.1.9-py3-none-manylinux2014_i686.whl", hash = "sha256:d3dda00aca282b26194bdd0adec21e4c21e916956d972369359ba63ade616153"},
+    {file = "watchdog-2.1.9-py3-none-manylinux2014_ppc64.whl", hash = "sha256:186f6c55abc5e03872ae14c2f294a153ec7292f807af99f57611acc8caa75306"},
+    {file = "watchdog-2.1.9-py3-none-manylinux2014_ppc64le.whl", hash = "sha256:083171652584e1b8829581f965b9b7723ca5f9a2cd7e20271edf264cfd7c1412"},
+    {file = "watchdog-2.1.9-py3-none-manylinux2014_s390x.whl", hash = "sha256:b530ae007a5f5d50b7fbba96634c7ee21abec70dc3e7f0233339c81943848dc1"},
+    {file = "watchdog-2.1.9-py3-none-manylinux2014_x86_64.whl", hash = "sha256:4f4e1c4aa54fb86316a62a87b3378c025e228178d55481d30d857c6c438897d6"},
+    {file = "watchdog-2.1.9-py3-none-win32.whl", hash = "sha256:5952135968519e2447a01875a6f5fc8c03190b24d14ee52b0f4b1682259520b1"},
+    {file = "watchdog-2.1.9-py3-none-win_amd64.whl", hash = "sha256:7a833211f49143c3d336729b0020ffd1274078e94b0ae42e22f596999f50279c"},
+    {file = "watchdog-2.1.9-py3-none-win_ia64.whl", hash = "sha256:ad576a565260d8f99d97f2e64b0f97a48228317095908568a9d5c786c829d428"},
+    {file = "watchdog-2.1.9.tar.gz", hash = "sha256:43ce20ebb36a51f21fa376f76d1d4692452b2527ccd601950d69ed36b9e21609"},
 ]
 wemake-python-styleguide = [
     {file = "wemake-python-styleguide-0.16.1.tar.gz", hash = "sha256:4fcd78dd55732679b5fc8bc37fd7e04bbaa5cdc1b1a829ad265e8f6b0d853cf6"},
