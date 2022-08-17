@@ -14,6 +14,7 @@ from typing import (
 from pydantic import BaseModel
 from typing_extensions import ParamSpec
 
+from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.exceptions import SendTaskError
 from taskiq.message import TaskiqMessage
 from taskiq.task import AsyncTaskiqTask, SyncTaskiqTask
@@ -87,7 +88,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
     ) -> AsyncTaskiqTask[_ReturnType]:
         ...
 
-    async def kiq(
+    async def kiq(  # noqa: C901
         self,
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
@@ -110,15 +111,16 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         )
         message = self._prepare_message(*args, **kwargs)
         for middleware in self.broker.middlewares:
-            message = await maybe_awaitable(middleware.pre_send(message))
-
+            if middleware.__class__.pre_send != TaskiqMiddleware.pre_send:
+                message = await maybe_awaitable(middleware.pre_send(message))
         try:
             await self.broker.kick(self.broker.formatter.dumps(message))
         except Exception as exc:
             raise SendTaskError() from exc
 
         for middleware in self.broker.middlewares:
-            await maybe_awaitable(middleware.post_send(message))
+            if middleware.__class__.post_send != TaskiqMiddleware.post_send:
+                await maybe_awaitable(middleware.post_send(message))
 
         return AsyncTaskiqTask(
             task_id=message.task_id,
