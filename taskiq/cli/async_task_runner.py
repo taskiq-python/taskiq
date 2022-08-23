@@ -12,6 +12,7 @@ from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.cli.args import TaskiqArgs
 from taskiq.cli.log_collector import log_collector
+from taskiq.context import Context, context_updater
 from taskiq.message import TaskiqMessage
 from taskiq.result import TaskiqResult
 from taskiq.utils import maybe_awaitable
@@ -224,11 +225,6 @@ async def async_listen_messages(  # noqa: C901, WPS210, WPS213
                 exc_info=True,
             )
             continue
-        logger.info(
-            "Executing task %s with ID: %s",
-            taskiq_msg.task_name,
-            taskiq_msg.task_id,
-        )
         for middleware in broker.middlewares:
             if middleware.__class__.pre_execute != TaskiqMiddleware.pre_execute:
                 taskiq_msg = await maybe_awaitable(
@@ -237,14 +233,20 @@ async def async_listen_messages(  # noqa: C901, WPS210, WPS213
                     ),
                 )
 
-        result = await run_task(
-            target=broker.available_tasks[message.task_name].original_func,
-            signature=task_signatures.get(message.task_name),
-            message=taskiq_msg,
-            log_collector_format=cli_args.log_collector_format,
-            executor=executor,
-            middlewares=broker.middlewares,
+        logger.info(
+            "Executing task %s with ID: %s",
+            taskiq_msg.task_name,
+            taskiq_msg.task_id,
         )
+        with context_updater(Context(taskiq_msg, broker)):
+            result = await run_task(
+                target=broker.available_tasks[message.task_name].original_func,
+                signature=task_signatures.get(message.task_name),
+                message=taskiq_msg,
+                log_collector_format=cli_args.log_collector_format,
+                executor=executor,
+                middlewares=broker.middlewares,
+            )
         for middleware in broker.middlewares:
             if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
                 await maybe_awaitable(middleware.post_execute(taskiq_msg, result))
