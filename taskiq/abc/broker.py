@@ -9,8 +9,10 @@ from typing import (  # noqa: WPS235
     Any,
     AsyncGenerator,
     Callable,
+    Coroutine,
     Dict,
     List,
+    NoReturn,
     Optional,
     TypeVar,
     Union,
@@ -120,14 +122,17 @@ class AsyncBroker(ABC):
         """
 
     @abstractmethod
-    def listen(self) -> AsyncGenerator[BrokerMessage, None]:
+    async def listen(
+        self,
+        callback: Callable[[BrokerMessage], Coroutine[Any, Any, None]],
+    ) -> None:
         """
         This function listens to new messages and yields them.
 
         This it the main point for workers.
         This function is used to get new tasks from the network.
 
-        :yields: taskiq messages.
+        :param callback: function to call when message received.
         :return: nothing.
         """
 

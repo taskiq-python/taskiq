@@ -13,7 +13,7 @@ from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.cli.args import TaskiqArgs
 from taskiq.cli.log_collector import log_collector
 from taskiq.context import Context, context_updater
-from taskiq.message import TaskiqMessage
+from taskiq.message import BrokerMessage, TaskiqMessage
 from taskiq.result import TaskiqResult
 from taskiq.utils import maybe_awaitable
 
@@ -180,7 +180,88 @@ async def run_task(  # noqa: C901, WPS210, WPS211
     return result
 
 
-async def async_listen_messages(  # noqa: C901, WPS210, WPS213
+class Receiver:
+    """Class that uses as a callback handler."""
+
+    def __init__(self, broker: AsyncBroker, cli_args: TaskiqArgs) -> None:
+        self.broker = broker
+        self.cli_args = cli_args
+        self.task_signatures: Dict[str, inspect.Signature] = {}
+        if not cli_args.no_parse:
+            for task in self.broker.available_tasks.values():
+                self.task_signatures[task.task_name] = inspect.signature(
+                    task.original_func,
+                )
+        self.executor = ThreadPoolExecutor(
+            max_workers=cli_args.max_threadpool_threads,
+        )
+
+    async def callback(self, message: BrokerMessage) -> None:  # noqa: C901
+        """
+        Receive new message and execute tasks.
+
+        This method is used to process message,
+        that came from brokers.
+
+        :param message: received message.
+        """
+        logger.debug(f"Received message: {message}")
+        if message.task_name not in self.broker.available_tasks:
+            logger.warning(
+                'task "%s" is not found. Maybe you forgot to import it?',
+                message.task_name,
+            )
+            return
+        logger.debug(
+            "Function for task %s is resolved. Executing...",
+            message.task_name,
+        )
+        try:
+            taskiq_msg = self.broker.formatter.loads(message=message)
+        except Exception as exc:
+            logger.warning(
+                "Cannot parse message: %s. Skipping execution.\n %s",
+                message,
+                exc,
+                exc_info=True,
+            )
+            return
+        for middleware in self.broker.middlewares:
+            if middleware.__class__.pre_execute != TaskiqMiddleware.pre_execute:
+                taskiq_msg = await maybe_awaitable(
+                    middleware.pre_execute(
+                        taskiq_msg,
+                    ),
+                )
+
+        logger.info(
+            "Executing task %s with ID: %s",
+            taskiq_msg.task_name,
+            taskiq_msg.task_id,
+        )
+        with context_updater(Context(taskiq_msg, self.broker)):
+            result = await run_task(
+                target=self.broker.available_tasks[message.task_name].original_func,
+                signature=self.task_signatures.get(message.task_name),
+                message=taskiq_msg,
+                log_collector_format=self.cli_args.log_collector_format,
+                executor=self.executor,
+                middlewares=self.broker.middlewares,
+            )
+        for middleware in self.broker.middlewares:
+            if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
+                await maybe_awaitable(middleware.post_execute(taskiq_msg, result))
+        try:
+            await self.broker.result_backend.set_result(message.task_id, result)
+        except Exception as exc:
+            logger.exception(
+                "Can't set result in result backend. Cause: %s",
+                exc,
+                exc_info=True,
+            )
+
+
+async def async_listen_messages(
     broker: AsyncBroker,
     cli_args: TaskiqArgs,
 ) -> None:
@@ -195,66 +276,7 @@ async def async_listen_messages(  # noqa: C901, WPS210, WPS213
     """
     logger.info("Runing startup event.")
     await broker.startup()
-    executor = ThreadPoolExecutor(
-        max_workers=cli_args.max_threadpool_threads,
-    )
+    logger.info("Inicialized receiver.")
+    receiver = Receiver(broker, cli_args)
     logger.info("Listening started.")
-    task_signatures: Dict[str, inspect.Signature] = {}
-    for task in broker.available_tasks.values():
-        if not cli_args.no_parse:
-            task_signatures[task.task_name] = inspect.signature(task.original_func)
-    async for message in broker.listen():
-        logger.debug(f"Received message: {message}")
-        if message.task_name not in broker.available_tasks:
-            logger.warning(
-                'task "%s" is not found. Maybe you forgot to import it?',
-                message.task_name,
-            )
-            continue
-        logger.debug(
-            "Function for task %s is resolved. Executing...",
-            message.task_name,
-        )
-        try:
-            taskiq_msg = broker.formatter.loads(message=message)
-        except Exception as exc:
-            logger.warning(
-                "Cannot parse message: %s. Skipping execution.\n %s",
-                message,
-                exc,
-                exc_info=True,
-            )
-            continue
-        for middleware in broker.middlewares:
-            if middleware.__class__.pre_execute != TaskiqMiddleware.pre_execute:
-                taskiq_msg = await maybe_awaitable(
-                    middleware.pre_execute(
-                        taskiq_msg,
-                    ),
-                )
-
-        logger.info(
-            "Executing task %s with ID: %s",
-            taskiq_msg.task_name,
-            taskiq_msg.task_id,
-        )
-        with context_updater(Context(taskiq_msg, broker)):
-            result = await run_task(
-                target=broker.available_tasks[message.task_name].original_func,
-                signature=task_signatures.get(message.task_name),
-                message=taskiq_msg,
-                log_collector_format=cli_args.log_collector_format,
-                executor=executor,
-                middlewares=broker.middlewares,
-            )
-        for middleware in broker.middlewares:
-            if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
-                await maybe_awaitable(middleware.post_execute(taskiq_msg, result))
-        try:
-            await broker.result_backend.set_result(message.task_id, result)
-        except Exception as exc:
-            logger.exception(
-                "Can't set result in result backend. Cause: %s",
-                exc,
-                exc_info=True,
-            )
+    await broker.listen(receiver.callback)

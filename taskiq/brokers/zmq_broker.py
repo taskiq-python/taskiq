@@ -1,4 +1,4 @@
-from typing import AsyncGenerator, Callable, Optional, TypeVar
+from typing import Any, Callable, Coroutine, Optional, TypeVar
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.result_backend import AsyncResultBackend
@@ -58,12 +58,15 @@ class ZeroMQBroker(AsyncBroker):
         with self.socket.connect(self.sub_host) as sock:
             await sock.send_string(message.json())
 
-    async def listen(self) -> AsyncGenerator[BrokerMessage, None]:
+    async def listen(
+        self,
+        callback: Callable[[BrokerMessage], Coroutine[Any, Any, None]],
+    ) -> None:
         """
         Start accepting new messages.
 
-        :yield: received broker message
+        :param callback: function to call when message received.
         """
         while True:  # noqa: WPS457
             with self.socket.connect(self.sub_host) as sock:
-                yield BrokerMessage.parse_raw(await sock.recv_string())
+                await callback(BrokerMessage.parse_raw(await sock.recv_string()))
