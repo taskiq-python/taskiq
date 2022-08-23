@@ -1,7 +1,7 @@
 import inspect
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, AsyncGenerator, Callable, Optional, TypeVar
+from typing import Any, Callable, Coroutine, Optional, TypeVar
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.result_backend import AsyncResultBackend, TaskiqResult
@@ -139,13 +139,17 @@ class InMemoryBroker(AsyncBroker):
         except Exception as exc:
             raise ResultSetError("Cannot set result.") from exc
 
-    async def listen(self) -> AsyncGenerator[BrokerMessage, None]:  # type: ignore
+    async def listen(
+        self,
+        callback: Callable[[BrokerMessage], Coroutine[Any, Any, None]],
+    ) -> None:
         """
         Inmemory broker cannot listen.
 
         This method throws RuntimeError if you call it.
         Because inmemory broker cannot really listen to any of tasks.
 
+        :param callback: message callback.
         :raises RuntimeError: if this method is called.
         """
         raise RuntimeError("Inmemory brokers cannot listen.")
