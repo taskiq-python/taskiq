@@ -1,11 +1,12 @@
 from dataclasses import asdict, is_dataclass
 from logging import getLogger
-from typing import (
+from typing import (  # noqa: WPS235
     TYPE_CHECKING,
     Any,
     Coroutine,
     Dict,
     Generic,
+    Optional,
     TypeVar,
     Union,
     overload,
@@ -42,6 +43,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         self.task_name = task_name
         self.broker = broker
         self.labels = labels
+        self.custom_task_id: Optional[str] = None
 
     def with_labels(
         self,
@@ -54,6 +56,19 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         :return: kicker with new labels.
         """
         self.labels.update(labels)
+        return self
+
+    def with_task_id(self, task_id: str) -> "AsyncKicker[_FuncParams, _ReturnType]":
+        """
+        Set task_id for current execution.
+
+        Please use this method with caution,
+        because it may brake the logic of getting results.
+
+        :param task_id: custom task id.
+        :return: kicker with custom task id.
+        """
+        self.custom_task_id = task_id
         return self
 
     def with_broker(
@@ -200,8 +215,12 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         for label, label_val in self.labels.items():
             labels[label] = str(label_val)
 
+        task_id = self.custom_task_id
+        if task_id is None:
+            task_id = self.broker.id_generator()
+
         return TaskiqMessage(
-            task_id=self.broker.id_generator(),
+            task_id=task_id,
             task_name=self.task_name,
             labels=labels,
             args=formatted_args,
