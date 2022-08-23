@@ -167,13 +167,14 @@ async def run_task(  # noqa: C901, WPS210, WPS211
     )
     if found_exception is not None:
         for middleware in middlewares:
-            await maybe_awaitable(
-                middleware.on_error(
-                    message,
-                    result,
-                    found_exception,
-                ),
-            )
+            if middleware.__class__.on_error != TaskiqMiddleware.on_error:
+                await maybe_awaitable(
+                    middleware.on_error(
+                        message,
+                        result,
+                        found_exception,
+                    ),
+                )
 
     return result
 
@@ -223,12 +224,18 @@ async def async_listen_messages(  # noqa: C901, WPS210, WPS213
                 exc_info=True,
             )
             continue
+        logger.info(
+            "Executing task %s with ID: %s",
+            taskiq_msg.task_name,
+            taskiq_msg.task_id,
+        )
         for middleware in broker.middlewares:
-            taskiq_msg = await maybe_awaitable(
-                middleware.pre_execute(
-                    taskiq_msg,
-                ),
-            )
+            if middleware.__class__.pre_execute != TaskiqMiddleware.pre_execute:
+                taskiq_msg = await maybe_awaitable(
+                    middleware.pre_execute(
+                        taskiq_msg,
+                    ),
+                )
 
         result = await run_task(
             target=broker.available_tasks[message.task_name].original_func,
@@ -239,7 +246,8 @@ async def async_listen_messages(  # noqa: C901, WPS210, WPS213
             middlewares=broker.middlewares,
         )
         for middleware in broker.middlewares:
-            await maybe_awaitable(middleware.post_execute(taskiq_msg, result))
+            if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
+                await maybe_awaitable(middleware.post_execute(taskiq_msg, result))
         try:
             await broker.result_backend.set_result(message.task_id, result)
         except Exception as exc:

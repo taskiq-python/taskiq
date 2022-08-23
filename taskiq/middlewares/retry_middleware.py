@@ -1,3 +1,4 @@
+from copy import deepcopy
 from logging import getLogger
 from typing import Any
 
@@ -40,19 +41,19 @@ class SimpleRetryMiddleware(TaskiqMiddleware):
         # Check if retrying is enabled for the task.
         if retry_on_error != "True":
             return
-
+        new_msg = deepcopy(message)
         # Getting number of previous retries.
-        retries = int(message.labels.get("_retries", 0)) + 1
-        message.labels["_retries"] = str(retries)
-        max_retries = int(message.labels.get("max_retries", self.default_retry_count))
+        retries = int(new_msg.labels.get("_retries", 0)) + 1
+        new_msg.labels["_retries"] = str(retries)
+        max_retries = int(new_msg.labels.get("max_retries", self.default_retry_count))
         if retries < max_retries:
             logger.info(
                 "Task '%s' invocation failed. Retrying.",
                 message.task_name,
             )
-            message.labels["_parent"] = message.task_id
-            message.task_id = self.broker.id_generator()
-            broker_message = self.broker.formatter.dumps(message=message)
+            new_msg.labels["_parent"] = message.task_id
+            new_msg.task_id = self.broker.id_generator()
+            broker_message = self.broker.formatter.dumps(message=new_msg)
             await self.broker.kick(broker_message)
         else:
             logger.warning(
