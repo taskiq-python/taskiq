@@ -71,4 +71,5 @@ jobs:
         run: coverage lcov
       - uses: romeovs/lcov-reporter-action@v0.2.16
         with:
+          delete-old-comments: true
           lcov-file: ./coverage.lcov
