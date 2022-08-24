@@ -46,6 +46,10 @@ jobs:
       - name: Run mypy check
         run: poetry run mypy .
   pytest:
+    permissions:
+      checks: write
+      pull-requests: write
+      contents: write
     strategy:
       matrix:
         py_version: ["3.7", "3.8", "3.9", "3.10"]
@@ -68,8 +72,7 @@ jobs:
       - name: Run pytest check
         run: poetry run pytest -vv -n auto --cov="taskiq" .
       - name: Generate report
-        run: coverage lcov
-      - uses: romeovs/lcov-reporter-action@v0.2.16
-        with:
-          delete-old-comments: true
-          lcov-file: ./coverage.lcov
+        run: coverage xml
+      - name: Upload coverage reports to Codecov with GitHub Action
+        uses: codecov/codecov-action@v3
+        if: matrix.os == 'ubuntu-latest' && matrix.py_version == '3.9'
