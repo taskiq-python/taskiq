@@ -46,6 +46,10 @@ jobs:
       - name: Run mypy check
         run: poetry run mypy .
   pytest:
+    permissions:
+      checks: write
+      pull-requests: write
+      contents: write
     strategy:
       matrix:
         py_version: ["3.7", "3.8", "3.9", "3.10"]
@@ -66,4 +70,9 @@ jobs:
         env:
           POETRY_VIRTUALENVS_CREATE: false
       - name: Run pytest check
-        run: poetry run pytest -vv --cov="taskiq" .
+        run: poetry run pytest -vv -n auto --cov="taskiq" .
+      - name: Generate report
+        run: coverage xml
+      - name: Upload coverage reports to Codecov with GitHub Action
+        uses: codecov/codecov-action@v3
+        if: matrix.os == 'ubuntu-latest' && matrix.py_version == '3.9'
