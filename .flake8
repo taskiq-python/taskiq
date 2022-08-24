@@ -97,6 +97,8 @@ per-file-ignores =
   S101,
   ; Found magic number
   WPS432,
+  ; Missing parameter(s) in Docstring
+  DAR101,
 
 exclude =
   ./.git,

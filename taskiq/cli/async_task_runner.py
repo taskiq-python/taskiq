@@ -59,27 +59,38 @@ def parse_params(  # noqa: C901
     if signature is None:
         return
     argnum = -1
+    # Iterate over function's params.
     for param_name, params_type in signature.parameters.items():
+        # If parameter doesn't have an annotation.
         if params_type.annotation is params_type.empty:
             continue
+        # Increment argument numbers. This is
+        # for positional arguments.
         argnum += 1
+        # Shortland for params_type.annotation
         annot = params_type.annotation
+        # Value from incoming message.
         value = None
         logger.debug("Trying to parse %s as %s", param_name, params_type.annotation)
-        if argnum >= len(message.args):
-            value = message.kwargs.get(param_name)
-            if value is None:
-                continue
-            try:
-                message.kwargs[param_name] = parse_obj_as(annot, value)
-            except (ValueError, RuntimeError) as exc:
-                logger.debug(exc, exc_info=True)
-        else:
+        # Check if we have positional arguments in passed message.
+        if argnum < len(message.args):
+            # Get positional argument.
             value = message.args[argnum]
             if value is None:
                 continue
             try:
+                # trying to parse found value as in type annotation.
                 message.args[argnum] = parse_obj_as(annot, value)
+            except (ValueError, RuntimeError) as exc:
+                logger.debug(exc, exc_info=True)
+        else:
+            # We try to get this parameter from kwargs.
+            value = message.kwargs.get(param_name)
+            if value is None:
+                continue
+            try:
+                # trying to parse found value as in type annotation.
+                message.kwargs[param_name] = parse_obj_as(annot, value)
             except (ValueError, RuntimeError) as exc:
                 logger.debug(exc, exc_info=True)
 
@@ -100,9 +111,9 @@ def run_sync(target: Callable[..., Any], message: TaskiqMessage) -> Any:
 
 async def run_task(  # noqa: C901, WPS210, WPS211
     target: Callable[..., Any],
-    signature: Optional[inspect.Signature],
     message: TaskiqMessage,
-    log_collector_format: str,
+    signature: Optional[inspect.Signature] = None,
+    log_collector_format: str = "%(message)s",
     executor: Optional[Executor] = None,
     middlewares: Optional[List[TaskiqMiddleware]] = None,
 ) -> TaskiqResult[Any]:
@@ -132,17 +143,22 @@ async def run_task(  # noqa: C901, WPS210, WPS211
         middlewares = []
 
     loop = asyncio.get_running_loop()
+    # Buffer to capture logs.
     logs = io.StringIO()
     returned = None
     found_exception = None
-    # Captures function's logs.
     parse_params(signature, message)
+    # Captures function's logs.
     with log_collector(logs, log_collector_format):
+        # Start a timer.
         start_time = time()
         try:
+            # If the function is a coroutine we await it.
             if asyncio.iscoroutinefunction(target):
                 returned = await target(*message.args, **message.kwargs)
             else:
+                # If this is a synchronous function we
+                # run it in executor.
                 returned = await loop.run_in_executor(
                     executor,
                     run_sync,
@@ -156,16 +172,19 @@ async def run_task(  # noqa: C901, WPS210, WPS211
                 exc,
                 exc_info=True,
             )
+        # Stop the timer.
         execution_time = time() - start_time
 
     raw_logs = logs.getvalue()
     logs.close()
+    # Assemble result.
     result: "TaskiqResult[Any]" = TaskiqResult(
         is_err=found_exception is not None,
         log=raw_logs,
         return_value=returned,
         execution_time=execution_time,
     )
+    # If exception is found we execute middlewares.
     if found_exception is not None:
         for middleware in middlewares:
             if middleware.__class__.on_error != TaskiqMiddleware.on_error:
