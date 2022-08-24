@@ -66,4 +66,9 @@ jobs:
         env:
           POETRY_VIRTUALENVS_CREATE: false
       - name: Run pytest check
-        run: poetry run pytest -vv --cov="taskiq" .
+        run: poetry run pytest -vv -n auto --cov="taskiq" .
+      - name: Generate report
+        run: coverage lcov
+      - uses: romeovs/lcov-reporter-action@v0.2.16
+        with:
+          lcov-file: ./coverage.lcov
