@@ -6,7 +6,7 @@ from taskiq.result import TaskiqResult
 _ReturnType = TypeVar("_ReturnType")
 
 
-class DummyResultBackend(AsyncResultBackend[_ReturnType]):
+class DummyResultBackend(AsyncResultBackend[_ReturnType]):  # pragma: no cover
     """Default result backend, that does nothing."""
 
     async def set_result(self, task_id: str, result: Any) -> None:

@@ -1,12 +1,12 @@
 import inspect
 from collections import OrderedDict
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Coroutine, Optional, TypeVar
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.result_backend import AsyncResultBackend, TaskiqResult
-from taskiq.cli.async_task_runner import run_task
-from taskiq.exceptions import ResultSetError, TaskiqError
+from taskiq.cli.args import TaskiqArgs
+from taskiq.cli.receiver import Receiver
+from taskiq.exceptions import TaskiqError
 from taskiq.message import BrokerMessage
 
 _ReturnType = TypeVar("_ReturnType")
@@ -100,16 +100,16 @@ class InMemoryBroker(AsyncBroker):
             result_backend=result_backend,
             task_id_generator=task_id_generator,
         )
-        self.executor = ThreadPoolExecutor(max_workers=sync_tasks_pool_size)
-        self.cast_types = cast_types
-        if logs_format is None:
-            logs_format = (
-                "[%(asctime)s]"
-                "[%(levelname)-7s]"
-                "[%(module)s:%(funcName)s:%(lineno)d] "
-                "%(message)s"
-            )
-        self.logs_format = logs_format
+        self.receiver = Receiver(
+            self,
+            TaskiqArgs(
+                broker="",
+                modules=[],
+                max_threadpool_threads=sync_tasks_pool_size,
+                no_parse=not cast_types,
+                log_collector_format=logs_format or TaskiqArgs.log_collector_format,
+            ),
+        )
 
     async def kick(self, message: BrokerMessage) -> None:
         """
@@ -119,25 +119,20 @@ class InMemoryBroker(AsyncBroker):
 
         :param message: incomming message.
 
-        :raises ResultSetError: if cannot save results in result backend.
         :raises TaskiqError: if someone wants to kick unknown task.
         """
         target_task = self.available_tasks.get(message.task_name)
-        taskiq_message = self.formatter.loads(message=message)
         if target_task is None:
             raise TaskiqError("Unknown task.")
-        result = await run_task(
-            target=target_task.original_func,
-            signature=inspect.signature(target_task.original_func),
-            message=taskiq_message,
-            log_collector_format=self.logs_format,
-            executor=self.executor,
-            middlewares=self.middlewares,
-        )
-        try:
-            await self.result_backend.set_result(message.task_id, result)
-        except Exception as exc:
-            raise ResultSetError("Cannot set result.") from exc
+        if self.receiver.task_signatures:
+            if not self.receiver.task_signatures.get(target_task.task_name):
+                self.receiver.task_signatures[
+                    target_task.task_name
+                ] = inspect.signature(
+                    target_task.original_func,
+                )
+
+        await self.receiver.callback(message=message)
 
     async def listen(
         self,
