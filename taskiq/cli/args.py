@@ -128,8 +128,5 @@ class TaskiqArgs:
             help="Do not use gitignore to check for updated files.",
         )
 
-        if args is None:
-            namespace = parser.parse_args(args)
-        else:
-            namespace = parser.parse_args()
+        namespace = parser.parse_args(args)
         return TaskiqArgs(**namespace.__dict__)
