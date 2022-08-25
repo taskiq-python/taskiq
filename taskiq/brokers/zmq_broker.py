@@ -1,3 +1,5 @@
+import asyncio
+from logging import getLogger
 from typing import Any, Callable, Coroutine, Optional, TypeVar
 
 from taskiq.abc.broker import AsyncBroker
@@ -11,6 +13,8 @@ except ImportError:
     zmq = None  # type: ignore
 
 _T = TypeVar("_T")  # noqa: WPS111
+
+logger = getLogger(__name__)
 
 
 class ZeroMQBroker(AsyncBroker):
@@ -67,6 +71,13 @@ class ZeroMQBroker(AsyncBroker):
 
         :param callback: function to call when message received.
         """
-        while True:  # noqa: WPS457
+        loop = asyncio.get_event_loop()
+        while True:
             with self.socket.connect(self.sub_host) as sock:
-                await callback(BrokerMessage.parse_raw(await sock.recv_string()))
+                received_str = await sock.recv_string()
+                try:
+                    broker_msg = BrokerMessage.parse_raw(received_str)
+                except ValueError:
+                    logger.warning("Cannot parse received message %s", received_str)
+                    continue
+                loop.create_task(callback(broker_msg))

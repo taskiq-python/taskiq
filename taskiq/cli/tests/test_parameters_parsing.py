@@ -5,7 +5,7 @@ from typing import Any, Type
 import pytest
 from pydantic import BaseModel
 
-from taskiq.cli.async_task_runner import parse_params
+from taskiq.cli.params_parser import parse_params
 from taskiq.message import TaskiqMessage
 
 

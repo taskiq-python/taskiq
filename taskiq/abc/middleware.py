@@ -1,12 +1,12 @@
 from typing import TYPE_CHECKING, Any, Coroutine, Union
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.broker import AsyncBroker
     from taskiq.message import TaskiqMessage
     from taskiq.result import TaskiqResult
 
 
-class TaskiqMiddleware:
+class TaskiqMiddleware:  # pragma: no cover
     """Base class for middlewares."""
 
     def __init__(self) -> None:
