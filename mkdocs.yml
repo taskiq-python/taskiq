@@ -1,0 +1,48 @@
+site_name: "taskiq"
+site_url: "https://taskiq-python.github.io/taskiq"
+repo_url: https://github.com/taskiq-python/taskiq
+repo_name: taskiq-python/taskiq
+edit_uri: ""
+
+theme:
+  icon:
+    repo: fontawesome/brands/github
+  name: material
+  language: en
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.expand
+    - search.suggest
+    - header.autohide
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+plugins:
+  - search:
+      lang: en
+
+extra:
+  generator: true
+
+markdown_extensions:
+  - admonition
+  - markdown.extensions.meta
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
