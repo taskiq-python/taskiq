@@ -4,19 +4,46 @@ import io
 from concurrent.futures import ThreadPoolExecutor
 from logging import getLogger
 from time import time
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.cli.args import TaskiqArgs
 from taskiq.cli.log_collector import log_collector
 from taskiq.cli.params_parser import parse_params
-from taskiq.context import Context, context_updater
+from taskiq.context import Context
 from taskiq.message import BrokerMessage, TaskiqMessage
 from taskiq.result import TaskiqResult
 from taskiq.utils import maybe_awaitable
 
 logger = getLogger(__name__)
+
+
+def inject_context(
+    signature: Optional[inspect.Signature],
+    message: TaskiqMessage,
+    broker: AsyncBroker,
+) -> None:
+    """
+    Inject context parameter in message's kwargs.
+
+    This function parses signature to get
+    the context parameter definition.
+
+    If at least one parameter has the Context
+    type, it will add current context as kwarg.
+
+    :param signature: function's signature.
+    :param message: current taskiq message.
+    :param broker: current broker.
+    """
+    if signature is None:
+        return
+    for param_name, param in signature.parameters.items():
+        if param.annotation is param.empty:
+            continue
+        if param.annotation is Context:
+            message.kwargs[param_name] = Context(message.copy(), broker)
 
 
 def _run_sync(target: Callable[..., Any], message: TaskiqMessage) -> Any:
@@ -40,11 +67,8 @@ class Receiver:
         self.broker = broker
         self.cli_args = cli_args
         self.task_signatures: Dict[str, inspect.Signature] = {}
-        if not cli_args.no_parse:
-            for task in self.broker.available_tasks.values():
-                self.task_signatures[task.task_name] = inspect.signature(
-                    task.original_func,
-                )
+        for task in self.broker.available_tasks.values():
+            self.task_signatures[task.task_name] = inspect.signature(task.original_func)
         self.executor = ThreadPoolExecutor(
             max_workers=cli_args.max_threadpool_threads,
         )
@@ -100,11 +124,10 @@ class Receiver:
             taskiq_msg.task_name,
             taskiq_msg.task_id,
         )
-        with context_updater(Context(taskiq_msg, self.broker)):
-            result = await self.run_task(
-                target=self.broker.available_tasks[message.task_name].original_func,
-                message=taskiq_msg,
-            )
+        result = await self.run_task(
+            target=self.broker.available_tasks[message.task_name].original_func,
+            message=taskiq_msg,
+        )
         for middleware in self.broker.middlewares:
             if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
                 await maybe_awaitable(middleware.post_execute(taskiq_msg, result))
@@ -147,7 +170,15 @@ class Receiver:
         logs = io.StringIO()
         returned = None
         found_exception = None
-        parse_params(self.task_signatures.get(message.task_name), message)
+        signature = self.task_signatures.get(message.task_name)
+        if self.cli_args.no_parse:
+            signature = None
+        parse_params(signature, message)
+        inject_context(
+            self.task_signatures.get(message.task_name),
+            message,
+            self.broker,
+        )
         # Captures function's logs.
         with log_collector(logs, self.cli_args.log_collector_format):
             # Start a timer.

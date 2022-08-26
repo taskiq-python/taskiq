@@ -124,13 +124,10 @@ class InMemoryBroker(AsyncBroker):
         target_task = self.available_tasks.get(message.task_name)
         if target_task is None:
             raise TaskiqError("Unknown task.")
-        if self.receiver.task_signatures:
-            if not self.receiver.task_signatures.get(target_task.task_name):
-                self.receiver.task_signatures[
-                    target_task.task_name
-                ] = inspect.signature(
-                    target_task.original_func,
-                )
+        if not self.receiver.task_signatures.get(target_task.task_name):
+            self.receiver.task_signatures[target_task.task_name] = inspect.signature(
+                target_task.original_func,
+            )
 
         await self.receiver.callback(message=message)
 
