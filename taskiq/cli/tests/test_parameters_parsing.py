@@ -1,6 +1,6 @@
 import inspect
 from dataclasses import dataclass
-from typing import Any, Type
+from typing import Any, Type, get_type_hints
 
 import pytest
 from pydantic import BaseModel
@@ -30,6 +30,7 @@ def test_parse_params_no_signature() -> None:
     modify_msg = src_msg.copy(deep=True)
     parse_params(
         signature=None,
+        type_hints={},
         message=modify_msg,
     )
 
@@ -51,7 +52,11 @@ def test_parse_params_classes(test_class: Type[Any]) -> None:
         kwargs={},
     )
 
-    parse_params(inspect.signature(test_func), msg_with_args)
+    parse_params(
+        inspect.signature(test_func),
+        get_type_hints(test_func),
+        msg_with_args,
+    )
 
     assert isinstance(msg_with_args.args[0], test_class)
     assert msg_with_args.args[0].field == "test_val"
@@ -64,7 +69,11 @@ def test_parse_params_classes(test_class: Type[Any]) -> None:
         kwargs={"param": {"field": "test_val"}},
     )
 
-    parse_params(inspect.signature(test_func), msg_with_kwargs)
+    parse_params(
+        inspect.signature(test_func),
+        get_type_hints(test_func),
+        msg_with_kwargs,
+    )
 
     assert isinstance(msg_with_kwargs.kwargs["param"], test_class)
     assert msg_with_kwargs.kwargs["param"].field == "test_val"
@@ -85,7 +94,11 @@ def test_parse_params_wrong_data(test_class: Type[Any]) -> None:
         kwargs={},
     )
 
-    parse_params(inspect.signature(test_func), msg_with_args)
+    parse_params(
+        inspect.signature(test_func),
+        get_type_hints(test_func),
+        msg_with_args,
+    )
 
     assert isinstance(msg_with_args.args[0], dict)
 
@@ -97,7 +110,11 @@ def test_parse_params_wrong_data(test_class: Type[Any]) -> None:
         kwargs={"param": {"unknown": "unknown"}},
     )
 
-    parse_params(inspect.signature(test_func), msg_with_kwargs)
+    parse_params(
+        inspect.signature(test_func),
+        get_type_hints(test_func),
+        msg_with_kwargs,
+    )
 
     assert isinstance(msg_with_kwargs.kwargs["param"], dict)
 
@@ -117,7 +134,7 @@ def test_parse_params_nones(test_class: Type[Any]) -> None:
         kwargs={},
     )
 
-    parse_params(inspect.signature(test_func), msg_with_args)
+    parse_params(inspect.signature(test_func), get_type_hints(test_func), msg_with_args)
 
     assert msg_with_args.args[0] is None
 
@@ -129,6 +146,10 @@ def test_parse_params_nones(test_class: Type[Any]) -> None:
         kwargs={"param": None},
     )
 
-    parse_params(inspect.signature(test_func), msg_with_kwargs)
+    parse_params(
+        inspect.signature(test_func),
+        get_type_hints(test_func),
+        msg_with_kwargs,
+    )
 
     assert msg_with_kwargs.kwargs["param"] is None

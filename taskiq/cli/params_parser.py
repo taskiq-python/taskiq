@@ -1,6 +1,6 @@
 import inspect
 from logging import getLogger
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from pydantic import parse_obj_as
 
@@ -11,6 +11,7 @@ logger = getLogger(__name__)
 
 def parse_params(  # noqa: C901
     signature: Optional[inspect.Signature],
+    type_hints: Dict[str, Any],
     message: TaskiqMessage,
 ) -> None:
     """
@@ -42,25 +43,30 @@ def parse_params(  # noqa: C901
     or you can make some of parameters untyped,
     or use Any.
 
+    Why do we need type_hints separate with
+    Signature. The reason is simple.
+    If some variable doesn't have a type hint
+    it won't be added in the dict of type hints.
+
     :param signature: original function's signature.
+    :param type_hints: function's type hints.
     :param message: incoming message.
     """
     if signature is None:
         return
     argnum = -1
     # Iterate over function's params.
-    for param_name, params_type in signature.parameters.items():
+    for param_name in signature.parameters.keys():
         # If parameter doesn't have an annotation.
-        if params_type.annotation is params_type.empty:
+        annot = type_hints.get(param_name)
+        if annot is None:
             continue
         # Increment argument numbers. This is
         # for positional arguments.
         argnum += 1
-        # Shortland for params_type.annotation
-        annot = params_type.annotation
         # Value from incoming message.
         value = None
-        logger.debug("Trying to parse %s as %s", param_name, params_type.annotation)
+        logger.debug("Trying to parse %s as %s", param_name, annot)
         # Check if we have positional arguments in passed message.
         if argnum < len(message.args):
             # Get positional argument.
