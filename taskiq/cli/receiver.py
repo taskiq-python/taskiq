@@ -4,7 +4,7 @@ import io
 from concurrent.futures import ThreadPoolExecutor
 from logging import getLogger
 from time import time
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, get_type_hints
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
@@ -20,7 +20,7 @@ logger = getLogger(__name__)
 
 
 def inject_context(
-    signature: Optional[inspect.Signature],
+    type_hints: Dict[str, Any],
     message: TaskiqMessage,
     broker: AsyncBroker,
 ) -> None:
@@ -33,16 +33,14 @@ def inject_context(
     If at least one parameter has the Context
     type, it will add current context as kwarg.
 
-    :param signature: function's signature.
+    :param type_hints: function's type hints.
     :param message: current taskiq message.
     :param broker: current broker.
     """
-    if signature is None:
+    if not type_hints:
         return
-    for param_name, param in signature.parameters.items():
-        if param.annotation is param.empty:
-            continue
-        if param.annotation is Context:
+    for param_name, param_type in type_hints.items():
+        if param_type is Context:
             message.kwargs[param_name] = Context(message.copy(), broker)
 
 
@@ -67,8 +65,10 @@ class Receiver:
         self.broker = broker
         self.cli_args = cli_args
         self.task_signatures: Dict[str, inspect.Signature] = {}
+        self.task_hints: Dict[str, Dict[str, Any]] = {}
         for task in self.broker.available_tasks.values():
             self.task_signatures[task.task_name] = inspect.signature(task.original_func)
+            self.task_hints[task.task_name] = get_type_hints(task.original_func)
         self.executor = ThreadPoolExecutor(
             max_workers=cli_args.max_threadpool_threads,
         )
@@ -173,9 +173,9 @@ class Receiver:
         signature = self.task_signatures.get(message.task_name)
         if self.cli_args.no_parse:
             signature = None
-        parse_params(signature, message)
+        parse_params(signature, self.task_hints.get(message.task_name) or {}, message)
         inject_context(
-            self.task_signatures.get(message.task_name),
+            self.task_hints.get(message.task_name) or {},
             message,
             self.broker,
         )

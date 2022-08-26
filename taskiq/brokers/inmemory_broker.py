@@ -1,6 +1,6 @@
 import inspect
 from collections import OrderedDict
-from typing import Any, Callable, Coroutine, Optional, TypeVar
+from typing import Any, Callable, Coroutine, Optional, TypeVar, get_type_hints
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.result_backend import AsyncResultBackend, TaskiqResult
@@ -126,6 +126,10 @@ class InMemoryBroker(AsyncBroker):
             raise TaskiqError("Unknown task.")
         if not self.receiver.task_signatures.get(target_task.task_name):
             self.receiver.task_signatures[target_task.task_name] = inspect.signature(
+                target_task.original_func,
+            )
+        if not self.receiver.task_hints.get(target_task.task_name):
+            self.receiver.task_hints[target_task.task_name] = get_type_hints(
                 target_task.original_func,
             )
 
