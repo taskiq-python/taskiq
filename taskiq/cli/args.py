@@ -19,17 +19,19 @@ class TaskiqArgs:
     """Taskiq worker CLI arguments."""
 
     broker: str
-    tasks_pattern: str
     modules: List[str]
-    fs_discover: bool
-    log_level: str
-    workers: int
-    log_collector_format: str
-    max_threadpool_threads: int
-    no_parse: bool
-    shutdown_timeout: float
-    reload: bool
-    no_gitignore: bool
+    tasks_pattern: str = "tasks.py"
+    fs_discover: bool = False
+    log_level: str = "INFO"
+    workers: int = 2
+    log_collector_format: str = (
+        "[%(asctime)s][%(levelname)-7s][%(module)s:%(funcName)s:%(lineno)d] %(message)s"
+    )
+    max_threadpool_threads: int = 10
+    no_parse: bool = False
+    shutdown_timeout: float = 5
+    reload: bool = False
+    no_gitignore: bool = False
 
     @classmethod
     def from_cli(cls, args: Optional[List[str]] = None) -> "TaskiqArgs":  # noqa: WPS213
@@ -128,8 +130,5 @@ class TaskiqArgs:
             help="Do not use gitignore to check for updated files.",
         )
 
-        if args is None:
-            namespace = parser.parse_args(args)
-        else:
-            namespace = parser.parse_args()
+        namespace = parser.parse_args(args)
         return TaskiqArgs(**namespace.__dict__)

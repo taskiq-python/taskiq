@@ -5,7 +5,7 @@ from gitignore_parser import parse_gitignore
 from watchdog.events import FileSystemEvent
 
 
-class FileWatcher:
+class FileWatcher:  # pragma: no cover
     """Filewatcher that watchs for filesystem changes."""
 
     def __init__(

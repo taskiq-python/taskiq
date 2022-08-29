@@ -1,12 +1,12 @@
 from typing import TYPE_CHECKING, Any, Coroutine, Union
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.broker import AsyncBroker
     from taskiq.message import TaskiqMessage
     from taskiq.result import TaskiqResult
 
 
-class TaskiqMiddleware:
+class TaskiqMiddleware:  # pragma: no cover
     """Base class for middlewares."""
 
     def __init__(self) -> None:
@@ -79,6 +79,21 @@ class TaskiqMiddleware:
 
         :param message: incoming message.
         :param result: result of execution for current task.
+        """
+
+    def post_save(
+        self,
+        message: "TaskiqMessage",
+        result: "TaskiqResult[Any]",
+    ) -> "Union[None, Coroutine[Any, Any, None]]":
+        """
+        Post save hook.
+
+        This function is called after result of
+        the executions is saved in the result_backend.
+
+        :param message: processed message.
+        :param result: returned value.
         """
 
     def on_error(
