@@ -73,7 +73,7 @@ class Receiver:
             max_workers=cli_args.max_threadpool_threads,
         )
 
-    async def callback(  # noqa: C901
+    async def callback(  # noqa: C901, WPS213
         self,
         message: BrokerMessage,
         raise_err: bool = False,
@@ -141,6 +141,10 @@ class Receiver:
             )
             if raise_err:
                 raise exc
+
+        for middleware in self.broker.middlewares:
+            if middleware.__class__.post_save != TaskiqMiddleware.post_save:
+                await maybe_awaitable(middleware.post_save(taskiq_msg, result))
 
     async def run_task(  # noqa: C901, WPS210
         self,
