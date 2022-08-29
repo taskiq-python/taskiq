@@ -95,6 +95,10 @@ per-file-ignores =
   test_*.py,tests.py,tests_*.py,*/tests/*:
   ; Use of assert detected
   S101,
+  ; Found magic number
+  WPS432,
+  ; Missing parameter(s) in Docstring
+  DAR101,
 
 exclude =
   ./.git,

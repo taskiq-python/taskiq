@@ -7,12 +7,10 @@ from logging import getLogger
 from typing import (  # noqa: WPS235
     TYPE_CHECKING,
     Any,
-    AsyncGenerator,
     Callable,
     Coroutine,
     Dict,
     List,
-    NoReturn,
     Optional,
     TypeVar,
     Union,
