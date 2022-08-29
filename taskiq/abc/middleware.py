@@ -81,6 +81,21 @@ class TaskiqMiddleware:  # pragma: no cover
         :param result: result of execution for current task.
         """
 
+    def post_save(
+        self,
+        message: "TaskiqMessage",
+        result: "TaskiqResult[Any]",
+    ) -> "Union[None, Coroutine[Any, Any, None]]":
+        """
+        Post save hook.
+
+        This function is called after result of
+        the executions is saved in the result_backend.
+
+        :param message: processed message.
+        :param result: returned value.
+        """
+
     def on_error(
         self,
         message: "TaskiqMessage",
