@@ -16,9 +16,7 @@ class JSONFormatter(TaskiqFormatter):
             task_id=message.task_id,
             task_name=message.task_name,
             message=message.json(),
-            labels={
-                "content_type": "application/json",
-            },
+            labels=message.labels,
         )
 
     def loads(self, message: BrokerMessage) -> TaskiqMessage:
