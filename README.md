@@ -23,3 +23,41 @@ pip install git+https://github.com/taskiq-python/taskiq
 ```
 
 You can read more about how to use it in our docs: https://taskiq-python.github.io/.
+
+
+# Local development
+
+
+## Linting
+
+We use pre-commit to do linting locally.
+
+After cloning this project, please install [pre-commit](https://pre-commit.com/#install). It helps fix files before committing changes.
+
+```bash
+pre-commit install
+```
+
+
+## Testing
+
+Pytest can run without any additional actions or options.
+
+```bash
+pytest
+```
+
+## Docs
+
+To run docs locally, you need to install [yarn](https://yarnpkg.com/getting-started/install).
+
+First, you need to install dependencies.
+```
+yarn install
+```
+
+After that you can set up a docs server by running:
+
+```
+yarn docs:dev
+```
