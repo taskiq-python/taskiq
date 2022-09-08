@@ -5,7 +5,7 @@ from typing import Any, Type, get_type_hints
 import pytest
 from pydantic import BaseModel
 
-from taskiq.cli.params_parser import parse_params
+from taskiq.cli.worker.params_parser import parse_params
 from taskiq.message import TaskiqMessage
 
 

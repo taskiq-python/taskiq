@@ -4,16 +4,22 @@ order: 4
 
 # CLI
 
-Core library comes with CLI programm called `taskiq`, which is used to run workers.
+Core library comes with CLI programm called `taskiq`, which is used to run different subcommands.
 
-To run it you have to specify the broker you want to use and modules with defined tasks.
+
+By default taskiq is shipped with only one command: `worker`. You can search for more taskiq plugins
+using pypi. Some plugins may add new commands to taskiq.
+
+## Worker
+
+To run worker process, you have to specify the broker you want to use and modules with defined tasks.
 Like this:
 
 ```bash
-taskiq mybroker:broker_var my_project.module1 my_project.module2
+taskiq worker mybroker:broker_var my_project.module1 my_project.module2
 ```
 
-## Autoimporting
+### Autoimporting
 
 Enumerating all modules with tasks is not an option sometimes.
 That's why taskiq can autodiscover tasks in current directory recursively.
@@ -24,7 +30,7 @@ We have two options for this:
 * `--fs-discover` or `-fsd`. This option enables search of task files in current directory recursively, using the given pattern.
 
 
-## Type casts
+### Type casts
 
 One of features taskiq have is automatic type casts. For examle you have a type-hinted task like this:
 ```python
@@ -38,7 +44,7 @@ dataclasses as the input parameters.
 
 To disable this pass the `--no-parse` option to the taskiq.
 
-## Hot reload
+### Hot reload
 
 This is annoying to restart workers every time you modify tasks. That's why taskiq supports hot-reload.
 To enable this option simply pass the `--reload` or `-r` option to taskiq CLI.

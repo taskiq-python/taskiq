@@ -1,6 +1,6 @@
 from typing import get_type_hints
 
-from taskiq.cli.receiver import inject_context
+from taskiq.cli.worker.receiver import inject_context
 from taskiq.context import Context
 from taskiq.message import TaskiqMessage
 

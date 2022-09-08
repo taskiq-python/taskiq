@@ -142,7 +142,7 @@ docker run --rm -d ^
 Now we need to start worker process by running taskiq cli command. You can get more info about the CLI in the [CLI](./cli.md) section.
 
 ```bash:no-line-numbers
-taskiq broker:broker
+taskiq worker broker:broker
 ```
 
 After the worker is up, we can run our script as an ordinary python file and see how the worker executes tasks.
@@ -206,7 +206,7 @@ docker run --rm -d ^
 Let's run taskiq once again. The command is the same.
 
 ```bash:no-line-numbers
-taskiq broker:broker
+taskiq worker broker:broker
 ```
 
 Now, if we run this file with python, we can get the correct results with a valid execution time.
