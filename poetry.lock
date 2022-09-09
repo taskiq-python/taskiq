@@ -388,7 +388,7 @@ smmap = ">=3.0.1,<6"
 
 [[package]]
 name = "gitignore-parser"
-version = "0.0.8"
+version = "0.1.0"
 description = "A spec-compliant gitignore parser for Python 3.5+"
 category = "main"
 optional = false
@@ -429,7 +429,7 @@ python-versions = ">=3.5"
 name = "importlib-metadata"
 version = "4.2.0"
 description = "Read metadata from Python packages"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.6"
 
@@ -966,7 +966,7 @@ tokenize-rt = ">=2.1"
 name = "zipp"
 version = "3.8.1"
 description = "Backport of pathlib-compatible object wrapper for zip files"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -981,7 +981,7 @@ zmq = ["pyzmq"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "6564a89dce2058899fea7833777ca29a9b111dcb982825758be1c732a0dae52c"
+content-hash = "bd939735931a7b22fb879088796c49ca7f75195e1eba290a798c721b43afd831"
 
 [metadata.files]
 anyio = [
@@ -1243,7 +1243,7 @@ gitdb = [
     {file = "gitdb-4.0.9.tar.gz", hash = "sha256:bac2fd45c0a1c9cf619e63a90d62bdc63892ef92387424b855792a6cabe789aa"},
 ]
 gitignore-parser = [
-    {file = "gitignore_parser-0.0.8.tar.gz", hash = "sha256:b4e6e63d971810cbd2168bc02deddba719c07da655eaf56336d4bb0233ecef85"},
+    {file = "gitignore_parser-0.1.0.tar.gz", hash = "sha256:7efe2677dd433b784c3f28c7246478e6ff442e22ff56d54eb6b9e9cec96e873c"},
 ]
 gitpython = [
     {file = "GitPython-3.1.27-py3-none-any.whl", hash = "sha256:5b68b000463593e05ff2b261acff0ff0972df8ab1b70d3cdbd41b546c8b8fc3d"},

@@ -99,7 +99,7 @@ You have to provide a path to your broker. As an example, if you want to start l
 with a broker that is stored in a variable `my broker` in the module `my_project.broker` run this in your terminal:
 
 ```
-taskiq my_project.broker:mybroker
+taskiq worker my_project.broker:mybroker
 ```
 
 taskiq can discover task modules to import automatically,

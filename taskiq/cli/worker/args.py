@@ -1,7 +1,7 @@
 import enum
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 
 class LogLevel(str, enum.Enum):  # noqa: WPS600
@@ -15,14 +15,14 @@ class LogLevel(str, enum.Enum):  # noqa: WPS600
 
 
 @dataclass
-class TaskiqArgs:
+class WorkerArgs:
     """Taskiq worker CLI arguments."""
 
     broker: str
     modules: List[str]
     tasks_pattern: str = "tasks.py"
     fs_discover: bool = False
-    log_level: str = "INFO"
+    log_level: LogLevel = LogLevel.INFO
     workers: int = 2
     log_collector_format: str = (
         "[%(asctime)s][%(levelname)-7s][%(module)s:%(funcName)s:%(lineno)d] %(message)s"
@@ -34,7 +34,10 @@ class TaskiqArgs:
     no_gitignore: bool = False
 
     @classmethod
-    def from_cli(cls, args: Optional[List[str]] = None) -> "TaskiqArgs":  # noqa: WPS213
+    def from_cli(  # noqa: WPS213
+        cls,
+        args: Optional[Sequence[str]] = None,
+    ) -> "WorkerArgs":
         """
         Construct TaskiqArgs instanc from CLI arguments.
 
@@ -131,4 +134,4 @@ class TaskiqArgs:
         )
 
         namespace = parser.parse_args(args)
-        return TaskiqArgs(**namespace.__dict__)
+        return WorkerArgs(**namespace.__dict__)
