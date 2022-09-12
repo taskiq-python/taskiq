@@ -33,6 +33,7 @@ uvloop = { version = ">=0.16.0,<1", optional = true }
 watchdog = "^2.1.9"
 gitignore-parser = "^0.1.0"
 importlib-metadata = "<4.3"
+pycron = "^3.0.0"
 
 
 [tool.poetry.dev-dependencies]
@@ -59,8 +60,9 @@ uv = ["uvloop"]
 [tool.poetry.scripts]
 taskiq = "taskiq.__main__:main"
 
-[tool.poetry.plugins.taskiq-cli]
+[tool.poetry.plugins."taskiq-cli"]
 worker = "taskiq.cli.worker.cmd:WorkerCMD"
+scheduler = "taskiq.cli.scheduler.cmd:SchedulerCMD"
 
 [tool.mypy]
 strict = true

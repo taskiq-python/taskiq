@@ -1,17 +1,8 @@
-import enum
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from dataclasses import dataclass
 from typing import List, Optional, Sequence
 
-
-class LogLevel(str, enum.Enum):  # noqa: WPS600
-    """Different log levels."""
-
-    INFO = "INFO"
-    WARNING = "WARNING"
-    DEBUG = "DEBUG"
-    ERROR = "ERROR"
-    FATAL = "FATAL"
+from taskiq.cli.common_args import LogLevel
 
 
 @dataclass

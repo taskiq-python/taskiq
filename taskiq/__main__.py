@@ -48,6 +48,7 @@ def main() -> None:  # noqa: C901, WPS210
         try:
             cmd_class = entrypoint.load()
         except ImportError:
+            print(f"Could not load {entrypoint.value}")  # noqa: WPS421
             continue
         if issubclass(cmd_class, TaskiqCMD):
             subparsers.add_parser(
