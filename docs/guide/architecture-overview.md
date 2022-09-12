@@ -241,7 +241,7 @@ This can be done with context.
 Context holds information about the current broker and current incoming message.
 To get it, simply add the context parameter with `type-hint`.
 
-::: warning Cool warning!
+::: danger Cool warning!
 Context injected only if you have a type hint.
 :::
 

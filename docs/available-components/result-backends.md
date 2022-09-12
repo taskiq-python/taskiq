@@ -1,8 +1,8 @@
 ---
-order: 6
+order: 3
 ---
 
-# Result backends
+# Available result backends
 
 Result backends are used to store execution results.
 This includes:

@@ -18,8 +18,7 @@ def main() -> None:  # noqa: C901, WPS210
     All arguments are passed to them as it was a normal
     call.
     """
-    plugins = entry_points().select(group="taskiq-cli")
-    found_plugins = len(plugins)
+    found_plugins = len(entry_points().select(group="taskiq_cli"))
     parser = argparse.ArgumentParser(
         description=f"""
         CLI for taskiq. Distributed task queue.
@@ -44,10 +43,11 @@ def main() -> None:  # noqa: C901, WPS210
         metavar="",
         dest="subcommand",
     )
-    for entrypoint in entry_points().select(group="taskiq-cli"):
+    for entrypoint in entry_points().select(group="taskiq_cli"):
         try:
             cmd_class = entrypoint.load()
         except ImportError:
+            print(f"Could not load {entrypoint.value}")  # noqa: WPS421
             continue
         if issubclass(cmd_class, TaskiqCMD):
             subparsers.add_parser(

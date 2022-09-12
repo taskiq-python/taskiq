@@ -7,7 +7,7 @@ order: 4
 Core library comes with CLI programm called `taskiq`, which is used to run different subcommands.
 
 
-By default taskiq is shipped with only one command: `worker`. You can search for more taskiq plugins
+By default taskiq is shipped with only two commands: `worker` and `scheduler`. You can search for more taskiq plugins
 using pypi. Some plugins may add new commands to taskiq.
 
 ## Worker
@@ -51,3 +51,29 @@ To enable this option simply pass the `--reload` or `-r` option to taskiq CLI.
 
 Also this option supports `.gitignore` files. If you have such files in your directory. It won't reload worker,
 if you cange ignored file's contents. To disable this functionality pass `--do-not-use-gitignore` option.
+
+
+## Scheduler
+
+Scheduler is used to schedule tasks as described in [Scheduling tasks](./scheduling-tasks.md) section.
+
+To run it simply run
+
+```
+taskiq scheduler <path to scheduler> [optional module to import]...
+```
+
+For example
+
+```python
+taskiq scheduler my_project.broker:scheduler my_project.module1 my_project.module2
+```
+
+### Parameters
+
+Path to scheduler is the only required argument.
+
+* `--tasks-pattern` or `-tp`.
+    It's a name of files to import. By default is searches for all `tasks.py` files.
+* `--fs-discover` or `-fsd`. This option enables search of task files in current directory recursively, using the given pattern.
+* `--log-level` is used to set a log level.
