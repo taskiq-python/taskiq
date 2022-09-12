@@ -8,9 +8,9 @@ from typing import Any, Callable, Dict, get_type_hints
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
-from taskiq.cli.args import TaskiqArgs
-from taskiq.cli.log_collector import log_collector
-from taskiq.cli.params_parser import parse_params
+from taskiq.cli.worker.args import WorkerArgs
+from taskiq.cli.worker.log_collector import log_collector
+from taskiq.cli.worker.params_parser import parse_params
 from taskiq.context import Context
 from taskiq.message import BrokerMessage, TaskiqMessage
 from taskiq.result import TaskiqResult
@@ -61,7 +61,7 @@ def _run_sync(target: Callable[..., Any], message: TaskiqMessage) -> Any:
 class Receiver:
     """Class that uses as a callback handler."""
 
-    def __init__(self, broker: AsyncBroker, cli_args: TaskiqArgs) -> None:
+    def __init__(self, broker: AsyncBroker, cli_args: WorkerArgs) -> None:
         self.broker = broker
         self.cli_args = cli_args
         self.task_signatures: Dict[str, inspect.Signature] = {}

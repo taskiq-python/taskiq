@@ -1,15 +1,15 @@
 from logging import getLogger
 
 from taskiq.abc.broker import AsyncBroker
-from taskiq.cli.args import TaskiqArgs
-from taskiq.cli.receiver import Receiver
+from taskiq.cli.worker.args import WorkerArgs
+from taskiq.cli.worker.receiver import Receiver
 
 logger = getLogger("taskiq.worker")
 
 
 async def async_listen_messages(
     broker: AsyncBroker,
-    cli_args: TaskiqArgs,
+    cli_args: WorkerArgs,
 ) -> None:  # pragma: no cover
     """
     This function iterates over tasks asynchronously.

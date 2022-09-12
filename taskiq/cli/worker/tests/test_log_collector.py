@@ -2,7 +2,7 @@ import logging
 import sys
 from io import StringIO
 
-from taskiq.cli.log_collector import log_collector
+from taskiq.cli.worker.log_collector import log_collector
 
 
 def test_log_collector_std_success() -> None:

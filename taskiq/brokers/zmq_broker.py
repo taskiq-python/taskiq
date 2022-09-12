@@ -72,8 +72,8 @@ class ZeroMQBroker(AsyncBroker):
         :param callback: function to call when message received.
         """
         loop = asyncio.get_event_loop()
-        while True:
-            with self.socket.connect(self.sub_host) as sock:
+        with self.socket.connect(self.sub_host) as sock:
+            while True:
                 received_str = await sock.recv_string()
                 try:
                     broker_msg = BrokerMessage.parse_raw(received_str)
