@@ -1,7 +1,7 @@
 ---
 title: Home
 home: true
-heroImage: logo.png
+heroImage: logo.svg
 heroAlt: logo
 heroText: Taskiq python
 actions:
