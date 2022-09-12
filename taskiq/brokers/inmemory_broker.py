@@ -4,8 +4,8 @@ from typing import Any, Callable, Coroutine, Optional, TypeVar, get_type_hints
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.result_backend import AsyncResultBackend, TaskiqResult
-from taskiq.cli.args import TaskiqArgs
-from taskiq.cli.receiver import Receiver
+from taskiq.cli.worker.args import WorkerArgs
+from taskiq.cli.worker.receiver import Receiver
 from taskiq.exceptions import TaskiqError
 from taskiq.message import BrokerMessage
 
@@ -102,12 +102,12 @@ class InMemoryBroker(AsyncBroker):
         )
         self.receiver = Receiver(
             self,
-            TaskiqArgs(
+            WorkerArgs(
                 broker="",
                 modules=[],
                 max_threadpool_threads=sync_tasks_pool_size,
                 no_parse=not cast_types,
-                log_collector_format=logs_format or TaskiqArgs.log_collector_format,
+                log_collector_format=logs_format or WorkerArgs.log_collector_format,
             ),
         )
 

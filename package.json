@@ -1,0 +1,17 @@
+{
+  "name": "taskiq-docs",
+  "repository": "git@github.com:taskiq-python/taskiq.git",
+  "author": "Pavel Kirilin <win10@list.ru>",
+  "license": "MIT",
+  "private": false,
+  "scripts": {
+    "docs:dev": "vuepress dev docs --clean-cache",
+    "docs:build": "vuepress build docs",
+    "docs:serve": "vuepress serve docs"
+  },
+  "devDependencies": {
+    "@vuepress/plugin-search": "^2.0.0-beta.51",
+    "vuepress": "^2.0.0-beta.51",
+    "vuepress-theme-hope": "^2.0.0-beta.97"
+  }
+}
