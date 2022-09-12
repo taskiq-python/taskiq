@@ -27,7 +27,7 @@ from setuptools import setup
 setup(
     # ...,
     entry_points={
-        'taskiq-cli': [
+        'taskiq_cli': [
             'demo = my_project.cmd:MyCommand',
         ]
     }
@@ -37,14 +37,14 @@ setup(
 @tab setuptools pyproject.toml
 
 ```toml
-[project.entry-points.taskiq-cli]
+[project.entry-points.taskiq_cli]
 demo = "my_project.cmd:MyCommand"
 ```
 
 @tab poetry
 
 ```toml
-[tool.poetry.plugins.taskiq-cli]
+[tool.poetry.plugins.taskiq_cli]
 demo = "my_project.cmd:MyCommand"
 ```
 

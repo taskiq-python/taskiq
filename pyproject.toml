@@ -60,7 +60,7 @@ uv = ["uvloop"]
 [tool.poetry.scripts]
 taskiq = "taskiq.__main__:main"
 
-[tool.poetry.plugins."taskiq-cli"]
+[tool.poetry.plugins.taskiq_cli]
 worker = "taskiq.cli.worker.cmd:WorkerCMD"
 scheduler = "taskiq.cli.scheduler.cmd:SchedulerCMD"
 

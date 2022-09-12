@@ -71,6 +71,8 @@ async def run_scheduler(args: SchedulerArgs) -> None:  # noqa: C901, WPS210, WPS
             " %(message)s"
         ),
     )
+    for source in scheduler.sources:
+        await source.startup()
     loop = asyncio.get_event_loop()
     tasks: "List[ScheduledTask]" = []
     loop.create_task(schedules_updater(scheduler, tasks))

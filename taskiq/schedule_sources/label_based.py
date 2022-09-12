@@ -25,6 +25,8 @@ class LabelScheduleSource(ScheduleSource):
         """
         schedules = []
         for task_name, task in self.broker.available_tasks.items():
+            if task.broker != self.broker:
+                continue
             for schedule in task.labels.get("schedule", []):
                 labels = schedule.get("labels", {})
                 labels.update(task.labels)

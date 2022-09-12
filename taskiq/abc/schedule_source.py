@@ -8,6 +8,12 @@ if TYPE_CHECKING:
 class ScheduleSource(ABC):
     """Abstract class for source of scheduled tasks."""
 
+    async def startup(self) -> None:
+        """Action to execute during startup."""
+
+    async def shutdown(self) -> None:
+        """Actions to execute during shutdown."""
+
     @abstractmethod
     async def get_schedules(self) -> List["ScheduledTask"]:
         """Get list of taskiq schedules."""
