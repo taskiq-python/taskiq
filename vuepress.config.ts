@@ -7,10 +7,10 @@ export default defineUserConfig({
     title: "Taskiq",
     description: 'Distributed task queue with full async support',
     head: [
-        ['meta', { property: 'og:image', content: 'https://taskiq-python.github.io/logo.png' }]
+        ['meta', { property: 'og:image', content: 'https://taskiq-python.github.io/logo.svg' }]
     ],
     theme: hopeTheme({
-        logo: "/logo.png",
+        logo: "/logo.svg",
         pure: true,
         backToTop: false,
         repo: 'taskiq-python/taskiq',

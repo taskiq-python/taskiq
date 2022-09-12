@@ -2,7 +2,10 @@
 [![PyPI](https://img.shields.io/pypi/v/taskiq?style=for-the-badge)](https://pypi.org/project/taskiq/)
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/taskiq?style=for-the-badge)](https://pypistats.org/packages/taskiq)
 
-# Taskiq
+<div align="center">
+<a href="https://taskiq-python.github.io/"><img src="https://raw.githubusercontent.com/taskiq-python/taskiq/master/imgs/logo.svg" width=600></a>
+<hr/>
+</div>
 
 Taskiq is an asynchronous distributed task queue for python.
 This project takes inspiration from big projects such as [Celery](https://docs.celeryq.dev) and [Dramatiq](https://dramatiq.io/).

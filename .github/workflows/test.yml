@@ -21,7 +21,7 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: "3.9"
-          cache: 'poetry'
+          cache: "poetry"
       - name: Install deps
         run: poetry install
       - name: Run lint check
@@ -44,7 +44,7 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: "${{ matrix.py_version }}"
-          cache: 'poetry'
+          cache: "poetry"
       - name: Install deps
         run: poetry install
       - name: Run pytest check
