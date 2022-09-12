@@ -5,8 +5,8 @@ import pytest
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.brokers.inmemory_broker import InMemoryBroker
-from taskiq.cli.args import TaskiqArgs
-from taskiq.cli.receiver import Receiver
+from taskiq.cli.worker.args import WorkerArgs
+from taskiq.cli.worker.receiver import Receiver
 from taskiq.message import BrokerMessage, TaskiqMessage
 from taskiq.result import TaskiqResult
 
@@ -26,7 +26,7 @@ def get_receiver(
         broker = InMemoryBroker()
     return Receiver(
         broker,
-        TaskiqArgs(
+        WorkerArgs(
             broker="",
             modules=[],
             no_parse=no_parse,

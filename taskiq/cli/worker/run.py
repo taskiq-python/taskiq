@@ -1,22 +1,19 @@
 import asyncio
 import os
 import signal
-import sys
-from contextlib import contextmanager
-from importlib import import_module
 from logging import basicConfig, getLevelName, getLogger
 from multiprocessing import Process
-from pathlib import Path
 from queue import Queue
 from time import sleep
-from typing import Any, Generator, List
+from typing import Any, List
 
 from watchdog.observers import Observer
 
 from taskiq.abc.broker import AsyncBroker
-from taskiq.cli.args import TaskiqArgs
-from taskiq.cli.async_task_runner import async_listen_messages
+from taskiq.cli.utils import import_object, import_tasks
 from taskiq.cli.watcher import FileWatcher
+from taskiq.cli.worker.args import WorkerArgs
+from taskiq.cli.worker.async_task_runner import async_listen_messages
 
 try:
     import uvloop  # noqa: WPS433
@@ -78,82 +75,6 @@ def schedule_workers_reload() -> None:
     reload_queue.join()
 
 
-@contextmanager
-def add_cwd_in_path() -> Generator[None, None, None]:
-    """
-    Adds current directory in python path.
-
-    This context manager adds current directory in sys.path,
-    so all python files are discoverable now, without installing
-    current project.
-
-    :yield: none
-    """
-    cwd = os.getcwd()
-    if cwd in sys.path:
-        yield
-    else:
-        logger.debug(f"Inserting {cwd} in sys.path")
-        sys.path.insert(0, cwd)
-        try:
-            yield
-        finally:
-            try:  # noqa: WPS505
-                sys.path.remove(cwd)
-            except ValueError:
-                logger.warning(f"Cannot remove '{cwd}' from sys.path")
-
-
-def import_broker(broker_spec: str) -> Any:
-    """
-    It parses broker spec and imports it.
-
-    :param broker_spec: string in format like `package.module:variable`
-    :raises ValueError: if spec has unknown format.
-    :returns: imported broker.
-    """
-    import_spec = broker_spec.split(":")
-    if len(import_spec) != 2:
-        raise ValueError("You should provide broker in `module:variable` format.")
-    with add_cwd_in_path():
-        module = import_module(import_spec[0])
-    return getattr(module, import_spec[1])
-
-
-def import_from_modules(modules: list[str]) -> None:
-    """
-    Import all modules from modules variable.
-
-    :param modules: list of modules.
-    """
-    for module in modules:
-        try:
-            logger.info(f"Importing tasks from module {module}")
-            with add_cwd_in_path():
-                import_module(module)
-        except ImportError:
-            logger.warning(f"Cannot import {module}")
-
-
-def import_tasks(modules: list[str], pattern: str, fs_discover: bool) -> None:
-    """
-    Import tasks modules.
-
-    This function is used to
-    import all tasks from modules.
-
-    :param modules: list of modules to import.
-    :param pattern: pattern of a file if fs_discover is True.
-    :param fs_discover: If true it will try to import modules
-        from filesystem.
-    """
-    if fs_discover:
-        for path in Path(".").rglob(pattern):
-            modules.append(str(path).removesuffix(".py").replace("/", "."))
-
-    import_from_modules(modules)
-
-
 async def shutdown_broker(broker: AsyncBroker, timeout: float) -> None:
     """
     This function used to shutdown broker.
@@ -181,7 +102,7 @@ async def shutdown_broker(broker: AsyncBroker, timeout: float) -> None:
         )
 
 
-def start_listen(args: TaskiqArgs) -> None:  # noqa: C901
+def start_listen(args: WorkerArgs) -> None:  # noqa: C901
     """
     This function starts actual listening process.
 
@@ -202,7 +123,7 @@ def start_listen(args: TaskiqArgs) -> None:  # noqa: C901
     # We must set this field before importing tasks,
     # so broker will remember all tasks it's related to.
     AsyncBroker.is_worker_process = True
-    broker = import_broker(args.broker)
+    broker = import_object(args.broker)
     import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
     if not isinstance(broker, AsyncBroker):
         raise ValueError("Unknown broker type. Please use AsyncBroker instance.")
@@ -240,7 +161,7 @@ def start_listen(args: TaskiqArgs) -> None:  # noqa: C901
         loop.run_until_complete(shutdown_broker(broker, args.shutdown_timeout))
 
 
-def watcher_loop(args: TaskiqArgs) -> None:  # noqa: C901, WPS213
+def watcher_loop(args: WorkerArgs) -> None:  # noqa: C901, WPS213
     """
     Infinate loop for main process.
 
@@ -293,7 +214,7 @@ def watcher_loop(args: TaskiqArgs) -> None:  # noqa: C901, WPS213
             worker_processes.remove(dead_process)
 
 
-def run_worker(args: TaskiqArgs) -> None:  # noqa: WPS213
+def run_worker(args: WorkerArgs) -> None:  # noqa: WPS213
     """
     This function starts worker processes.
 
