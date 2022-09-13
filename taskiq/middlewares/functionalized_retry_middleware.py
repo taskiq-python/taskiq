@@ -1,6 +1,6 @@
 from copy import deepcopy
 from logging import getLogger
-from typing import Any, Callable
+from typing import Any, Callable, Dict
 
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.kicker import AsyncKicker
@@ -15,7 +15,7 @@ def default_exponential_delay(retries_count: int, **kwargs: Any) -> float:
     Returns new delay as a float number.
 
     :param retries_count: number of retries.
-    :param kwargs: position arguments.
+    :param kwargs: named arguments.
 
     :returns: delay as a float number.
     """
@@ -96,7 +96,7 @@ class FunctionalizedRetryMiddleware(TaskiqMiddleware):
                 _retries=retries,
                 _delay_strategy=self.strategy_name,
             ).kiq(
-                *message.args, **message.kwargs
+                *message.args, **message.kwargs,
             )
         else:
             logger.warning(
