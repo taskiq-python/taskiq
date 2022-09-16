@@ -13,7 +13,6 @@ class SchedulerArgs:
     modules: List[str]
     log_level: str = LogLevel.INFO.name
     fs_discover: bool = False
-    pattern: str = "tasks.py"
     tasks_pattern: str = "tasks.py"
 
     @classmethod
