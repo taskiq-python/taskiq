@@ -6,6 +6,8 @@ authors = ["Pavel Kirilin <win10@list.ru>"]
 maintainers = ["Pavel Kirilin <win10@list.ru>"]
 readme = "README.md"
 repository = "https://github.com/taskiq-python/taskiq"
+homepage = "https://taskiq-python.github.io/"
+documentation = "https://taskiq-python.github.io/"
 license = "LICENSE"
 classifiers = [
     "Typing :: Typed",
@@ -21,7 +23,6 @@ classifiers = [
     "Topic :: System :: Networking",
     "Development Status :: 3 - Alpha",
 ]
-homepage = "https://github.com/taskiq-python/taskiq"
 keywords = ["taskiq", "tasks", "distributed", "async"]
 
 [tool.poetry.dependencies]

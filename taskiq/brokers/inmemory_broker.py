@@ -6,8 +6,10 @@ from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.result_backend import AsyncResultBackend, TaskiqResult
 from taskiq.cli.worker.args import WorkerArgs
 from taskiq.cli.worker.receiver import Receiver
+from taskiq.events import TaskiqEvents
 from taskiq.exceptions import TaskiqError
 from taskiq.message import BrokerMessage
+from taskiq.utils import maybe_awaitable
 
 _ReturnType = TypeVar("_ReturnType")
 
@@ -149,3 +151,15 @@ class InMemoryBroker(AsyncBroker):
         :raises RuntimeError: if this method is called.
         """
         raise RuntimeError("Inmemory brokers cannot listen.")
+
+    async def startup(self) -> None:
+        """Runs startup events for client and worker side."""
+        for event in (TaskiqEvents.CLIENT_STARTUP, TaskiqEvents.WORKER_STARTUP):
+            for handler in self.event_handlers.get(event, []):
+                await maybe_awaitable(handler(self.state))
+
+    async def shutdown(self) -> None:
+        """Runs shutdown events for client and worker side."""
+        for event in (TaskiqEvents.CLIENT_SHUTDOWN, TaskiqEvents.WORKER_SHUTDOWN):
+            for handler in self.event_handlers.get(event, []):
+                await maybe_awaitable(handler(self.state))

@@ -1,16 +1,19 @@
-import inspect
 import os
 import sys
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from functools import wraps
 from logging import getLogger
 from typing import (  # noqa: WPS235
     TYPE_CHECKING,
     Any,
+    Awaitable,
     Callable,
     Coroutine,
+    DefaultDict,
     Dict,
     List,
+    Literal,
     Optional,
     TypeVar,
     Union,
@@ -18,21 +21,26 @@ from typing import (  # noqa: WPS235
 )
 from uuid import uuid4
 
-from typing_extensions import ParamSpec
+from typing_extensions import ParamSpec, TypeAlias
 
+from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.decor import AsyncTaskiqDecoratedTask
+from taskiq.events import TaskiqEvents
 from taskiq.formatters.json_formatter import JSONFormatter
 from taskiq.message import BrokerMessage
 from taskiq.result_backends.dummy import DummyResultBackend
+from taskiq.state import TaskiqState
+from taskiq.utils import maybe_awaitable
 
 if TYPE_CHECKING:
     from taskiq.abc.formatter import TaskiqFormatter
-    from taskiq.abc.middleware import TaskiqMiddleware
     from taskiq.abc.result_backend import AsyncResultBackend
 
 _T = TypeVar("_T")  # noqa: WPS111
 _FuncParams = ParamSpec("_FuncParams")
 _ReturnType = TypeVar("_ReturnType")
+
+EventHandler: TypeAlias = Callable[[TaskiqState], Optional[Awaitable[None]]]
 
 logger = getLogger("taskiq")
 
@@ -49,7 +57,7 @@ def default_id_generator() -> str:
     return uuid4().hex
 
 
-class AsyncBroker(ABC):
+class AsyncBroker(ABC):  # noqa: WPS230
     """
     Async broker.
 
@@ -75,8 +83,16 @@ class AsyncBroker(ABC):
         self.decorator_class = AsyncTaskiqDecoratedTask
         self.formatter: "TaskiqFormatter" = JSONFormatter()
         self.id_generator = task_id_generator
+        # Every event has a list of handlers.
+        # Every handler is a function which takes state as a first argument.
+        # And handler can be either sync or async.
+        self.event_handlers: DefaultDict[  # noqa: WPS234
+            TaskiqEvents,
+            List[Callable[[TaskiqState], Optional[Awaitable[None]]]],
+        ] = defaultdict(list)
+        self.state = TaskiqState()
 
-    def add_middlewares(self, middlewares: "List[TaskiqMiddleware]") -> None:
+    def add_middlewares(self, *middlewares: "TaskiqMiddleware") -> None:
         """
         Add a list of middlewares.
 
@@ -86,11 +102,23 @@ class AsyncBroker(ABC):
         :param middlewares: list of middlewares.
         """
         for middleware in middlewares:
+            if not isinstance(middleware, TaskiqMiddleware):
+                logger.warning(
+                    f"Middleware {middleware} is not an instance of TaskiqMiddleware. "
+                    "Skipping...",
+                )
+                continue
             middleware.set_broker(self)
             self.middlewares.append(middleware)
 
     async def startup(self) -> None:
         """Do something when starting broker."""
+        event = TaskiqEvents.CLIENT_STARTUP
+        if self.is_worker_process:
+            event = TaskiqEvents.WORKER_STARTUP
+
+        for handler in self.event_handlers[event]:
+            await maybe_awaitable(handler(self.state))
 
     async def shutdown(self) -> None:
         """
@@ -99,11 +127,13 @@ class AsyncBroker(ABC):
         This method is called,
         when broker is closig.
         """
-        for middleware in self.middlewares:
-            middleware_shutdown = middleware.shutdown()
-            if inspect.isawaitable(middleware_shutdown):
-                await middleware_shutdown
-        await self.result_backend.shutdown()
+        event = TaskiqEvents.CLIENT_SHUTDOWN
+        if self.is_worker_process:
+            event = TaskiqEvents.WORKER_SHUTDOWN
+
+        # Call all shutdown events.
+        for handler in self.event_handlers[event]:
+            await maybe_awaitable(handler(self.state))
 
     @abstractmethod
     async def kick(
@@ -232,3 +262,43 @@ class AsyncBroker(ABC):
             inner_task_name=task_name,
             inner_labels=labels or {},
         )
+
+    def on_event(self, *events: TaskiqEvents) -> Callable[[EventHandler], EventHandler]:
+        """
+        Adds event handler.
+
+        This function adds function to call when event occurs.
+
+        :param events: events to react to.
+        :return: a decorator function.
+        """
+
+        def handler(function: EventHandler) -> EventHandler:
+            for event in events:
+                self.event_handlers[event].append(function)
+            return function
+
+        return handler
+
+    def add_event_handler(
+        self,
+        event: TaskiqEvents,
+        handler: EventHandler,
+    ) -> None:
+        """
+        Adds event handler.
+
+        this function is the same as on_event.
+
+        >>> broker.add_event_handler(TaskiqEvents.WORKER_STARTUP, my_startup)
+
+        if similar to:
+
+        >>> @broker.on_event(TaskiqEvents.WORKER_STARTUP)
+        >>> async def my_startup(context: Context) -> None:
+        >>>    ...
+
+        :param event: Event to react to.
+        :param handler: handler to call when event is started.
+        """
+        self.event_handlers[event].append(handler)

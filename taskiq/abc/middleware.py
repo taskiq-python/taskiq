@@ -20,9 +20,6 @@ class TaskiqMiddleware:  # pragma: no cover
         """
         self.broker = broker
 
-    def shutdown(self) -> Union[None, Coroutine[Any, Any, None]]:
-        """This function is used to do some work on shutdown."""
-
     def pre_send(
         self,
         message: "TaskiqMessage",
