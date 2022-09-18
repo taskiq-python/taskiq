@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List
 from taskiq.abc.broker import AsyncBroker
 from taskiq.scheduler.merge_functions import preserve_all
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.schedule_source import ScheduleSource
 
 

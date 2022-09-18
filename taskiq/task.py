@@ -10,7 +10,7 @@ from taskiq.exceptions import (
 )
 from taskiq.utils import run_sync
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.result_backend import AsyncResultBackend
     from taskiq.result import TaskiqResult
 

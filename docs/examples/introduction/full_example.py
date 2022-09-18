@@ -26,6 +26,7 @@ async def main() -> None:
         print(f"Returned value: {result.return_value}")
     else:
         print("Error found while executing task.")
+    await broker.shutdown()
 
 
 if __name__ == "__main__":
