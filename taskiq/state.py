@@ -1,8 +1,13 @@
 from collections import UserDict
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    _Base = UserDict[str, Any]
+else:
+    _Base = UserDict
 
 
-class TaskiqState(UserDict[str, Any]):
+class TaskiqState(_Base):
     """
     State class.
 
