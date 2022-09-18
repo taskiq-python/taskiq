@@ -13,7 +13,6 @@ from typing import (  # noqa: WPS235
     DefaultDict,
     Dict,
     List,
-    Literal,
     Optional,
     TypeVar,
     Union,
