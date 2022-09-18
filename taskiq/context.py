@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from taskiq.abc.broker import AsyncBroker
 from taskiq.message import TaskiqMessage
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from taskiq.state import TaskiqState
 
 

@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Any, Coroutine, Union
 
-if TYPE_CHECKING:  # pragma: no cover
+if TYPE_CHECKING:  # pragma: no cover  # pragma: no cover
     from taskiq.abc.broker import AsyncBroker
     from taskiq.message import TaskiqMessage
     from taskiq.result import TaskiqResult

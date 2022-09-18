@@ -31,7 +31,7 @@ from taskiq.result_backends.dummy import DummyResultBackend
 from taskiq.state import TaskiqState
 from taskiq.utils import maybe_awaitable
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.formatter import TaskiqFormatter
     from taskiq.abc.result_backend import AsyncResultBackend
 
