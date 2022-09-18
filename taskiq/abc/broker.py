@@ -167,7 +167,7 @@ class AsyncBroker(ABC):  # noqa: WPS230
     def task(
         self,
         task_name: Callable[_FuncParams, _ReturnType],
-    ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]:
+    ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]:  # pragma: no cover
         ...
 
     @overload
@@ -178,7 +178,7 @@ class AsyncBroker(ABC):  # noqa: WPS230
     ) -> Callable[
         [Callable[_FuncParams, _ReturnType]],
         AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType],
-    ]:
+    ]:  # pragma: no cover
         ...
 
     def task(  # type: ignore[misc]
@@ -222,7 +222,7 @@ class AsyncBroker(ABC):  # noqa: WPS230
                 nonlocal inner_task_name  # noqa: WPS420
                 if inner_task_name is None:
                     fmodule = func.__module__
-                    if fmodule == "__main__":
+                    if fmodule == "__main__":  # pragma: no cover
                         fmodule = ".".join(  # noqa: WPS220
                             sys.argv[0]
                             .removesuffix(
