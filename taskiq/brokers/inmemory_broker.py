@@ -6,6 +6,7 @@ from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.result_backend import AsyncResultBackend, TaskiqResult
 from taskiq.cli.worker.args import WorkerArgs
 from taskiq.cli.worker.receiver import Receiver
+from taskiq.dependencies import DependencyGraph
 from taskiq.events import TaskiqEvents
 from taskiq.exceptions import TaskiqError
 from taskiq.message import BrokerMessage
@@ -126,6 +127,10 @@ class InMemoryBroker(AsyncBroker):
         target_task = self.available_tasks.get(message.task_name)
         if target_task is None:
             raise TaskiqError("Unknown task.")
+        if not self.receiver.dependency_graphs.get(target_task.task_name):
+            self.receiver.dependency_graphs[target_task.task_name] = DependencyGraph(
+                target_task.original_func,
+            )
         if not self.receiver.task_signatures.get(target_task.task_name):
             self.receiver.task_signatures[target_task.task_name] = inspect.signature(
                 target_task.original_func,
