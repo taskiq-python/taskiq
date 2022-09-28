@@ -5,8 +5,7 @@ from redis.asyncio import ConnectionPool, Redis  # type: ignore
 from taskiq_aio_pika import AioPikaBroker
 from taskiq_redis import RedisAsyncResultBackend
 
-from taskiq import Context, TaskiqEvents, TaskiqState
-from taskiq.context import default_context
+from taskiq import Context, TaskiqDepends, TaskiqEvents, TaskiqState
 
 # To run this example, please install:
 # * taskiq
@@ -34,14 +33,14 @@ async def shutdown(state: TaskiqState) -> None:
 
 
 @broker.task
-async def get_val(key: str, context: Context = default_context) -> Optional[str]:
+async def get_val(key: str, context: Context = TaskiqDepends()) -> Optional[str]:
     # Now we can use our pool.
     redis = Redis(connection_pool=context.state.redis, decode_responses=True)
     return await redis.get(key)
 
 
 @broker.task
-async def set_val(key: str, value: str, context: Context = default_context) -> None:
+async def set_val(key: str, value: str, context: Context = TaskiqDepends()) -> None:
     # Now we can use our pool to set value.
     await Redis(connection_pool=context.state.redis).set(key, value)
 

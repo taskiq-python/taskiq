@@ -14,8 +14,4 @@ class Context:
         self.message = message
         self.broker = broker
         self.state: "TaskiqState" = None  # type: ignore
-        if broker:
-            self.state = broker.state
-
-
-default_context = Context(None, None)  # type: ignore
+        self.state = broker.state
