@@ -121,7 +121,7 @@ async def test_run_task_exception_middlewares() -> None:
         raise ValueError()
 
     broker = InMemoryBroker()
-    broker.add_middlewares([_TestMiddleware()])
+    broker.add_middlewares(_TestMiddleware())
     receiver = get_receiver(broker)
 
     result = await receiver.run_task(

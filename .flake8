@@ -80,6 +80,14 @@ ignore =
   WPS229,
   ; Found function with too much cognitive complexity
   WPS231,
+  ; Found too deep nesting
+  WPS220,
+  ; Found line with high Jones Complexity
+  WPS221,
+  ; function name should be lowercase
+  N802,
+  ; Do not perform function calls in argument defaults.
+  B008,
 
   ; all init files
   __init__.py:
@@ -99,6 +107,10 @@ per-file-ignores =
   WPS432,
   ; Missing parameter(s) in Docstring
   DAR101,
+  ; Found too short name
+  WPS111,
+  ; Found complex default value
+  WPS404,
 
 exclude =
   ./.git,

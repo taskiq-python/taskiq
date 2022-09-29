@@ -21,7 +21,7 @@ from taskiq.message import TaskiqMessage
 from taskiq.task import AsyncTaskiqTask, SyncTaskiqTask
 from taskiq.utils import maybe_awaitable, run_sync
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.broker import AsyncBroker
 
 _T = TypeVar("_T")  # noqa: WPS111

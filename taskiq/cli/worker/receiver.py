@@ -12,36 +12,13 @@ from taskiq.cli.worker.args import WorkerArgs
 from taskiq.cli.worker.log_collector import log_collector
 from taskiq.cli.worker.params_parser import parse_params
 from taskiq.context import Context
+from taskiq.dependencies import DependencyGraph
 from taskiq.message import BrokerMessage, TaskiqMessage
 from taskiq.result import TaskiqResult
+from taskiq.state import TaskiqState
 from taskiq.utils import maybe_awaitable
 
 logger = getLogger(__name__)
-
-
-def inject_context(
-    type_hints: Dict[str, Any],
-    message: TaskiqMessage,
-    broker: AsyncBroker,
-) -> None:
-    """
-    Inject context parameter in message's kwargs.
-
-    This function parses signature to get
-    the context parameter definition.
-
-    If at least one parameter has the Context
-    type, it will add current context as kwarg.
-
-    :param type_hints: function's type hints.
-    :param message: current taskiq message.
-    :param broker: current broker.
-    """
-    if not type_hints:
-        return
-    for param_name, param_type in type_hints.items():
-        if param_type is Context:
-            message.kwargs[param_name] = Context(message.copy(), broker)
 
 
 def _run_sync(target: Callable[..., Any], message: TaskiqMessage) -> Any:
@@ -66,9 +43,11 @@ class Receiver:
         self.cli_args = cli_args
         self.task_signatures: Dict[str, inspect.Signature] = {}
         self.task_hints: Dict[str, Dict[str, Any]] = {}
+        self.dependency_graphs: Dict[str, DependencyGraph] = {}
         for task in self.broker.available_tasks.values():
             self.task_signatures[task.task_name] = inspect.signature(task.original_func)
             self.task_hints[task.task_name] = get_type_hints(task.original_func)
+            self.dependency_graphs[task.task_name] = DependencyGraph(task.original_func)
         self.executor = ThreadPoolExecutor(
             max_workers=cli_args.max_threadpool_threads,
         )
@@ -175,16 +154,27 @@ class Receiver:
         returned = None
         found_exception = None
         signature = self.task_signatures.get(message.task_name)
+        dependency_graph = self.dependency_graphs.get(message.task_name)
         if self.cli_args.no_parse:
             signature = None
         parse_params(signature, self.task_hints.get(message.task_name) or {}, message)
-        inject_context(
-            self.task_hints.get(message.task_name) or {},
-            message,
-            self.broker,
-        )
+
         # Captures function's logs.
         with log_collector(logs, self.cli_args.log_collector_format):
+            dep_ctx = None
+            if dependency_graph:
+                # Create a context for dependency resolving.
+                dep_ctx = dependency_graph.ctx(
+                    {
+                        Context: Context(message, self.broker),
+                        TaskiqState: self.broker.state,
+                    },
+                )
+                # Resolve all function's dependencies.
+                dep_kwargs = await dep_ctx.resolve_kwargs()
+                for key, val in dep_kwargs.items():
+                    if key not in message.kwargs:
+                        message.kwargs[key] = val
             # Start a timer.
             start_time = time()
             try:
@@ -209,6 +199,8 @@ class Receiver:
                 )
             # Stop the timer.
             execution_time = time() - start_time
+            if dep_ctx:
+                await dep_ctx.close()
 
         raw_logs = logs.getvalue()
         logs.close()
