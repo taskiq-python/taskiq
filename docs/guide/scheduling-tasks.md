@@ -1,5 +1,5 @@
 ---
-order: 7
+order: 8
 ---
 
 # Scheduling tasks
@@ -44,6 +44,12 @@ it may execute one task N times, where N is the number of running scheduler inst
 :::
 
 This command will import the scheduler you defined and start sending tasks to your broker.
+
+::: tip Cool tip!
+
+The scheduler doesn't execute tasks. It only sends them.
+
+:::
 
 You can check list of available schedule sources in the [Available schedule sources](../available-components/schedule-sources.md) section.
 

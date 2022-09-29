@@ -54,9 +54,15 @@ from taskiq import InMemoryBroker
 broker = InMemoryBroker()
 ```
 
-And that's it. Now let's add some tasks and the main function. You can add tasks in separate modules. You can find more information about that further.
+And that's it. Now let's add some tasks and the main function. You can add tasks in separate modules. You can find more information about that further. Also, we call the `startup` method at the beginning of the `main` function.
 
 @[code python](../examples/introduction/inmemory_run.py)
+
+::: tip Cool tip!
+
+Calling the `startup` method is not required, but we strongly recommend you do so.
+
+:::
 
 If you run this code, you will get this in your terminal:
 

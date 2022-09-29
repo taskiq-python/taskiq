@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Any, Coroutine, Union
 
-if TYPE_CHECKING:  # pragma: no cover
+if TYPE_CHECKING:  # pragma: no cover  # pragma: no cover
     from taskiq.abc.broker import AsyncBroker
     from taskiq.message import TaskiqMessage
     from taskiq.result import TaskiqResult
@@ -19,9 +19,6 @@ class TaskiqMiddleware:  # pragma: no cover
         :param broker: broker to set.
         """
         self.broker = broker
-
-    def shutdown(self) -> Union[None, Coroutine[Any, Any, None]]:
-        """This function is used to do some work on shutdown."""
 
     def pre_send(
         self,

@@ -14,7 +14,7 @@ from typing_extensions import ParamSpec
 from taskiq.kicker import AsyncKicker
 from taskiq.task import AsyncTaskiqTask, SyncTaskiqTask
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.broker import AsyncBroker
 
 _T = TypeVar("_T")  # noqa: WPS111
