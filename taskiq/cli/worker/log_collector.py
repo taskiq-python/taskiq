@@ -1,7 +1,23 @@
 import logging
 import sys
 from contextlib import contextmanager
-from typing import Generator, List, TextIO
+from typing import IO, Any, Generator, List, TextIO
+
+
+class Redirector:
+    """A class to write to multiple streams."""
+
+    def __init__(self, *streams: IO[Any]) -> None:
+        self.streams = streams
+
+    def write(self, message: Any) -> None:
+        """
+        This write request writes to all avaialble streams.
+
+        :param message: message to write.
+        """
+        for stream in self.streams:
+            stream.write(message)
 
 
 @contextmanager
@@ -36,8 +52,8 @@ def log_collector(
 
     old_targets.extend([sys.stdout, sys.stderr])
     logging.root.addHandler(log_handler)
-    sys.stdout = new_target
-    sys.stderr = new_target
+    sys.stdout = Redirector(new_target, sys.stdout)  # type: ignore
+    sys.stderr = Redirector(new_target, sys.stderr)  # type: ignore
 
     try:
         yield new_target
