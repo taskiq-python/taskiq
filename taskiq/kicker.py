@@ -18,8 +18,8 @@ from typing_extensions import ParamSpec
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.exceptions import SendTaskError
 from taskiq.message import TaskiqMessage
-from taskiq.task import AsyncTaskiqTask, SyncTaskiqTask
-from taskiq.utils import maybe_awaitable, run_sync
+from taskiq.task import AsyncTaskiqTask
+from taskiq.utils import maybe_awaitable
 
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.broker import AsyncBroker
@@ -141,40 +141,6 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
             task_id=message.task_id,
             result_backend=self.broker.result_backend,
         )
-
-    @overload
-    def kiq_sync(
-        self: "AsyncKicker[_FuncParams, Coroutine[Any, Any, _T]]",
-        *args: _FuncParams.args,
-        **kwargs: _FuncParams.kwargs,
-    ) -> SyncTaskiqTask[_T]:
-        ...
-
-    @overload
-    def kiq_sync(
-        self: "AsyncKicker[_FuncParams, _ReturnType]",
-        *args: _FuncParams.args,
-        **kwargs: _FuncParams.kwargs,
-    ) -> SyncTaskiqTask[_ReturnType]:
-        ...
-
-    def kiq_sync(
-        self,
-        *args: _FuncParams.args,
-        **kwargs: _FuncParams.kwargs,
-    ) -> Any:
-        """
-        This method sends function call over the network.
-
-        It just wraps async kiq call in run_sync
-        funcion.
-
-        :param args: function's arguments.
-        :param kwargs: function's key word arguments.
-
-        :returns: sync taskiq task.
-        """
-        return SyncTaskiqTask(run_sync(self.kiq(*args, **kwargs)))
 
     @classmethod
     def _prepare_arg(cls, arg: Any) -> Any:

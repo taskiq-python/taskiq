@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Sequence
 
 
-class TaskiqCMD(ABC):
+class TaskiqCMD(ABC):  # pragma: no cover
     """Base class for new commands."""
 
     short_help = ""

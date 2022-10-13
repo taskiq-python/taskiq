@@ -140,20 +140,6 @@ class _TaskiqDepends:
             rhs.kwargs,
         )
 
-    def __str__(self) -> str:
-        if self.dependency is None:
-            dep_name = "<from hint>"
-        else:
-            dep_name = (
-                f"{self.dependency.__module__}:"  # noqa: WPS237
-                f"{self.dependency.__name__}"
-            )
-        return (
-            f"TaskiqDepends({dep_name}, "
-            f"use_cache={self.use_cache}, "
-            f"kwargs={self.kwargs})"
-        )
-
 
 class DependencyResolveContext:
     """
