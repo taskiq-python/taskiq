@@ -92,7 +92,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         self: "AsyncKicker[_FuncParams, Coroutine[Any, Any, _T]]",
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
-    ) -> AsyncTaskiqTask[_T]:
+    ) -> AsyncTaskiqTask[_T]:  # pragma: no cover
         ...
 
     @overload
@@ -100,7 +100,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         self: "AsyncKicker[_FuncParams, _ReturnType]",
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
-    ) -> AsyncTaskiqTask[_ReturnType]:
+    ) -> AsyncTaskiqTask[_ReturnType]:  # pragma: no cover
         ...
 
     async def kiq(  # noqa: C901
