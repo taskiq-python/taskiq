@@ -31,13 +31,13 @@ class TaskiqScheduler:
             List["ScheduledTask"],
         ] = preserve_all,
         refresh_delay: float = 30.0,
-    ) -> None:
+    ) -> None:  # pragma: no cover
         self.broker = broker
         self.sources = sources
         self.refresh_delay = refresh_delay
         self.merge_func = merge_func
 
-    async def startup(self) -> None:
+    async def startup(self) -> None:  # pragma: no cover
         """
         This method is called on startup.
 
