@@ -6,13 +6,14 @@ from logging import getLogger
 from time import time
 from typing import Any, Callable, Dict, get_type_hints
 
+from taskiq_dependencies import DependencyGraph
+
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.cli.worker.args import WorkerArgs
 from taskiq.cli.worker.log_collector import log_collector
 from taskiq.cli.worker.params_parser import parse_params
 from taskiq.context import Context
-from taskiq.dependencies import DependencyGraph
 from taskiq.message import BrokerMessage, TaskiqMessage
 from taskiq.result import TaskiqResult
 from taskiq.state import TaskiqState
@@ -164,7 +165,7 @@ class Receiver:
             dep_ctx = None
             if dependency_graph:
                 # Create a context for dependency resolving.
-                dep_ctx = dependency_graph.ctx(
+                dep_ctx = dependency_graph.async_ctx(
                     {
                         Context: Context(message, self.broker),
                         TaskiqState: self.broker.state,

@@ -54,6 +54,7 @@ mock = "^4.0.3"
 anyio = "^3.6.1"
 pytest-xdist = { version = "^2.5.0", extras = ["psutil"] }
 types-mock = "^4.0.15"
+taskiq_dependencies =  "~1.0.0"
 
 [tool.poetry.extras]
 zmq = ["pyzmq"]

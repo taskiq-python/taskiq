@@ -2,11 +2,12 @@ import inspect
 from collections import OrderedDict
 from typing import Any, Callable, Coroutine, Optional, TypeVar, get_type_hints
 
+from taskiq_dependencies import DependencyGraph
+
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.result_backend import AsyncResultBackend, TaskiqResult
 from taskiq.cli.worker.args import WorkerArgs
 from taskiq.cli.worker.receiver import Receiver
-from taskiq.dependencies import DependencyGraph
 from taskiq.events import TaskiqEvents
 from taskiq.exceptions import TaskiqError
 from taskiq.message import BrokerMessage
