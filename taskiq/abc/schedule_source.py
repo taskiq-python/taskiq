@@ -8,17 +8,17 @@ if TYPE_CHECKING:  # pragma: no cover
 class ScheduleSource(ABC):
     """Abstract class for source of scheduled tasks."""
 
-    async def startup(self) -> None:
+    async def startup(self) -> None:  # noqa: B027
         """Action to execute during startup."""
 
-    async def shutdown(self) -> None:
+    async def shutdown(self) -> None:  # noqa: B027
         """Actions to execute during shutdown."""
 
     @abstractmethod
     async def get_schedules(self) -> List["ScheduledTask"]:
         """Get list of taskiq schedules."""
 
-    async def add_schedule(self, schedule: "ScheduledTask") -> None:
+    async def add_schedule(self, schedule: "ScheduledTask") -> None:  # noqa: B027
         """
         Add a new schedule.
 
