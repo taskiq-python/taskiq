@@ -167,6 +167,7 @@ class AsyncBroker(ABC):  # noqa: WPS230
     def task(
         self,
         task_name: Callable[_FuncParams, _ReturnType],
+        **lavels: Any,
     ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]:  # pragma: no cover
         ...
 
@@ -174,7 +175,7 @@ class AsyncBroker(ABC):  # noqa: WPS230
     def task(
         self,
         task_name: Optional[str] = None,
-        **labels: Union[str, int],
+        **labels: Any,
     ) -> Callable[
         [Callable[_FuncParams, _ReturnType]],
         AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType],
@@ -184,7 +185,7 @@ class AsyncBroker(ABC):  # noqa: WPS230
     def task(  # type: ignore[misc]
         self,
         task_name: Optional[str] = None,
-        **labels: Union[str, int],
+        **labels: Any,
     ) -> Any:
         """
         Decorator that turns function into a task.
@@ -223,7 +224,7 @@ class AsyncBroker(ABC):  # noqa: WPS230
                 if inner_task_name is None:
                     fmodule = func.__module__
                     if fmodule == "__main__":  # pragma: no cover
-                        fmodule = ".".join(  # noqa: WPS220
+                        fmodule = ".".join(
                             sys.argv[0]
                             .removesuffix(
                                 ".py",

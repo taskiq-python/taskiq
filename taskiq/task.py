@@ -8,7 +8,6 @@ from taskiq.exceptions import (
     ResultIsReadyError,
     TaskiqResultTimeoutError,
 )
-from taskiq.utils import run_sync
 
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.result_backend import AsyncResultBackend
@@ -65,60 +64,6 @@ class _Task(ABC, Generic[_ReturnType]):
         :param with_logs: whether you need to download logs.
         :return: TaskiqResult.
         """
-
-
-class SyncTaskiqTask(_Task[_ReturnType]):
-    """Sync wrapper over AsyncTaskiqTask."""
-
-    def __init__(self, async_task: "AsyncTaskiqTask[_ReturnType]") -> None:
-        self.async_task = async_task
-
-    def is_ready(self) -> bool:
-        """
-        Checks if task is completed.
-
-        :return: True if task is completed.
-        """
-        return run_sync(self.async_task.is_ready())
-
-    def get_result(self, with_logs: bool = False) -> "TaskiqResult[_ReturnType]":
-        """
-        Get result of a task from result backend.
-
-        :param with_logs: whether you want to fetch logs from worker.
-
-        :return: task's return value.
-        """
-        return run_sync(self.async_task.get_result(with_logs=with_logs))
-
-    def wait_result(
-        self,
-        check_interval: float = 0.2,
-        timeout: float = -1,
-        with_logs: bool = False,
-    ) -> "TaskiqResult[_ReturnType]":
-        """
-        Waits until result is ready.
-
-        This method just checks whether the task is
-        ready. And if it is it returns the result.
-
-        It may throw TaskiqResultTimeoutError if
-        task didn't became ready in provided
-        period of time.
-
-        :param check_interval: How often checks are performed.
-        :param timeout: timeout for the result.
-        :param with_logs: whether you want to fetch logs from worker.
-        :return: task's return value.
-        """
-        return run_sync(
-            self.async_task.wait_result(
-                check_interval=check_interval,
-                timeout=timeout,
-                with_logs=with_logs,
-            ),
-        )
 
 
 class AsyncTaskiqTask(_Task[_ReturnType]):

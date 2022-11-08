@@ -7,7 +7,7 @@ from importlib_metadata import entry_points, version
 from taskiq.abc.cmd import TaskiqCMD
 
 
-def main() -> None:  # noqa: C901, WPS210
+def main() -> None:  # noqa: C901, WPS210  # pragma: no cover
     """
     Main entrypoint of the taskiq.
 
@@ -72,5 +72,5 @@ def main() -> None:  # noqa: C901, WPS210
     command.exec(sys.argv[1:])
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()
