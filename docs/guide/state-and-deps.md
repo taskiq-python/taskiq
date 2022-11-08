@@ -37,9 +37,12 @@ You can access the state from the context.
 
 ## Dependencies
 
-Using context directly is nice, but this way won't get completion.
+Using context directly is nice, but this way you won't get code-completion.
 
 That's why we suggest you try TaskiqDependencies. The implementation is very similar to FastApi's dependencies. You can use classes, functions, and generators as dependencies.
+
+We use the [taskiq-dependencies](https://pypi.org/project/taskiq-dependencies/) package to provide autocompetion.
+You can easily integrate it in your own project.
 
 ::: danger Cool alarm!
 

@@ -34,9 +34,8 @@ def only_unique(
     :param new_tasks: newly discovered tasks.
     :return: list of unique schedules.
     """
-    new_tasks = []
-    new_tasks.extend(old_tasks)
+    result = old_tasks
     for task in new_tasks:
-        if task not in new_tasks:
-            new_tasks.append(task)
-    return new_tasks
+        if task not in result:
+            result.append(task)
+    return result

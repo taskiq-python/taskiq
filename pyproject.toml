@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "taskiq"
-version = "0.1.2"
+version = "0.1.3"
 description = "Distributed task queue with full async support"
 authors = ["Pavel Kirilin <win10@list.ru>"]
 maintainers = ["Pavel Kirilin <win10@list.ru>"]
@@ -54,6 +54,7 @@ mock = "^4.0.3"
 anyio = "^3.6.1"
 pytest-xdist = { version = "^2.5.0", extras = ["psutil"] }
 types-mock = "^4.0.15"
+taskiq_dependencies =  "~1.0.0"
 
 [tool.poetry.extras]
 zmq = ["pyzmq"]
@@ -81,6 +82,18 @@ warn_unused_ignores = false
 [tool.isort]
 profile = "black"
 multi_line_output = 3
+
+[tool.coverage.run]
+omit = [
+    "taskiq/__main__.py",
+    "taskiq/abc/cmd.py",
+    "taskiq/cli/scheduler/args.py",
+    "taskiq/cli/scheduler/cmd.py",
+    "taskiq/cli/utils.py",
+    "taskiq/cli/worker/args.py",
+    "taskiq/cli/worker/async_task_runner.py",
+    "taskiq/cli/worker/cmd.py",
+]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

@@ -12,7 +12,7 @@ from typing import (
 from typing_extensions import ParamSpec
 
 from taskiq.kicker import AsyncKicker
-from taskiq.task import AsyncTaskiqTask, SyncTaskiqTask
+from taskiq.task import AsyncTaskiqTask
 
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.broker import AsyncBroker
@@ -92,40 +92,6 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         :returns: taskiq task.
         """
         return await self.kicker().kiq(*args, **kwargs)
-
-    @overload
-    def kiq_sync(
-        self: "AsyncTaskiqDecoratedTask[_FuncParams, Coroutine[Any, Any, _T]]",
-        *args: _FuncParams.args,
-        **kwargs: _FuncParams.kwargs,
-    ) -> SyncTaskiqTask[_T]:
-        ...
-
-    @overload
-    def kiq_sync(
-        self: "AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]",
-        *args: _FuncParams.args,
-        **kwargs: _FuncParams.kwargs,
-    ) -> SyncTaskiqTask[_ReturnType]:
-        ...
-
-    def kiq_sync(
-        self,
-        *args: _FuncParams.args,
-        **kwargs: _FuncParams.kwargs,
-    ) -> Any:
-        """
-        This method sends function call over the network.
-
-        It gets current broker and calls it's kick method,
-        returning what it returns.
-
-        :param args: function's arguments.
-        :param kwargs: function's key word arguments.
-
-        :returns: taskiq task.
-        """
-        return self.kicker().kiq_sync(*args, **kwargs)
 
     def kicker(self) -> AsyncKicker[_FuncParams, _ReturnType]:
         """
