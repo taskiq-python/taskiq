@@ -35,8 +35,7 @@ watchdog = "^2.1.9"
 gitignore-parser = "^0.1.0"
 importlib-metadata = "<4.3"
 pycron = "^3.0.0"
-graphlib-backport = { version = "^1.0.3", python="<3.9" }
-
+taskiq_dependencies =  "~1.0.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"
@@ -54,7 +53,6 @@ mock = "^4.0.3"
 anyio = "^3.6.1"
 pytest-xdist = { version = "^2.5.0", extras = ["psutil"] }
 types-mock = "^4.0.15"
-taskiq_dependencies =  "~1.0.0"
 
 [tool.poetry.extras]
 zmq = ["pyzmq"]
