@@ -4,19 +4,19 @@ order: 7
 
 # State and Dependencies
 
-
 ## State
 
 The `TaskiqState` is a global variable where you can keep the variables you want to use later.
 For example, you want to open a database connection pool at a broker's startup.
 
-This can be acieved by adding event handlers.
+This can be achieved by adding event handlers.
 
 You can use one of these events:
-* `WORKER_STARTUP`
-* `CLIENT_STARTUP`
-* `WORKER_SHUTDOWN`
-* `CLIENT_SHUTDOWN`
+
+- `WORKER_STARTUP`
+- `CLIENT_STARTUP`
+- `WORKER_SHUTDOWN`
+- `CLIENT_SHUTDOWN`
 
 Worker events are called when you start listening to the broker messages using taskiq.
 Client events are called when you call the `startup` method of your broker from your code.
@@ -33,7 +33,6 @@ If you want to add handlers programmatically, you can use the `broker.add_event_
 
 As you can see in this example, this worker will initialize the Redis pool at the startup.
 You can access the state from the context.
-
 
 ## Dependencies
 
@@ -54,9 +53,10 @@ FastAPI's `Depends` is not compatible with `TaskiqDepends`.
 
 You can use dependencies for better autocompletion and reduce the amount of code you write.
 Since the state is generic, we cannot guess the types of the state fields.
-Dependencies can be annotated with type hints and therfore provide better auto-completion.
+Dependencies can be annotated with type hints and therefore provide better auto-completion.
 
 Let's assume that you've stored a Redis connection pool in the state as in the example above.
+
 ```python
 @broker.on_event(TaskiqEvents.WORKER_STARTUP)
 async def startup(state: TaskiqState) -> None:
@@ -91,7 +91,6 @@ async def my_task(redis: Redis = TaskiqDepends(redis_dep)) -> None:
 Now, this dependency injection will be autocompleted. But, of course, state fields cannot be autocompleted,
 even in dependencies. But this way, you won't make any typos while writing tasks.
 
-
 ### How do dependencies work
 
 We build a graph of dependencies on startup. If the parameter of the function has
@@ -103,9 +102,8 @@ For example:
 
 @[code python](../examples/state/dependencies_tree.py)
 
-In this code, the dependency `common_dep` is going to be evaluated only once and the `dep1` and the `dep2` are going to recevie the same value. You can control this behaviour by using the `use_cache=False` parameter to you dependency. This parameter will force the
+In this code, the dependency `common_dep` is going to be evaluated only once and the `dep1` and the `dep2` are going to recevie the same value. You can control this behavior by using the `use_cache=False` parameter to you dependency. This parameter will force the
 dependency to reevaluate all it's subdependencies.
-
 
 In this example we cannot predict the result. Since the `dep2` doesn't use cache for the `common_dep` function.
 @[code python](../examples/state/no_cache.py)
@@ -150,7 +148,7 @@ Let's see an example:
 @[code python](../examples/state/class_dependency.py)
 
 As you can see, the dependency for `my_task` function is declared with `TaskiqDependency()`.
-It's because you can omit the class if it's declared in typehint for the parameter. This feature doesn't
+It's because you can omit the class if it's declared in type-hint for the parameter. This feature doesn't
 work with dependency functions, it's only for classes.
 
 You can pass dependencies for classes in the constructor.
@@ -167,9 +165,9 @@ If you want to do something asynchronously, convert this function to an asynchro
 
 @[code python](../examples/state/async_generator_deps.py)
 
-
 ### Default dependencies
 
 By default taskiq has only two deendencies:
-* Context from `taskiq.context.Context`
-* TaskiqState from `taskiq.state.TaskiqState`
+
+- Context from `taskiq.context.Context`
+- TaskiqState from `taskiq.state.TaskiqState`

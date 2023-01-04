@@ -1,7 +1,7 @@
 ---
 order: 1
 dir:
-    order: 1
+  order: 1
 ---
 
 # Introduction
