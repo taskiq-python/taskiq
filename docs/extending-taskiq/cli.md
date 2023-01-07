@@ -53,7 +53,6 @@ demo = "my_project.cmd:MyCommand"
 You can read more about entry points in [python documentation](https://packaging.python.org/en/latest/specifications/entry-points/).
 The subcommand name is the same as the name of the entry point you've created.
 
-
 ```bash
 $ taskiq demo --help
 usage: demo [-h] [--test TEST]

@@ -53,7 +53,6 @@ The scheduler doesn't execute tasks. It only sends them.
 
 You can check list of available schedule sources in the [Available schedule sources](../available-components/schedule-sources.md) section.
 
-
 ## Multiple sources
 
 Sometimes you may want to use multiple sources to assemble a schedule for tasks. The `TaskiqScheduler` can do so.
@@ -64,7 +63,7 @@ complex logic aside from sources. For example, filter out some task schedules.
 
 Currently we have only two default functions to merge tasks. You can find them in the `taskiq.scheduler.merge_functions` module.
 
-* `preserve_all` - simply adds new schedules to the old ones.
-* `only_unique` - adds scheudle only if it was not added by previous sources.
+- `preserve_all` - simply adds new schedules to the old ones.
+- `only_unique` - adds schedule only if it was not added by previous sources.
 
 Every time we update schedule it gets task from the source and executes this function to merge them together.

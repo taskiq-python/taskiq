@@ -5,26 +5,25 @@ order: 2
 
 # Getting started
 
-
 ## Installation
 
 You can install taskiq from pypi or directly from git using pip:
 
-
 ::: tabs
 
 @tab pypi
+
 ```bash:no-line-numbers
 pip install taskiq
 ```
 
 @tab git
+
 ```bash:no-line-numbers
 pip install git+https://github.com/taskiq-python/taskiq.git
 ```
 
 :::
-
 
 After installation of the core library, you need to find the broker that fits you. You can do it using [PyPI](https://pypi.org/search/?q=taskiq) search.
 
@@ -97,6 +96,7 @@ from taskiq_aio_pika import AioPikaBroker
 
 broker = AioPikaBroker('amqp://guest:guest@localhost:5672')
 ```
+
 Also, AioPika broker requires to call startup before using it. Add this line at the beginning of the
 main function.
 
@@ -112,13 +112,12 @@ That's all you need to do.
 
 :::
 
-
 Let's run the worker process. First of all, we need rabbitMQ up and running. I highly recommend you use docker.
 
 ::: tabs
 
-
 @tab linux|macos
+
 ```bash
 docker run --rm -d \
     -p "5672:5672" \
@@ -141,9 +140,7 @@ docker run --rm -d ^
     rabbitmq:3.8.27-management-alpine
 ```
 
-
 :::
-
 
 Now we need to start worker process by running taskiq cli command. You can get more info about the CLI in the [CLI](./cli.md) section.
 
@@ -182,8 +179,8 @@ Now we need to start redis.
 
 ::: tabs
 
-
 @tab linux|macos
+
 ```bash
 docker run --rm -d \
     -p "6379:6379" \
@@ -198,16 +195,13 @@ docker run --rm -d ^
     redis
 ```
 
-
 :::
-
 
 ::: details Complete code
 
 @[code python](../examples/introduction/full_example.py)
 
 :::
-
 
 Let's run taskiq once again. The command is the same.
 
