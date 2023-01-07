@@ -2,12 +2,10 @@
 order: 4
 ---
 
-
 # Available schedule sources
 
 These objects are used to fetch current schedule for tasks.
 Currently we have only one schedule source.
-
 
 ## LabelScheduleSource
 
@@ -31,10 +29,11 @@ async def my_task():
 ```
 
 Parameters:
-* `cron` - crontab string when to run the task.
-* `args` - args to use, when invoking the task.
-* `kwargs` - key-word arguments to use when invoking the task.
-* `labels` - additional labels to use wehn invoking the task.
+
+- `cron` - crontab string when to run the task.
+- `args` - args to use, when invoking the task.
+- `kwargs` - key-word arguments to use when invoking the task.
+- `labels` - additional labels to use when invoking the task.
 
 Usage:
 
@@ -49,7 +48,6 @@ scheduler = TaskiqScheduler(
     sources=[LabelScheduleSource(broker)],
 )
 ```
-
 
 ::: warning Cool notice!
 

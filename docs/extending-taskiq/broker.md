@@ -17,6 +17,6 @@ For brokers, we have several conventions. It's good if your broker implements th
 These rules are optional, and it's ok if your broker doesn't implement them.
 
 1. If the message has the `delay` label with int or float number, this task's `execution` must be delayed
-    with the same number of seconds as in the delay label.
+   with the same number of seconds as in the delay label.
 2. If the message has the `priority` label, this message must be sent with priority. Tasks with
-    higher priorities are executed faster.
+   higher priorities are executed faster.

@@ -9,26 +9,37 @@ jobs:
   deploy_docs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Install dependencies
-        uses: borales/actions-yarn@v3.0.0
+      - uses: actions/checkout@v3
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
         with:
-          cmd: install # will run `yarn install` command
+          version: 7
+          run_install: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: pnpm
+
       - name: Build docs
-        uses: borales/actions-yarn@v3.0.0
-        with:
-          cmd: docs:build -d docs_dist # will run `docs:build -d docs_dist` command
+        run: |-
+          pnpm docs:build
+
       - name: Setup git
         run: |
           git config --global lfs.allowincompletepush true
+
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
           personal_token: ${{ secrets.PERSONAL_TOKEN }}
           external_repository: taskiq-python/taskiq-python.github.io
           publish_dir: ./docs_dist
-          user_name: 'github-actions[bot]'
-          user_email: 'github-actions[bot]@users.noreply.github.com'
+          user_name: "github-actions[bot]"
+          user_email: "github-actions[bot]@users.noreply.github.com"
+
   deploy:
     runs-on: ubuntu-latest
     steps:

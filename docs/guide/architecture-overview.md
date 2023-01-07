@@ -31,7 +31,6 @@ end
 Result backend ->> Your code: Receive the result
 ```
 
-
 Let's discuss every component.
 
 ## Broker
@@ -39,8 +38,9 @@ Let's discuss every component.
 Brokers are the most critical element of the taskiq. Every broker **must** implement the `AsyncBroker` abstract class from [taskiq.abc.broker](https://github.com/taskiq-python/taskiq/blob/master/taskiq/abc/broker.py) to make things work.
 
 `AsyncBroker` class has two main methods to implement:
-* kick
-* listen
+
+- kick
+- listen
 
 The `kick` method puts the message in the external system.
 For example, it may call the `PUB` command in Redis.
@@ -162,23 +162,25 @@ class MyMiddleware(TaskiqMiddleware):
 ```
 
 Here are methods you can implement in the order they are executed:
-* `pre_send` - executed on the client side before the message is sent. Here you can modify the message.
-* `post_send` - executed right after the message was sent.
-* `pre_execute` - executed on the worker side after the message was received by a worker and before its execution.
-* `on_error` - executed after the task was executed if the exception was found.
-* `post_execute` - executed after the message was executed.
-* `post_save` - executed after the result was saved in the result backend.
 
-You can use sync or async hooks without changing aything, but adding async to the hook signature.
+- `pre_send` - executed on the client side before the message is sent. Here you can modify the message.
+- `post_send` - executed right after the message was sent.
+- `pre_execute` - executed on the worker side after the message was received by a worker and before its execution.
+- `on_error` - executed after the task was executed if the exception was found.
+- `post_execute` - executed after the message was executed.
+- `post_save` - executed after the result was saved in the result backend.
+
+You can use sync or async hooks without changing anything, but adding async to the hook signature.
 
 ::: warning important note
-If excetion happens in middlewares it won't be caught. Please ensure that you have try\except for all edge cases of your middleware.
+
+If exception happens in middlewares it won't be caught. Please ensure that you have try\except for all edge cases of your middleware.
+
 :::
 
 Middlewares can store information in `message.labels` for
 later use. For example `SimpleRetryMiddleware` uses labels
 to remember number of failed attempts.
-
 
 ## Messages
 
