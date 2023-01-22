@@ -14,3 +14,8 @@ Here's a minimal example of a result backend:
 ::: info Cool tip!
 It's a good practice to skip fetching logs from the storage unless `with_logs=True` is explicitly specified.
 :::
+
+
+::: danger Important note!
+`with_logs` param is now deprecated. It will be removed in future releases.
+:::
