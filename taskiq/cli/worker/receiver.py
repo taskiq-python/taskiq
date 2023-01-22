@@ -1,6 +1,5 @@
 import asyncio
 import inspect
-import io
 from concurrent.futures import ThreadPoolExecutor
 from logging import getLogger
 from time import time
@@ -11,7 +10,6 @@ from taskiq_dependencies import DependencyGraph
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.cli.worker.args import WorkerArgs
-from taskiq.cli.worker.log_collector import log_collector
 from taskiq.cli.worker.params_parser import parse_params
 from taskiq.context import Context
 from taskiq.message import BrokerMessage, TaskiqMessage
@@ -150,8 +148,6 @@ class Receiver:
         :return: result of execution.
         """
         loop = asyncio.get_running_loop()
-        # Buffer to capture logs.
-        logs = io.StringIO()
         returned = None
         found_exception = None
         signature = self.task_signatures.get(message.task_name)
@@ -160,55 +156,51 @@ class Receiver:
             signature = None
         parse_params(signature, self.task_hints.get(message.task_name) or {}, message)
 
-        # Captures function's logs.
-        with log_collector(logs, self.cli_args.log_collector_format):
-            dep_ctx = None
-            if dependency_graph:
-                # Create a context for dependency resolving.
-                dep_ctx = dependency_graph.async_ctx(
-                    {
-                        Context: Context(message, self.broker),
-                        TaskiqState: self.broker.state,
-                    },
+        dep_ctx = None
+        if dependency_graph:
+            # Create a context for dependency resolving.
+            dep_ctx = dependency_graph.async_ctx(
+                {
+                    Context: Context(message, self.broker),
+                    TaskiqState: self.broker.state,
+                },
+            )
+            # Resolve all function's dependencies.
+            dep_kwargs = await dep_ctx.resolve_kwargs()
+            for key, val in dep_kwargs.items():
+                if key not in message.kwargs:
+                    message.kwargs[key] = val
+        # Start a timer.
+        start_time = time()
+        try:
+            # If the function is a coroutine we await it.
+            if asyncio.iscoroutinefunction(target):
+                returned = await target(*message.args, **message.kwargs)
+            else:
+                # If this is a synchronous function we
+                # run it in executor.
+                returned = await loop.run_in_executor(
+                    self.executor,
+                    _run_sync,
+                    target,
+                    message,
                 )
-                # Resolve all function's dependencies.
-                dep_kwargs = await dep_ctx.resolve_kwargs()
-                for key, val in dep_kwargs.items():
-                    if key not in message.kwargs:
-                        message.kwargs[key] = val
-            # Start a timer.
-            start_time = time()
-            try:
-                # If the function is a coroutine we await it.
-                if asyncio.iscoroutinefunction(target):
-                    returned = await target(*message.args, **message.kwargs)
-                else:
-                    # If this is a synchronous function we
-                    # run it in executor.
-                    returned = await loop.run_in_executor(
-                        self.executor,
-                        _run_sync,
-                        target,
-                        message,
-                    )
-            except Exception as exc:
-                found_exception = exc
-                logger.error(
-                    "Exception found while executing function: %s",
-                    exc,
-                    exc_info=True,
-                )
-            # Stop the timer.
-            execution_time = time() - start_time
-            if dep_ctx:
-                await dep_ctx.close()
+        except Exception as exc:
+            found_exception = exc
+            logger.error(
+                "Exception found while executing function: %s",
+                exc,
+                exc_info=True,
+            )
+        # Stop the timer.
+        execution_time = time() - start_time
+        if dep_ctx:
+            await dep_ctx.close()
 
-        raw_logs = logs.getvalue()
-        logs.close()
         # Assemble result.
         result: "TaskiqResult[Any]" = TaskiqResult(
             is_err=found_exception is not None,
-            log=raw_logs,
+            log=None,
             return_value=returned,
             execution_time=execution_time,
         )

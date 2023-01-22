@@ -1,9 +1,10 @@
 import asyncio
 import os
 import signal
-from logging import basicConfig, getLevelName, getLogger
-from multiprocessing import Process
-from queue import Queue
+import sys
+from logging import StreamHandler, basicConfig, getLevelName, getLogger
+from logging.handlers import QueueHandler, QueueListener
+from multiprocessing import Process, Queue
 from time import sleep
 from typing import Any, List
 
@@ -223,10 +224,14 @@ def run_worker(args: WorkerArgs) -> None:  # noqa: WPS213
 
     :param args: CLI arguments.
     """
+    logging_queue = Queue(-1)  # type: ignore
+    listener = QueueListener(logging_queue, StreamHandler(sys.stdout))
     basicConfig(
         level=getLevelName(args.log_level),
-        format=("[%(asctime)s][%(levelname)-7s][%(processName)s] %(message)s"),
+        format="[%(asctime)s][%(levelname)-7s][%(processName)s] %(message)s",
+        handlers=[QueueHandler(logging_queue)],
     )
+    listener.start()
     logger.info("Starting %s worker processes.", args.workers)
 
     global worker_processes  # noqa: WPS420
@@ -259,3 +264,4 @@ def run_worker(args: WorkerArgs) -> None:  # noqa: WPS213
     signal.signal(signal.SIGTERM, signal_handler)
 
     watcher_loop(args=args)
+    listener.stop()
