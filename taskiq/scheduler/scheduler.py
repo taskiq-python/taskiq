@@ -1,5 +1,6 @@
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, Dict, List
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.scheduler.merge_functions import preserve_all
@@ -16,7 +17,17 @@ class ScheduledTask:
     labels: Dict[str, Any]
     args: List[Any]
     kwargs: Dict[str, Any]
-    cron: str
+    cron: Optional[str] = field(default=None)
+    time: Optional[datetime] = field(default=None)
+
+    def __post_init__(self) -> None:
+        """
+        This method validates, that either `cron` or `time` field is present.
+
+        :raises ValueError: if cron and time are none.
+        """
+        if self.cron is None and self.time is None:
+            raise ValueError("Either cron or datetime must be present.")
 
 
 class TaskiqScheduler:
@@ -44,4 +55,3 @@ class TaskiqScheduler:
         Here you can do stuff, like creating
         connections or anything you'd like.
         """
-        await self.broker.startup()

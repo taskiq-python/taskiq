@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from importlib import import_module
 from logging import getLogger
 from pathlib import Path
-from typing import Any, Generator
+from typing import Any, Generator, List
 
 logger = getLogger("taskiq.worker")
 
@@ -51,7 +51,7 @@ def import_object(object_spec: str) -> Any:
     return getattr(module, import_spec[1])
 
 
-def import_from_modules(modules: list[str]) -> None:
+def import_from_modules(modules: List[str]) -> None:
     """
     Import all modules from modules variable.
 
@@ -66,7 +66,7 @@ def import_from_modules(modules: list[str]) -> None:
             logger.warning(f"Cannot import {module}")
 
 
-def import_tasks(modules: list[str], pattern: str, fs_discover: bool) -> None:
+def import_tasks(modules: List[str], pattern: str, fs_discover: bool) -> None:
     """
     Import tasks modules.
 
