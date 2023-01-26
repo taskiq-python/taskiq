@@ -55,3 +55,4 @@ class TaskiqScheduler:
         Here you can do stuff, like creating
         connections or anything you'd like.
         """
+        await self.broker.startup()
