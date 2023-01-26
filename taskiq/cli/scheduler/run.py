@@ -47,6 +47,20 @@ async def schedules_updater(
         await asyncio.sleep(scheduler.refresh_delay)
 
 
+def should_run(task: ScheduledTask) -> bool:
+    """
+    Checks if it's time to run a task.
+
+    :param task: task to check.
+    :return: True if task must be sent.
+    """
+    if task.cron is not None:
+        return is_now(task.cron)
+    if task.time is not None:
+        return task.time <= datetime.utcnow()
+    return False
+
+
 async def run_scheduler(args: SchedulerArgs) -> None:  # noqa: C901, WPS210, WPS213
     """
     Runs scheduler loop.
@@ -83,7 +97,7 @@ async def run_scheduler(args: SchedulerArgs) -> None:  # noqa: C901, WPS210, WPS
         not_fired_tasks = []
         for task in tasks:
             try:
-                ready = is_now(task.cron)
+                ready = should_run(task)
             except ValueError:
                 logger.warning(
                     "Cannot parse cron: %s for task: %s",

@@ -28,7 +28,7 @@ class LabelScheduleSource(ScheduleSource):
             if task.broker != self.broker:
                 continue
             for schedule in task.labels.get("schedule", []):
-                if "cron" not in schedule:
+                if "cron" not in schedule and "time" not in schedule:
                     continue
                 labels = schedule.get("labels", {})
                 labels.update(task.labels)
@@ -38,7 +38,8 @@ class LabelScheduleSource(ScheduleSource):
                         labels=labels,
                         args=schedule.get("args", []),
                         kwargs=schedule.get("kwargs", {}),
-                        cron=schedule["cron"],
+                        cron=schedule.get("cron"),
+                        time=schedule.get("time"),
                     ),
                 )
         return schedules
