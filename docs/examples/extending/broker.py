@@ -1,5 +1,4 @@
-import asyncio
-from typing import Any, Callable, Coroutine, Optional, TypeVar
+from typing import AsyncGenerator, Callable, Optional, TypeVar
 
 from taskiq import AsyncBroker, AsyncResultBackend, BrokerMessage
 
@@ -29,14 +28,9 @@ class MyBroker(AsyncBroker):
         # Send a message.
         pass
 
-    async def listen(
-        self,
-        callback: Callable[[BrokerMessage], Coroutine[Any, Any, None]],
-    ) -> None:
-        loop = asyncio.get_event_loop()
+    async def listen(self) -> AsyncGenerator[BrokerMessage, None]:
         while True:
             # Get new message.
-            # new_message = ...
-            # Create a new task to execute.
-            # loop.create_task(callback(new_message))
-            pass
+            new_message: BrokerMessage = ...  # type: ignore
+            # Yield it!
+            yield new_message
