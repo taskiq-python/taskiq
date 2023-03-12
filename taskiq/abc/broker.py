@@ -7,6 +7,7 @@ from logging import getLogger
 from typing import (  # noqa: WPS235
     TYPE_CHECKING,
     Any,
+    AsyncGenerator,
     Awaitable,
     Callable,
     Coroutine,
@@ -149,17 +150,14 @@ class AsyncBroker(ABC):  # noqa: WPS230
         """
 
     @abstractmethod
-    async def listen(
-        self,
-        callback: Callable[[BrokerMessage], Coroutine[Any, Any, None]],
-    ) -> None:
+    def listen(self) -> AsyncGenerator[BrokerMessage, None]:
         """
         This function listens to new messages and yields them.
 
         This it the main point for workers.
         This function is used to get new tasks from the network.
 
-        :param callback: function to call when message received.
+        :yield: incoming messages.
         :return: nothing.
         """
 

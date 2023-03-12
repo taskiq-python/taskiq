@@ -1,3 +1,4 @@
+import asyncio
 from logging import getLogger
 
 from taskiq.abc.broker import AsyncBroker
@@ -25,4 +26,15 @@ async def async_listen_messages(
     logger.info("Inicialized receiver.")
     receiver = Receiver(broker, cli_args)
     logger.info("Listening started.")
-    await broker.listen(receiver.callback)
+    tasks = set()
+    async for message in broker.listen():
+        task = asyncio.create_task(
+            receiver.callback(message=message, raise_err=False),
+        )
+
+        if cli_args.max_async_tasks > 1:
+            tasks.add(task)
+
+        if tasks and len(tasks) >= cli_args.max_async_tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+            tasks.clear()
