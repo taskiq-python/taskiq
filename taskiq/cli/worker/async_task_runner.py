@@ -31,10 +31,19 @@ async def async_listen_messages(
         task = asyncio.create_task(
             receiver.callback(message=message, raise_err=False),
         )
+        tasks.add(task)
 
-        if cli_args.max_async_tasks > 1:
-            tasks.add(task)
+        # We want the task to remove itself from the set when it's done.
+        #
+        # Because python's GC can silently cancel task
+        # and it considered to be Hisenbug.
+        # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
+        task.add_done_callback(tasks.discard)
 
-        if tasks and len(tasks) >= cli_args.max_async_tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
-            tasks.clear()
+        # If we have finite number of maximum simultanious tasks,
+        # we await them when we reached the limit.
+        # But we don't await all of them, we await only first completed task,
+        # and then continue.
+        if 1 <= cli_args.max_async_tasks <= len(tasks):
+            _, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            tasks = pending
