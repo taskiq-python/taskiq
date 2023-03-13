@@ -1,6 +1,6 @@
 import inspect
 from collections import OrderedDict
-from typing import Any, Callable, Coroutine, Optional, TypeVar, get_type_hints
+from typing import Any, AsyncGenerator, Callable, Optional, TypeVar, get_type_hints
 
 from taskiq_dependencies import DependencyGraph
 
@@ -143,17 +143,13 @@ class InMemoryBroker(AsyncBroker):
 
         await self.receiver.callback(message=message)
 
-    async def listen(
-        self,
-        callback: Callable[[BrokerMessage], Coroutine[Any, Any, None]],
-    ) -> None:
+    def listen(self) -> AsyncGenerator[BrokerMessage, None]:
         """
         Inmemory broker cannot listen.
 
         This method throws RuntimeError if you call it.
         Because inmemory broker cannot really listen to any of tasks.
 
-        :param callback: message callback.
         :raises RuntimeError: if this method is called.
         """
         raise RuntimeError("Inmemory brokers cannot listen.")

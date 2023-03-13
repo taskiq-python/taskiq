@@ -1,6 +1,5 @@
-import asyncio
 from logging import getLogger
-from typing import Any, Callable, Coroutine, Optional, TypeVar
+from typing import AsyncGenerator, Callable, Optional, TypeVar
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.result_backend import AsyncResultBackend
@@ -62,16 +61,12 @@ class ZeroMQBroker(AsyncBroker):
         with self.socket.connect(self.sub_host) as sock:
             await sock.send_string(message.json())
 
-    async def listen(
-        self,
-        callback: Callable[[BrokerMessage], Coroutine[Any, Any, None]],
-    ) -> None:
+    async def listen(self) -> AsyncGenerator[BrokerMessage, None]:
         """
         Start accepting new messages.
 
-        :param callback: function to call when message received.
+        :yields: incoming messages.
         """
-        loop = asyncio.get_event_loop()
         with self.socket.connect(self.sub_host) as sock:
             while True:
                 received_str = await sock.recv_string()
@@ -80,4 +75,4 @@ class ZeroMQBroker(AsyncBroker):
                 except ValueError:
                     logger.warning("Cannot parse received message %s", received_str)
                     continue
-                loop.create_task(callback(broker_msg))
+                yield broker_msg

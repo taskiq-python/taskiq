@@ -1,4 +1,4 @@
-from typing import Any, Callable, Coroutine
+from typing import AsyncGenerator
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.decor import AsyncTaskiqDecoratedTask
@@ -17,10 +17,7 @@ class _TestBroker(AsyncBroker):
         :param message: message to lost.
         """
 
-    async def listen(
-        self,
-        callback: Callable[[BrokerMessage], Coroutine[Any, Any, None]],
-    ) -> None:
+    async def listen(self) -> AsyncGenerator[BrokerMessage, None]:  # type: ignore
         """
         This method is not implemented.
 

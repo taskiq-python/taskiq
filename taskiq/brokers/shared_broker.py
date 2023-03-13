@@ -1,4 +1,4 @@
-from typing import Any, Callable, Coroutine, Optional, TypeVar
+from typing import AsyncGenerator, Optional, TypeVar
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.decor import AsyncTaskiqDecoratedTask
@@ -59,16 +59,12 @@ class AsyncSharedBroker(AsyncBroker):
             "without setting the default_broker.",
         )
 
-    async def listen(
-        self,
-        callback: Callable[[BrokerMessage], Coroutine[Any, Any, None]],
-    ) -> None:  # type: ignore
+    async def listen(self) -> AsyncGenerator[BrokerMessage, None]:  # type: ignore
         """
         Shared broker cannot listen to tasks.
 
         This method will throw an exception.
 
-        :param callback: message callback.
         :raises TaskiqError: if called.
         """
         raise TaskiqError("Shared broker cannot listen")
