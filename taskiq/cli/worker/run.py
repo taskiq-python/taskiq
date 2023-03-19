@@ -1,5 +1,4 @@
 import asyncio
-import enum
 import logging
 import signal
 import sys
@@ -19,14 +18,6 @@ try:
     import uvloop  # noqa: WPS433
 except ImportError:
     uvloop = None  # type: ignore
-
-
-class ProcessAction(enum.Enum):
-    """Enumberate of possible events."""
-
-    FULL_RELOAD = enum.auto()
-    SHUTDOWN = enum.auto()
-    RELOAD_ONE = enum.auto()
 
 
 logger = logging.getLogger("taskiq.worker")

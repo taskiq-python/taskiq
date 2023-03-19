@@ -23,7 +23,7 @@ async def async_listen_messages(
     """
     logger.debug("Runing startup event.")
     await broker.startup()
-    logger.debug("Inicialized receiver.")
+    logger.debug("Initialized receiver.")
     receiver = Receiver(broker, cli_args)
     logger.info("Listening started.")
     tasks = set()
