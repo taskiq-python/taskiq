@@ -20,7 +20,7 @@ class WorkerArgs:
     )
     max_threadpool_threads: int = 10
     no_parse: bool = False
-    shutdown_timeout: float = 5
+    shutdown_timeout: float = 1
     reload: bool = False
     no_gitignore: bool = False
     max_async_tasks: int = 100

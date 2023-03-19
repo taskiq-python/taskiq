@@ -21,9 +21,9 @@ async def async_listen_messages(
     :param broker: broker to listen to.
     :param cli_args: CLI arguments for worker.
     """
-    logger.info("Runing startup event.")
+    logger.debug("Runing startup event.")
     await broker.startup()
-    logger.info("Inicialized receiver.")
+    logger.debug("Inicialized receiver.")
     receiver = Receiver(broker, cli_args)
     logger.info("Listening started.")
     tasks = set()

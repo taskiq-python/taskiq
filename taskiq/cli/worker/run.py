@@ -1,12 +1,12 @@
 import asyncio
-import os
+import enum
+import logging
 import signal
 import sys
-from logging import StreamHandler, basicConfig, getLevelName, getLogger
 from logging.handlers import QueueHandler, QueueListener
 from multiprocessing import Process, Queue
 from time import sleep
-from typing import Any, List
+from typing import Any, Callable, List, Optional, Tuple
 
 from watchdog.observers import Observer
 
@@ -22,58 +22,51 @@ except ImportError:
     uvloop = None  # type: ignore
 
 
-logger = getLogger("taskiq.worker")
+class ProcessAction(enum.Enum):
+    """Enumberate of possible events."""
+
+    FULL_RELOAD = enum.auto()
+    SHUTDOWN = enum.auto()
+    RELOAD_ONE = enum.auto()
 
 
-restart_workers = True
-worker_processes: List[Process] = []
-observer = Observer()
-reload_queue: "Queue[bool]" = Queue(-1)
+logger = logging.getLogger("taskiq.worker")
 
 
-def signal_handler(_signal: int, _frame: Any) -> None:
+def get_signal_handler(
+    action_queue: "Queue[Tuple[ProcessAction, Optional[int]]]",
+) -> Callable[[int, Any], None]:
     """
-    This handler is used only by main process.
+    Generate singnal handler for main process.
 
-    If the OS sent you SIGINT or SIGTERM,
-    we should kill all spawned processes.
+    The signal handler will just put the SHUTDOWN event in
+    the action queue.
 
-    :param _signal: incoming signal.
-    :param _frame: current execution frame.
+    :param action_queue: event queue.
+    :returns: actual signal handler.
     """
-    global restart_workers  # noqa: WPS420
-    global worker_processes  # noqa: WPS420
 
-    restart_workers = False  # noqa: WPS442
-    for process in worker_processes:
-        # This is how we kill children,
-        # by sending SIGINT to child processes.
-        if process.pid is None:
-            continue
-        try:
-            os.kill(process.pid, signal.SIGINT)
-        except ProcessLookupError:
-            continue
-        process.join()
-    if observer.is_alive():
-        observer.stop()
-        observer.join()
+    def _signal_handler(signal_num: int, _frame: Any) -> None:
+        logger.debug(f"Got signal {signal_num}.")
+        action_queue.put((ProcessAction.SHUTDOWN, None))
+        logger.warn("Workers are scheduled for shutdown.")
+
+    return _signal_handler
 
 
-def schedule_workers_reload() -> None:
+def schedule_workers_reload(
+    action_queue: "Queue[Tuple[ProcessAction, Optional[int]]]",
+) -> None:
     """
     Function to schedule workers to restart.
 
-    This function adds worker ids to the queue.
+    It simply send FULL_RELOAD event, which is handled
+    in the mainloop.
 
-    This queue is later read in watcher loop.
+    :param action_queue: queue to send events to.
     """
-    global worker_processes  # noqa: WPS420
-    global reload_queue  # noqa: WPS420
-
-    reload_queue.put(True)
+    action_queue.put((ProcessAction.FULL_RELOAD, None))
     logger.info("Scheduled workers reload.")
-    reload_queue.join()
 
 
 async def shutdown_broker(broker: AsyncBroker, timeout: float) -> None:
@@ -103,7 +96,7 @@ async def shutdown_broker(broker: AsyncBroker, timeout: float) -> None:
         )
 
 
-def start_listen(args: WorkerArgs) -> None:  # noqa: C901
+def start_listen(args: WorkerArgs) -> None:  # noqa: C901, WPS213
     """
     This function starts actual listening process.
 
@@ -135,17 +128,18 @@ def start_listen(args: WorkerArgs) -> None:  # noqa: C901
     # times. And it may interrupt the broker's shutdown process.
     shutting_down = False
 
-    def interrupt_handler(_signum: int, _frame: Any) -> None:
+    def interrupt_handler(signum: int, _frame: Any) -> None:
         """
         Signal handler.
 
         This handler checks if process is already
         terminating and if it's true, it does nothing.
 
-        :param _signum: received signal number.
+        :param signum: received signal number.
         :param _frame: current execution frame.
         :raises KeyboardInterrupt: if termiation hasn't begun.
         """
+        logger.debug(f"Got signal {signum}.")
         nonlocal shutting_down  # noqa: WPS420
         if shutting_down:
             return
@@ -153,6 +147,7 @@ def start_listen(args: WorkerArgs) -> None:  # noqa: C901
         raise KeyboardInterrupt
 
     signal.signal(signal.SIGINT, interrupt_handler)
+    signal.signal(signal.SIGTERM, interrupt_handler)
 
     loop = asyncio.get_event_loop()
     try:
@@ -162,57 +157,98 @@ def start_listen(args: WorkerArgs) -> None:  # noqa: C901
         loop.run_until_complete(shutdown_broker(broker, args.shutdown_timeout))
 
 
-def watcher_loop(args: WorkerArgs) -> None:  # noqa: C901, WPS213
+def start_process_watcher(  # noqa: C901, WPS210, WPS213
+    args: WorkerArgs,
+    action_queue: "Queue[Tuple[ProcessAction, Optional[int]]]",
+) -> None:
     """
-    Infinate loop for main process.
+    Main loop.
 
-    This loop restarts worker processes
-    if they exit with error returncodes.
+    This function is an endless loop,
+    which listens to new events from different sources.
 
-    Also it reads process ids from reload_queue
-    and reloads workers if they were scheduled to reload.
+    Every second it checks for new events and
+    current states of child processes.
 
-    :param args: cli arguements.
+    If there are new events it handles them.
+    Taskiq has 3 types of events:
+
+    1. FULL_RELOAD - when we want to restart all child processes.
+        It checks for running processes and generates RELOAD_ONE event for
+        any process.
+
+    2. RELOAD_ONE - this event restarts one single child process.
+
+    3. SHUTDOWN - exits the loop. Since all child processes are
+        daemons, they will be automatically terminated using signals.
+
+    If some processes are not up, it schedules a restart
+    for each unhealthy process.
+
+    :param args: cli args for worker.
+    :param action_queue: queue for events.
     """
-    global worker_processes  # noqa: WPS420
-    global restart_workers  # noqa: WPS420
+    workers: List[Process] = []
+    for process in range(args.workers):
+        work_proc = Process(
+            target=start_listen,
+            kwargs={"args": args},
+            name=f"worker-{process}",
+            daemon=True,
+        )
+        logger.debug(
+            "Started process worker-%d with pid %s ",
+            process,
+            work_proc.pid,
+        )
+        work_proc.start()
+        workers.append(work_proc)
 
-    while worker_processes and restart_workers:
-        # List of processes to remove.
+    while True:
         sleep(1)
-        process_to_remove = []
-        if not reload_queue.empty():
-            while not reload_queue.empty():
-                reload_queue.get()
-                reload_queue.task_done()
-
-            for worker_id, worker in enumerate(worker_processes):
-                worker.terminate()
+        reloaded_workers = set()
+        # We bulk_process all pending events.
+        while not action_queue.empty():
+            action, action_arg = action_queue.get()
+            logging.debug(f"GOT event: {action} with args: {action_arg}")
+            if action == ProcessAction.FULL_RELOAD:
+                # Generate RELOAD_ONE for all current children.
+                for worker_num, _ in enumerate(workers):
+                    action_queue.put((ProcessAction.RELOAD_ONE, worker_num))
+            elif action == ProcessAction.RELOAD_ONE:
+                if action_arg is None:
+                    continue
+                # If we just reloaded this worker, skip handling.
+                if action_arg in reloaded_workers:
+                    continue
+                # Check that it's a valid worker id.
+                if action_arg < 0 or action_arg >= len(workers):
+                    logger.warn(f"Unknown worker number: {action_arg}.")
+                    continue
+                worker = workers[action_arg]
+                try:
+                    worker.terminate()
+                except ValueError:
+                    logger.debug(f"Process {worker.name} is already terminated.")
+                # Waiting worker shutdown.
                 worker.join()
-                worker_processes[worker_id] = Process(
+                new_process = Process(
                     target=start_listen,
                     kwargs={"args": args},
-                    name=f"worker-{worker_id}",
+                    name=f"worker-{action_arg}",
+                    daemon=True,
                 )
-                worker_processes[worker_id].start()
+                new_process.start()
+                workers[action_arg] = new_process
+                reloaded_workers.add(action_arg)
+            elif action == ProcessAction.SHUTDOWN:
+                logger.debug("Event processed.")
+                return
 
-        for worker_id, worker in enumerate(worker_processes):
-            if worker.is_alive():
-                continue
-            if worker.exitcode is not None and worker.exitcode > 0 and restart_workers:
-                logger.info("Trying to restart the worker-%s", worker_id)
-                worker_processes[worker_id] = Process(
-                    target=start_listen,
-                    kwargs={"args": args},
-                    name=f"worker-{worker_id}",
-                )
-                worker_processes[worker_id].start()
-            else:
-                logger.info("Worker-%s terminated.", worker_id)
-                process_to_remove.append(worker)
-
-        for dead_process in process_to_remove:
-            worker_processes.remove(dead_process)
+        for worker_num, worker in enumerate(workers):
+            if not worker.is_alive():
+                logger.info(f"{worker.name} is dead. Scheduling reload.")
+                action_queue.put((ProcessAction.RELOAD_ONE, worker_num))
 
 
 def run_worker(args: WorkerArgs) -> None:  # noqa: WPS213
@@ -225,43 +261,42 @@ def run_worker(args: WorkerArgs) -> None:  # noqa: WPS213
     :param args: CLI arguments.
     """
     logging_queue = Queue(-1)  # type: ignore
-    listener = QueueListener(logging_queue, StreamHandler(sys.stdout))
-    basicConfig(
-        level=getLevelName(args.log_level),
-        format="[%(asctime)s][%(levelname)-7s][%(processName)s] %(message)s",
+    listener = QueueListener(logging_queue, logging.StreamHandler(sys.stdout))
+    logging.basicConfig(
+        level=logging.getLevelName(args.log_level),
+        format="[%(asctime)s][%(name)s][%(levelname)-7s][%(processName)s] %(message)s",
         handlers=[QueueHandler(logging_queue)],
     )
+    logging.getLogger("watchdog.observers.inotify_buffer").setLevel(level=logging.INFO)
     listener.start()
     logger.info("Starting %s worker processes.", args.workers)
 
-    global worker_processes  # noqa: WPS420
-
-    for process in range(args.workers):
-        work_proc = Process(
-            target=start_listen,
-            kwargs={"args": args},
-            name=f"worker-{process}",
-        )
-        work_proc.start()
-        logger.debug(
-            "Started process worker-%d with pid %s ",
-            process,
-            work_proc.pid,
-        )
-        worker_processes.append(work_proc)
+    action_queue: "Queue[Tuple[ProcessAction, Optional[int]]]" = Queue(-1)
+    observer = Observer()
 
     if args.reload:
         observer.schedule(
             FileWatcher(
                 callback=schedule_workers_reload,
                 use_gitignore=not args.no_gitignore,
+                action_queue=action_queue,
             ),
             path=".",
             recursive=True,
         )
         observer.start()
+        logging.warning("Reload on chage enabled. Number of worker processes set to 1.")
+        args.workers = 1
+
+    signal_handler = get_signal_handler(action_queue)
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    watcher_loop(args=args)
+    start_process_watcher(args, action_queue)
+
+    if observer.is_alive():
+        if args.reload:
+            logger.info("Stopping watching files.")
+        observer.stop()
+    logger.info("Stopping logging thread.")
     listener.stop()
