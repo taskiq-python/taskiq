@@ -75,6 +75,7 @@ class ReloadOneAction(ProcessActionBase):
             daemon=True,
         )
         new_process.start()
+        logger.info(f"Process {new_process.name} restarted with pid {new_process.pid}")
         workers[self.worker_num] = new_process
 
 
@@ -163,12 +164,12 @@ class ProcessManager:
                 name=f"worker-{process}",
                 daemon=True,
             )
+            work_proc.start()
             logger.info(
                 "Started process worker-%d with pid %s ",
                 process,
                 work_proc.pid,
             )
-            work_proc.start()
             self.workers.append(work_proc)
 
     def start(self) -> None:  # noqa: C901, WPS213
