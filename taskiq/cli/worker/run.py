@@ -1,9 +1,6 @@
 import asyncio
 import logging
 import signal
-import sys
-from logging.handlers import QueueHandler, QueueListener
-from multiprocessing import Queue
 from typing import Any
 
 from watchdog.observers import Observer
@@ -120,15 +117,11 @@ def run_worker(args: WorkerArgs) -> None:  # noqa: WPS213
 
     :param args: CLI arguments.
     """
-    logging_queue = Queue(-1)  # type: ignore
-    listener = QueueListener(logging_queue, logging.StreamHandler(sys.stdout))
     logging.basicConfig(
         level=logging.getLevelName(args.log_level),
         format="[%(asctime)s][%(name)s][%(levelname)-7s][%(processName)s] %(message)s",
-        handlers=[QueueHandler(logging_queue)],
     )
     logging.getLogger("watchdog.observers.inotify_buffer").setLevel(level=logging.INFO)
-    listener.start()
     logger.info("Starting %s worker processes.", args.workers)
 
     observer = Observer()
@@ -149,4 +142,3 @@ def run_worker(args: WorkerArgs) -> None:  # noqa: WPS213
             logger.info("Stopping watching files.")
         observer.stop()
     logger.info("Stopping logging thread.")
-    listener.stop()
