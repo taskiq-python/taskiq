@@ -16,6 +16,8 @@ head:
     - name: "google-site-verification"
       content: "hQCR5w2tmeuOvYIYXsOYU3u4kLNwT86lnqltANYlRQ0"
 features:
+    - title: Production ready
+      details: Taskiq has proven that it can run in heavy-production systems with high load.
     - title: Fully asynchronous
       details: Taskiq can run both sync and async functions. You don't have to worry about it.
     - title: Easily extensible
@@ -23,9 +25,7 @@ features:
         your own broker or middleware.
     - title: Strongly typed
       details: Taskiq provides correct autocompletion for most of its functionality.
-    - title: Simple
-      details: We tried to make the interface to be as simple as possible. And we are proud of it.
-footer: MIT Licensed | Copyright© 2022
+footer: MIT Licensed | Copyright© 2022-2023
 ---
 
 ## Installation
