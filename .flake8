@@ -8,6 +8,8 @@ docstring_style=sphinx
 ignore =
   ; Found a line that starts with a dot
   WPS348,
+  ; Found overly complex type annotation
+  WPS234,
   ; `noqa` comments overuse ))))
   WPS402,
   ; Found `%` string formatting
