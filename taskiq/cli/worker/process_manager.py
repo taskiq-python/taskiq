@@ -147,11 +147,6 @@ class ProcessManager:
                 path=".",
                 recursive=True,
             )
-            observer.start()
-            logging.warning(
-                "Reload on chage enabled. Number of worker processes set to 1.",
-            )
-            self.args.workers = 1
 
         signal_handler = get_signal_handler(self.action_queue)
         signal.signal(signal.SIGINT, signal_handler)

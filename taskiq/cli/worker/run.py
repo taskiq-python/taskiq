@@ -133,6 +133,13 @@ def run_worker(args: WorkerArgs) -> None:  # noqa: WPS213
 
     observer = Observer()
 
+    if args.reload:
+        observer.start()
+        args.workers = 1
+        logging.warning(
+            "Reload on chage enabled. Number of worker processes set to 1.",
+        )
+
     manager = ProcessManager(args=args, observer=observer, worker_function=start_listen)
 
     manager.start()
