@@ -17,7 +17,7 @@ head:
       content: "hQCR5w2tmeuOvYIYXsOYU3u4kLNwT86lnqltANYlRQ0"
 features:
     - title: Production ready
-      details: Taskiq has proven that it can run in heavy-production systems with high load.
+      details: Taskiq has proven that it can run in heavy production systems with high load.
     - title: Fully asynchronous
       details: Taskiq can run both sync and async functions. You don't have to worry about it.
     - title: Easily extensible
