@@ -27,7 +27,7 @@ You might have seen projects built on top of asyncio that solve similar problem,
 |         Actively maintained |   ✅    |   ✅   |    ❌     |
 |    Multiple broker backends |   ✅    |   ❌   |    ✅     |
 |    Multiple result backends |   ✅    |   ❌   |    ❌     |
-|  Have  a rich documentation |   ✅    |   ❌   |    ❌     |
+|  Have a rich documentation  |   ✅    |   ❌   |    ❌     |
 |   Startup & Shutdown events |   ✅    |   ✅   |    ❌     |
 | Have ability to abort tasks |   ❌    |   ✅   |    ❌     |
 |          Custom serializers |   ✅    |   ✅   |    ❌     |
