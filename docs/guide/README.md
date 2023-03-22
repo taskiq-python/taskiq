@@ -18,8 +18,22 @@ replaceable parts, such as brokers, result backends, and middlewares.
 ## Why not use existing libraries?
 
 We couldn't find a solution like Celery or Dramatiq that can run async code and send tasks asynchronously.
-It was the main reason we created this project. It's still in the early stages of development,
-so it's not a production-ready solution yet. We use it at work, but still, you may encounter bugs.
-If your project requires mature solutions, please use Dramatiq or Celery instead.
+It was the main reason we created this project.
 
-Also, this project is not for you if you have a fully synchronous project.
+You might have seen projects built on top of asyncio that solve similar problem, but here's a comparasion table of taskiq and other projects.
+
+|                Feature name | Taskiq |  Arq  | AioTasks |
+| --------------------------: | :----: | :---: | :------: |
+|         Actively maintained |   ✅    |   ✅   |    ❌     |
+|    Multiple broker backends |   ✅    |   ❌   |    ✅     |
+|    Multiple result backends |   ✅    |   ❌   |    ❌     |
+|  Have a rich documentation  |   ✅    |   ❌   |    ❌     |
+|   Startup & Shutdown events |   ✅    |   ✅   |    ❌     |
+| Have ability to abort tasks |   ❌    |   ✅   |    ❌     |
+|          Custom serializers |   ✅    |   ✅   |    ❌     |
+|        Dependency injection |   ✅    |   ❌   |    ❌     |
+|              Task pipelines |   ✅    |   ✅   |    ❌     |
+|              Task schedules |   ✅    |   ✅   |    ❌     |
+|          Global middlewares |   ✅    |   ❌   |    ❌     |
+
+If you have a fully synchronous project, consider using celery or dramatiq instead.
