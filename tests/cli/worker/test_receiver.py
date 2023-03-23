@@ -1,6 +1,7 @@
 from typing import Any, Optional
 
 import pytest
+from taskiq_dependencies import Depends
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
@@ -200,3 +201,43 @@ async def test_callback_unknown_task() -> None:
     )
 
     await receiver.callback(broker_message)
+
+
+@pytest.mark.anyio
+async def test_custom_ctx() -> None:
+    """Tests that run_task can run sync tasks."""
+
+    class MyTestClass:
+        """Class to test injection."""
+
+        def __init__(self, val: int) -> None:
+            self.val = val
+
+    broker = InMemoryBroker()
+
+    # We register a task into broker,
+    # to build dependency graph on startup.
+    @broker.task
+    def test_func(tes_val: MyTestClass = Depends()) -> int:
+        return tes_val.val
+
+    # We add custom first-level dependency.
+    broker.add_dependency_context({MyTestClass: MyTestClass(11)})
+    # Create a receiver.
+    receiver = get_receiver(broker)
+
+    result = await receiver.run_task(
+        test_func,
+        TaskiqMessage(
+            task_id="",
+            task_name=test_func.task_name,
+            labels={},
+            args=[],
+            kwargs={},
+        ),
+    )
+
+    # Check that the value is equal
+    # to the one we supplied.
+    assert result.return_value == 11
+    assert not result.is_err

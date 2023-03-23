@@ -86,11 +86,23 @@ class AsyncBroker(ABC):  # noqa: WPS230
         # Every event has a list of handlers.
         # Every handler is a function which takes state as a first argument.
         # And handler can be either sync or async.
-        self.event_handlers: DefaultDict[  # noqa: WPS234
+        self.event_handlers: DefaultDict[
             TaskiqEvents,
             List[Callable[[TaskiqState], Optional[Awaitable[None]]]],
         ] = defaultdict(list)
         self.state = TaskiqState()
+        self.custom_dependency_context: Dict[Any, Any] = {}
+
+    def add_dependency_context(self, new_ctx: Dict[Any, Any]) -> None:
+        """
+        Add first-level dependencies.
+
+        Provided dict will be used to inject new dependencies
+        in all dependency graph contexts.
+
+        :param new_ctx: Additional context values for dependnecy injection.
+        """
+        self.custom_dependency_context.update(new_ctx)
 
     def add_middlewares(self, *middlewares: "TaskiqMiddleware") -> None:
         """

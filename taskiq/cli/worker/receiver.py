@@ -159,12 +159,14 @@ class Receiver:
         dep_ctx = None
         if dependency_graph:
             # Create a context for dependency resolving.
-            dep_ctx = dependency_graph.async_ctx(
+            broker_ctx = self.broker.custom_dependency_context
+            broker_ctx.update(
                 {
                     Context: Context(message, self.broker),
                     TaskiqState: self.broker.state,
                 },
             )
+            dep_ctx = dependency_graph.async_ctx(broker_ctx)
             # Resolve all function's dependencies.
             dep_kwargs = await dep_ctx.resolve_kwargs()
             for key, val in dep_kwargs.items():
