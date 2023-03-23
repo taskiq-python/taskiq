@@ -171,3 +171,13 @@ By default taskiq has only two deendencies:
 
 - Context from `taskiq.context.Context`
 - TaskiqState from `taskiq.state.TaskiqState`
+
+
+### Adding first-level dependencies
+
+You can expand default list of available dependencies for you application.
+Taskiq have an ability to add new first-level dependencies using brokers.
+
+The AsyncBroker interface has a function called `add_dependency_context` and you can add
+more default dependencies to the taskiq. This may be useful for libraries if you want to
+add new dependencies to users.
