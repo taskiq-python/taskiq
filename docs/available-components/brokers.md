@@ -79,22 +79,34 @@ await my_task.kicker().with_broker(broker).kiq()
 
 :::
 
-## AioPikaBroker (for RabbitMQ)
 
-This broker is not part of the core taskiq lib. You can install it as a separate package [taskiq-aio-pika](https://pypi.org/project/taskiq-aio-pika/).
+## Custom brokers
+
+These brokers are not parts of the core taskiq lib. You can install them as a separate packages.
+
+You can read more about parameters and abilities of these brokers in README.md of each repo.
+
+
+###  AioPikaBroker (for RabbitMQ)
+
+Project link: [taskiq-aio-pika](https://github.com/taskiq-python/taskiq-aio-pika).
 
 ```bash
 pip install taskiq-aio-pika
 ```
 
-You can read more about parameters and abilities of this broker in [README.md](https://github.com/taskiq-python/taskiq-aio-pika).
+### Redis broker
 
-## Redis broker
-
-This broker is not part of the core taskiq lib. You can install it as a separate package [taskiq-redis](https://pypi.org/project/taskiq-redis/).
+Project link: [taskiq-redis](https://github.com/taskiq-python/taskiq-redis).
 
 ```bash
 pip install taskiq-redis
 ```
 
-You can read more about parameters and abilities of this broker in [README.md](https://github.com/taskiq-python/taskiq-redis).
+### NATS broker
+
+Project link: [taskiq-nats](https://github.com/taskiq-python/taskiq-nats).
+
+```bash
+pip install taskiq-nats
+```
