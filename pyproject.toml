@@ -35,7 +35,7 @@ watchdog = "^2.1.9"
 gitignore-parser = "^0.1.0"
 importlib-metadata = "<4.3"
 pycron = "^3.0.0"
-taskiq_dependencies =  "^1.0.0"
+taskiq_dependencies =  "^1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"
