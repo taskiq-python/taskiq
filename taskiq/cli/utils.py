@@ -62,8 +62,9 @@ def import_from_modules(modules: List[str]) -> None:
             logger.info(f"Importing tasks from module {module}")
             with add_cwd_in_path():
                 import_module(module)
-        except ImportError:
-            logger.warning(f"Cannot import {module}")
+        except ImportError as err:
+            logger.warning(f"Cannot import {module}. Cause:")
+            logger.exception(err)
 
 
 def import_tasks(modules: List[str], pattern: str, fs_discover: bool) -> None:
