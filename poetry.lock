@@ -393,19 +393,19 @@ testing = ["pre-commit"]
 
 [[package]]
 name = "filelock"
-version = "3.10.4"
+version = "3.10.5"
 description = "A platform independent file lock."
 category = "dev"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "filelock-3.10.4-py3-none-any.whl", hash = "sha256:6d332dc5c896f18ba93a21d987155e97c434a96d3fe4042ca70d0b3b46e3b470"},
-    {file = "filelock-3.10.4.tar.gz", hash = "sha256:9fc1734dbddcdcd4aaa02c160dd94db5272b92dfa859b44ec8df28e160b751f0"},
+    {file = "filelock-3.10.5-py3-none-any.whl", hash = "sha256:bfe2df552f604a333a32e43f666f0ece4ebb489c01fe42c0e8237bf83cde8ba9"},
+    {file = "filelock-3.10.5.tar.gz", hash = "sha256:6c0312de887536b07321e16e6428a580497be288259baa501bf898e39f9486f3"},
 ]
 
 [package.extras]
 docs = ["furo (>=2022.12.7)", "sphinx (>=6.1.3)", "sphinx-autodoc-typehints (>=1.22,!=1.23.4)"]
-testing = ["covdefaults (>=2.3)", "coverage (>=7.2.2)", "pytest (>=7.2.2)", "pytest-cov (>=4)", "pytest-timeout (>=2.1)"]
+testing = ["covdefaults (>=2.3)", "coverage (>=7.2.2)", "diff-cover (>=7.5)", "pytest (>=7.2.2)", "pytest-cov (>=4)", "pytest-mock (>=3.10)", "pytest-timeout (>=2.1)"]
 
 [[package]]
 name = "flake8"
@@ -1516,14 +1516,14 @@ pbr = ">=2.0.0,<2.1.0 || >2.1.0"
 
 [[package]]
 name = "taskiq-dependencies"
-version = "1.1.0"
+version = "1.1.1"
 description = "FastAPI like dependency injection implementation"
 category = "main"
 optional = false
 python-versions = ">=3.7,<4.0"
 files = [
-    {file = "taskiq_dependencies-1.1.0-py3-none-any.whl", hash = "sha256:467a016765f85484318106f600f352d3be0386deebec5ff08dbdc87663c517bd"},
-    {file = "taskiq_dependencies-1.1.0.tar.gz", hash = "sha256:0e5a6652cb30ceff84871c7e61251db84375c7ea0e94a43c31e7d23d8d58c05c"},
+    {file = "taskiq_dependencies-1.1.1-py3-none-any.whl", hash = "sha256:7676d80f46456a55fd8c2a433804c99e98316c4e25fc6329c5c25adf18b9ba5f"},
+    {file = "taskiq_dependencies-1.1.1.tar.gz", hash = "sha256:7da7a6420700fd8a79597e53224da840d9fcb9e9f708d4e3199b0c3ade2c5fd1"},
 ]
 
 [package.dependencies]
@@ -1792,4 +1792,4 @@ zmq = ["pyzmq"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.7"
-content-hash = "0b198b77f0293061c756289cc6a2342e28e42b712e6e12cdfffcf045f8f28986"
+content-hash = "947ba1a73dc424b56f4110ce5fd8aeb23115c5728d52a3caf0082a6d29c4ab2c"
