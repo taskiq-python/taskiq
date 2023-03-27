@@ -81,6 +81,6 @@ def import_tasks(modules: List[str], pattern: str, fs_discover: bool) -> None:
     """
     if fs_discover:
         for path in Path(".").rglob(pattern):
-            modules.append(str(path).removesuffix(".py").replace("/", "."))
+            modules.append(str(path).removesuffix(".py").replace(os.path.sep, "."))
 
     import_from_modules(modules)

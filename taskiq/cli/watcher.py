@@ -24,7 +24,7 @@ class FileWatcher:  # pragma: no cover
             self.gitignore = parse_gitignore(gpath)
         self.callback_kwargs = callback_kwargs
 
-    def dispatch(self, event: FileSystemEvent) -> None:
+    def dispatch(self, event: FileSystemEvent) -> None:  # noqa: C901
         """
         React to event.
 
@@ -39,7 +39,14 @@ class FileWatcher:  # pragma: no cover
             return
         if ".git" in event.src_path:
             return
-        if self.gitignore and self.gitignore(event.src_path):
+        try:
+            if self.gitignore and self.gitignore(event.src_path):
+                return
+        except Exception as exc:
+            logger.info(
+                f"Cannot check path `{event.src_path}` in gitignore. Cause: {exc}",
+            )
             return
+
         logger.debug(f"File changed. Event: {event}")
         self.callback(**self.callback_kwargs)
