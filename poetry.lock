@@ -393,14 +393,14 @@ testing = ["pre-commit"]
 
 [[package]]
 name = "filelock"
-version = "3.10.5"
+version = "3.10.7"
 description = "A platform independent file lock."
 category = "dev"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "filelock-3.10.5-py3-none-any.whl", hash = "sha256:bfe2df552f604a333a32e43f666f0ece4ebb489c01fe42c0e8237bf83cde8ba9"},
-    {file = "filelock-3.10.5.tar.gz", hash = "sha256:6c0312de887536b07321e16e6428a580497be288259baa501bf898e39f9486f3"},
+    {file = "filelock-3.10.7-py3-none-any.whl", hash = "sha256:bde48477b15fde2c7e5a0713cbe72721cb5a5ad32ee0b8f419907960b9d75536"},
+    {file = "filelock-3.10.7.tar.gz", hash = "sha256:892be14aa8efc01673b5ed6589dbccb95f9a8596f0507e232626155495c18105"},
 ]
 
 [package.extras]
@@ -1427,14 +1427,14 @@ docutils = ">=0.11,<1.0"
 
 [[package]]
 name = "rich"
-version = "13.3.2"
+version = "13.3.3"
 description = "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal"
 category = "dev"
 optional = false
 python-versions = ">=3.7.0"
 files = [
-    {file = "rich-13.3.2-py3-none-any.whl", hash = "sha256:a104f37270bf677148d8acb07d33be1569eeee87e2d1beb286a4e9113caf6f2f"},
-    {file = "rich-13.3.2.tar.gz", hash = "sha256:91954fe80cfb7985727a467ca98a7618e5dd15178cc2da10f553b36a93859001"},
+    {file = "rich-13.3.3-py3-none-any.whl", hash = "sha256:540c7d6d26a1178e8e8b37e9ba44573a3cd1464ff6348b99ee7061b95d1c6333"},
+    {file = "rich-13.3.3.tar.gz", hash = "sha256:dc84400a9d842b3a9c5ff74addd8eb798d155f36c1c91303888e0a66850d2a15"},
 ]
 
 [package.dependencies]
@@ -1516,14 +1516,14 @@ pbr = ">=2.0.0,<2.1.0 || >2.1.0"
 
 [[package]]
 name = "taskiq-dependencies"
-version = "1.1.1"
+version = "1.1.2"
 description = "FastAPI like dependency injection implementation"
 category = "main"
 optional = false
 python-versions = ">=3.7,<4.0"
 files = [
-    {file = "taskiq_dependencies-1.1.1-py3-none-any.whl", hash = "sha256:7676d80f46456a55fd8c2a433804c99e98316c4e25fc6329c5c25adf18b9ba5f"},
-    {file = "taskiq_dependencies-1.1.1.tar.gz", hash = "sha256:7da7a6420700fd8a79597e53224da840d9fcb9e9f708d4e3199b0c3ade2c5fd1"},
+    {file = "taskiq_dependencies-1.1.2-py3-none-any.whl", hash = "sha256:74605793cbaa69ba56b8bab72688eb55033960b52d0b074dac1a7718c86f1dc7"},
+    {file = "taskiq_dependencies-1.1.2.tar.gz", hash = "sha256:4909c0994f82080955f23e174538122c31487310f44da0a449847c5bd465e208"},
 ]
 
 [package.dependencies]
@@ -1792,4 +1792,4 @@ zmq = ["pyzmq"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.7"
-content-hash = "947ba1a73dc424b56f4110ce5fd8aeb23115c5728d52a3caf0082a6d29c4ab2c"
+content-hash = "49a0d7f64cb71f9d637e0418c0ad61c9f4a709ca7c18dc8b98ad3b6da786cac9"
