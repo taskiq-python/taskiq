@@ -2,11 +2,15 @@
     visibility: hidden;
 }
 
-.hero{
-    img{
-        max-width: 55% !important;
-        padding: 2rem;
+.hero-info-wrapper {
+    img {
+        max-width: 60% !important;
+        padding: 1rem;
     }
+}
+
+.actions {
+    align-items: flex-end;
 }
 
 span.site-name {
