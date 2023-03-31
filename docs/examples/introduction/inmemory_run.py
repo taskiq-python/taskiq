@@ -12,6 +12,7 @@ async def add_one(value: int) -> int:
 
 
 async def main() -> None:
+    # Never forget to call startup in the beginning.
     await broker.startup()
     # Send the task to the broker.
     task = await add_one.kiq(1)
