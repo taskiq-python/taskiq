@@ -12,15 +12,14 @@ Taskiq is a library that helps you send and process python functions in a distri
 For example, you have many heavy to calculate functions you want to execute on another server.
 You can implement interservice communication by yourself, or you can use Taskiq to make the job done easily.
 
-The core library has only two brokers. It provides CLI, basic functionality for creating tasks, and abstractions to extend functionality. The main idea is to make taskiq modular with a lot of
-replaceable parts, such as brokers, result backends, and middlewares.
+The core library doesn't have much functionality. It provides two built-in brokers, CLI, basic functionality for creating distributed tasks, and abstractions to extend the taskiq. The main idea of taskiq is to make it modular and easy to extend. We have libraries for many
+possible use cases, but if you lack something, you can adopt taskiq to fit your needs.
 
 ## Why not use existing libraries?
 
-We couldn't find a solution like Celery or Dramatiq that can run async code and send tasks asynchronously.
-It was the main reason we created this project.
+We created this project because we couldn't find any project that can execute and send async functions using distributed queues like RabbitMQ.
 
-You might have seen projects built on top of asyncio that solve similar problem, but here's a comparasion table of taskiq and other projects.
+You might have seen projects built on top of asyncio that solve a similar problem, but here's a comparison table of the taskiq and other projects.
 
 |                Feature name | Taskiq |  Arq  | AioTasks |
 | --------------------------: | :----: | :---: | :------: |

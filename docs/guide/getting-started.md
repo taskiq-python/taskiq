@@ -29,7 +29,7 @@ After installation of the core library, you need to find the broker that fits yo
 
 ::: info Cool tip!
 
-We highly recommend [taskiq-aio-pika](https://pypi.org/project/taskiq-aio-pika/) as the broker and [taskiq-redis](https://pypi.org/project/taskiq-redis/) as the result backend for production use.
+We highly recommend [taskiq-aio-pika](https://pypi.org/project/taskiq-aio-pika/) or [taskiq-nats](https://pypi.org/project/taskiq-nats/) as the broker and [taskiq-redis](https://pypi.org/project/taskiq-redis/) as the result backend for production use.
 
 :::
 
@@ -57,9 +57,9 @@ And that's it. Now let's add some tasks and the main function. You can add tasks
 
 @[code python](../examples/introduction/inmemory_run.py)
 
-::: tip Cool tip!
+::: warning Cool warning!
 
-Calling the `startup` method is not required, but we strongly recommend you do so.
+Calling the `startup` method is necessary. If you don't call it, you may get an undefined behaviour.
 
 :::
 
@@ -74,7 +74,7 @@ Returned value: 2
 Ok, the code of the task execution is a little bit fancier than an ordinary function call, but it's still relatively simple to understand. To send a task to the broker,
 you need to call the `.kiq` method on the function,
 it returns the `TaskiqTask` object that can check whether the result is ready
-or it can wait for it to become available.
+or not. Also it has methods to wait for the result to become available.
 
 You can get more information about taskiq types, CLI and internal structure in the "[Architecture overview](./architecture-overview.md)" section.
 

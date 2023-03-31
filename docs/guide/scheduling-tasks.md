@@ -5,9 +5,9 @@ order: 8
 # Scheduling tasks
 
 Sometimes you may want to execute some tasks according to some schedule.
-For example, you want to call a function every day at 2 pm.
+For example, you maybe want to call a function every day at 2 pm.
 
-It's easy to do with taskiq. We have primitives that can help you to solve your problems.
+That's not a problem if you use taskiq. We have primitives that can help you to solve your problems.
 
 Let's imagine we have a module, as shown below, and we want to execute the `heavy_task` every 5 minutes.
 What should we do?
