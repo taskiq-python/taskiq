@@ -87,7 +87,7 @@ from your_project.taskiq import broker
 
 @broker.task
 async def parse_int(val: str) -> int:
-	return int(val)
+    return int(val)
 ```
 
 This simple task may be defined anywhere in your project. If you want to test it,
@@ -111,7 +111,7 @@ from your_project.taskiq import broker
 
 @broker.task
 async def parse_int(val: str) -> int:
-	return int(val)
+    return int(val)
 
 
 async def parse_and_add_one(val: str) -> int:
@@ -166,8 +166,8 @@ async def test_modify_path():
 
 ```
 
-But what if we want to test task execution? Well, you don't need to provide dependencies manually, but
-you must inject dependencies somwhere and call it as task.
+But what if we want to test task execution? Well, you don't need to provide dependencies manually, you
+must mutate dependency_context before calling a task. We suggest to do it in fixtures.
 
 ```python
 import pytest
