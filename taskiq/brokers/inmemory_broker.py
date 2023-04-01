@@ -1,6 +1,7 @@
+import asyncio
 import inspect
 from collections import OrderedDict
-from typing import Any, AsyncGenerator, Callable, Optional, TypeVar, get_type_hints
+from typing import Any, AsyncGenerator, Callable, Optional, Set, TypeVar, get_type_hints
 
 from taskiq_dependencies import DependencyGraph
 
@@ -114,6 +115,7 @@ class InMemoryBroker(AsyncBroker):
                 log_collector_format=logs_format or WorkerArgs.log_collector_format,
             ),
         )
+        self._running_tasks: "Set[asyncio.Task[Any]]" = set()
 
     async def kick(self, message: BrokerMessage) -> None:
         """
@@ -128,6 +130,7 @@ class InMemoryBroker(AsyncBroker):
         target_task = self.available_tasks.get(message.task_name)
         if target_task is None:
             raise TaskiqError("Unknown task.")
+
         if not self.receiver.dependency_graphs.get(target_task.task_name):
             self.receiver.dependency_graphs[target_task.task_name] = DependencyGraph(
                 target_task.original_func,
@@ -141,7 +144,9 @@ class InMemoryBroker(AsyncBroker):
                 target_task.original_func,
             )
 
-        await self.receiver.callback(message=message)
+        task = asyncio.create_task(self.receiver.callback(message=message))
+        self._running_tasks.add(task)
+        task.add_done_callback(self._running_tasks.discard)
 
     def listen(self) -> AsyncGenerator[BrokerMessage, None]:
         """
