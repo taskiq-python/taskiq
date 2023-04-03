@@ -26,9 +26,10 @@ classifiers = [
 keywords = ["taskiq", "tasks", "distributed", "async"]
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.7.2"
 typing-extensions = ">=3.10.0.0"
 pydantic = "^1.6.2"
+aiochannel = { version = ">=1.2.0", optional = true }
 pyzmq = { version = "^23.2.0", optional = true }
 uvloop = { version = ">=0.16.0,<1", optional = true }
 watchdog = "^2.1.9"
@@ -55,6 +56,7 @@ pytest-xdist = { version = "^2.5.0", extras = ["psutil"] }
 types-mock = "^4.0.15"
 
 [tool.poetry.extras]
+memory = ["aiochannel"]
 zmq = ["pyzmq"]
 uv = ["uvloop"]
 
