@@ -224,3 +224,25 @@ class Receiver:
                     )
 
         return result
+
+    async def listen(self) -> None:  # pragma: no cover
+        """
+        This function iterates over tasks asynchronously.
+
+        It uses listen() method of an AsyncBroker
+        to get new messages from queues.
+        """
+        logger.debug("Runing startup event.")
+        await self.broker.startup()
+        logger.info("Listening started.")
+        tasks = set()
+        async for message in self.broker.listen():
+            task = asyncio.create_task(self.callback(message=message, raise_err=False))
+            tasks.add(task)
+
+            # We want the task to remove itself from the set when it's done.
+            #
+            # Because python's GC can silently cancel task
+            # and it considered to be Hisenbug.
+            # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
+            task.add_done_callback(tasks.discard)
