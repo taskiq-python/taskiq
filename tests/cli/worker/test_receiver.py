@@ -1,4 +1,5 @@
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Optional
 
 import pytest
@@ -7,16 +8,15 @@ from taskiq_dependencies import Depends
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.brokers.inmemory_broker import InMemoryBroker
-from taskiq.cli.worker.args import WorkerArgs
-from taskiq.cli.worker.receiver import Receiver
 from taskiq.message import BrokerMessage, TaskiqMessage
+from taskiq.receiver import Receiver
 from taskiq.result import TaskiqResult
 
 
 def get_receiver(
     broker: Optional[AsyncBroker] = None,
     no_parse: bool = False,
-    cli_args: Optional[WorkerArgs] = None,
+    max_async_tasks: int = 10,
 ) -> Receiver:
     """
     Returns receiver with custom broker and args.
@@ -28,15 +28,11 @@ def get_receiver(
     """
     if broker is None:
         broker = InMemoryBroker()
-    if cli_args is None:
-        cli_args = WorkerArgs(
-            broker="",
-            modules=[],
-            no_parse=no_parse,
-        )
     return Receiver(
         broker,
-        cli_args,
+        executor=ThreadPoolExecutor(max_workers=10),
+        validate_params=not no_parse,
+        max_async_tasks=max_async_tasks,
     )
 
 
@@ -261,13 +257,7 @@ async def test_callback_semaphore() -> None:
         await asyncio.sleep(1)
         return 1
 
-    cli_args = WorkerArgs(
-        broker="",
-        modules=[],
-        no_parse=False,
-        max_async_tasks=3,
-    )
-    receiver = get_receiver(broker, cli_args=cli_args)
+    receiver = get_receiver(broker, max_async_tasks=3)
 
     broker_message = broker.formatter.dumps(
         TaskiqMessage(
@@ -279,5 +269,6 @@ async def test_callback_semaphore() -> None:
         ),
     )
     tasks = [asyncio.create_task(receiver.callback(broker_message)) for _ in range(5)]
-    await asyncio.sleep(0)
+    await asyncio.sleep(0.3)
     assert sem_num == 3
+    await asyncio.gather(*tasks)

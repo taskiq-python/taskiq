@@ -8,8 +8,8 @@ from watchdog.observers import Observer
 from taskiq.abc.broker import AsyncBroker
 from taskiq.cli.utils import import_object, import_tasks
 from taskiq.cli.worker.args import WorkerArgs
-from taskiq.cli.worker.async_task_runner import async_listen_messages
 from taskiq.cli.worker.process_manager import ProcessManager
+from taskiq.receiver import async_listen_messages
 
 try:
     import uvloop  # noqa: WPS433
@@ -102,7 +102,13 @@ def start_listen(args: WorkerArgs) -> None:  # noqa: WPS213
 
     loop = asyncio.get_event_loop()
     try:
-        loop.run_until_complete(async_listen_messages(broker, args))
+        coro = async_listen_messages(
+            broker=broker,
+            max_threadpool_threads=args.max_threadpool_threads,
+            validate_params=not args.no_parse,
+            max_async_tasks=args.max_async_tasks,
+        )
+        loop.run_until_complete(coro)
     except KeyboardInterrupt:
         logger.warning("Worker process interrupted.")
         loop.run_until_complete(shutdown_broker(broker, args.shutdown_timeout))

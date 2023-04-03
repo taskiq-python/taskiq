@@ -5,8 +5,8 @@ from typing import Any, Type, get_type_hints
 import pytest
 from pydantic import BaseModel
 
-from taskiq.cli.worker.params_parser import parse_params
 from taskiq.message import TaskiqMessage
+from taskiq.receiver.params_parser import parse_params
 
 
 class _TestPydanticClass(BaseModel):
