@@ -1,13 +1,10 @@
-import inspect
 from collections import OrderedDict
-from typing import Any, AsyncGenerator, Callable, Optional, TypeVar, get_type_hints
+from typing import Any, AsyncGenerator, Callable, Optional, TypeVar
 
-from taskiq_dependencies import DependencyGraph
+from aiochannel import Channel
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.result_backend import AsyncResultBackend, TaskiqResult
-from taskiq.cli.worker.args import WorkerArgs
-from taskiq.cli.worker.receiver import Receiver
 from taskiq.events import TaskiqEvents
 from taskiq.exceptions import TaskiqError
 from taskiq.message import BrokerMessage
@@ -87,12 +84,9 @@ class InMemoryBroker(AsyncBroker):
     It's useful for local development, if you don't want to setup real broker.
     """
 
-    def __init__(  # noqa: WPS211
+    def __init__(
         self,
-        sync_tasks_pool_size: int = 4,
-        logs_format: Optional[str] = None,
         max_stored_results: int = 100,
-        cast_types: bool = True,
         result_backend: Optional[AsyncResultBackend[Any]] = None,
         task_id_generator: Optional[Callable[[], str]] = None,
     ) -> None:
@@ -104,16 +98,7 @@ class InMemoryBroker(AsyncBroker):
             result_backend=result_backend,
             task_id_generator=task_id_generator,
         )
-        self.receiver = Receiver(
-            self,
-            WorkerArgs(
-                broker="",
-                modules=[],
-                max_threadpool_threads=sync_tasks_pool_size,
-                no_parse=not cast_types,
-                log_collector_format=logs_format or WorkerArgs.log_collector_format,
-            ),
-        )
+        self.channel: Channel[BrokerMessage] = Channel()
 
     async def kick(self, message: BrokerMessage) -> None:
         """
@@ -128,31 +113,18 @@ class InMemoryBroker(AsyncBroker):
         target_task = self.available_tasks.get(message.task_name)
         if target_task is None:
             raise TaskiqError("Unknown task.")
-        if not self.receiver.dependency_graphs.get(target_task.task_name):
-            self.receiver.dependency_graphs[target_task.task_name] = DependencyGraph(
-                target_task.original_func,
-            )
-        if not self.receiver.task_signatures.get(target_task.task_name):
-            self.receiver.task_signatures[target_task.task_name] = inspect.signature(
-                target_task.original_func,
-            )
-        if not self.receiver.task_hints.get(target_task.task_name):
-            self.receiver.task_hints[target_task.task_name] = get_type_hints(
-                target_task.original_func,
-            )
+        await self.channel.put(message)
 
-        await self.receiver.callback(message=message)
-
-    def listen(self) -> AsyncGenerator[BrokerMessage, None]:
+    async def listen(self) -> AsyncGenerator[BrokerMessage, None]:
         """
-        Inmemory broker cannot listen.
+        Listen to channel.
 
-        This method throws RuntimeError if you call it.
-        Because inmemory broker cannot really listen to any of tasks.
+        This function listens to channel and yields every new message.
 
-        :raises RuntimeError: if this method is called.
+        :yields: broker message.
         """
-        raise RuntimeError("Inmemory brokers cannot listen.")
+        async for message in self.channel:
+            yield message
 
     async def startup(self) -> None:
         """Runs startup events for client and worker side."""
