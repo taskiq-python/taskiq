@@ -28,7 +28,7 @@ class _Task(ABC, Generic[_ReturnType]):
         """
 
     @abstractmethod
-    def get_result(  # noqa: WPS234
+    def get_result(
         self,
         with_logs: bool = False,
     ) -> Union[
@@ -43,7 +43,7 @@ class _Task(ABC, Generic[_ReturnType]):
         """
 
     @abstractmethod
-    def wait_result(  # noqa: WPS234
+    def wait_result(
         self,
         check_interval: float = 0.2,
         timeout: float = -1.0,

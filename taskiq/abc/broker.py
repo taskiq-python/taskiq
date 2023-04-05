@@ -30,7 +30,7 @@ from taskiq.formatters.json_formatter import JSONFormatter
 from taskiq.message import BrokerMessage
 from taskiq.result_backends.dummy import DummyResultBackend
 from taskiq.state import TaskiqState
-from taskiq.utils import maybe_awaitable
+from taskiq.utils import maybe_awaitable, remove_suffix
 
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.formatter import TaskiqFormatter
@@ -57,7 +57,7 @@ def default_id_generator() -> str:
     return uuid4().hex
 
 
-class AsyncBroker(ABC):  # noqa: WPS230
+class AsyncBroker(ABC):
     """
     Async broker.
 
@@ -235,11 +235,7 @@ class AsyncBroker(ABC):  # noqa: WPS230
                     fmodule = func.__module__
                     if fmodule == "__main__":  # pragma: no cover
                         fmodule = ".".join(
-                            sys.argv[0]
-                            .removesuffix(
-                                ".py",
-                            )
-                            .split(
+                            remove_suffix(sys.argv[0], ".py").split(
                                 os.path.sep,
                             ),
                         )

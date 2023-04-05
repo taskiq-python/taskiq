@@ -50,6 +50,7 @@ class Receiver:
         self.executor = ThreadPoolExecutor(
             max_workers=cli_args.max_threadpool_threads,
         )
+        self.sem = asyncio.Semaphore(cli_args.max_async_tasks)
 
     async def callback(  # noqa: C901, WPS213
         self,
@@ -68,61 +69,62 @@ class Receiver:
         :param raise_err: raise an error if cannot save result in
             result_backend.
         """
-        logger.debug(f"Received message: {message}")
-        if message.task_name not in self.broker.available_tasks:
-            logger.warning(
-                'task "%s" is not found. Maybe you forgot to import it?',
+        async with self.sem:
+            logger.debug(f"Received message: {message}")
+            if message.task_name not in self.broker.available_tasks:
+                logger.warning(
+                    'task "%s" is not found. Maybe you forgot to import it?',
+                    message.task_name,
+                )
+                return
+            logger.debug(
+                "Function for task %s is resolved. Executing...",
                 message.task_name,
             )
-            return
-        logger.debug(
-            "Function for task %s is resolved. Executing...",
-            message.task_name,
-        )
-        try:
-            taskiq_msg = self.broker.formatter.loads(message=message)
-        except Exception as exc:
-            logger.warning(
-                "Cannot parse message: %s. Skipping execution.\n %s",
-                message,
-                exc,
-                exc_info=True,
-            )
-            return
-        for middleware in self.broker.middlewares:
-            if middleware.__class__.pre_execute != TaskiqMiddleware.pre_execute:
-                taskiq_msg = await maybe_awaitable(
-                    middleware.pre_execute(
-                        taskiq_msg,
-                    ),
+            try:
+                taskiq_msg = self.broker.formatter.loads(message=message)
+            except Exception as exc:
+                logger.warning(
+                    "Cannot parse message: %s. Skipping execution.\n %s",
+                    message,
+                    exc,
+                    exc_info=True,
                 )
+                return
+            for middleware in self.broker.middlewares:
+                if middleware.__class__.pre_execute != TaskiqMiddleware.pre_execute:
+                    taskiq_msg = await maybe_awaitable(
+                        middleware.pre_execute(
+                            taskiq_msg,
+                        ),
+                    )
 
-        logger.info(
-            "Executing task %s with ID: %s",
-            taskiq_msg.task_name,
-            taskiq_msg.task_id,
-        )
-        result = await self.run_task(
-            target=self.broker.available_tasks[message.task_name].original_func,
-            message=taskiq_msg,
-        )
-        for middleware in self.broker.middlewares:
-            if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
-                await maybe_awaitable(middleware.post_execute(taskiq_msg, result))
-        try:
-            await self.broker.result_backend.set_result(message.task_id, result)
-        except Exception as exc:
-            logger.exception(
-                "Can't set result in result backend. Cause: %s",
-                exc,
-                exc_info=True,
+            logger.info(
+                "Executing task %s with ID: %s",
+                taskiq_msg.task_name,
+                taskiq_msg.task_id,
             )
-            if raise_err:
-                raise exc
+            result = await self.run_task(
+                target=self.broker.available_tasks[message.task_name].original_func,
+                message=taskiq_msg,
+            )
+            for middleware in self.broker.middlewares:
+                if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
+                    await maybe_awaitable(middleware.post_execute(taskiq_msg, result))
+            try:
+                await self.broker.result_backend.set_result(message.task_id, result)
+            except Exception as exc:
+                logger.exception(
+                    "Can't set result in result backend. Cause: %s",
+                    exc,
+                    exc_info=True,
+                )
+                if raise_err:
+                    raise exc
 
-        for middleware in self.broker.middlewares:
-            if middleware.__class__.post_save != TaskiqMiddleware.post_save:
-                await maybe_awaitable(middleware.post_save(taskiq_msg, result))
+            for middleware in self.broker.middlewares:
+                if middleware.__class__.post_save != TaskiqMiddleware.post_save:
+                    await maybe_awaitable(middleware.post_save(taskiq_msg, result))
 
     async def run_task(  # noqa: C901, WPS210
         self,

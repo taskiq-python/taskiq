@@ -60,7 +60,7 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         return self.original_func(*args, **kwargs)
 
     @overload
-    async def kiq(  # noqa: D102
+    async def kiq(
         self: "AsyncTaskiqDecoratedTask[_FuncParams, Coroutine[Any, Any, _T]]",
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
@@ -68,7 +68,7 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         ...
 
     @overload
-    async def kiq(  # noqa: D102
+    async def kiq(
         self: "AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]",
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
