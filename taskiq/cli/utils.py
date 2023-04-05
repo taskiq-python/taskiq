@@ -82,13 +82,9 @@ def import_tasks(modules: List[str], pattern: str, fs_discover: bool) -> None:
         from filesystem.
     """
     if fs_discover:
-        if sys.version_info < (3, 9):
-            for path in Path(".").rglob(pattern):
-                modules.append(
-                    remove_suffix(str(path), ".py").replace(os.path.sep, "."),
-                )
-        else:
-            for path in Path(".").rglob(pattern):
-                modules.append(str(path).removesuffix(".py").replace(os.path.sep, "."))
+        for path in Path(".").rglob(pattern):
+            modules.append(
+                remove_suffix(str(path), ".py").replace(os.path.sep, "."),
+            )
 
     import_from_modules(modules)

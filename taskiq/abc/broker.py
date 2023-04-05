@@ -234,22 +234,11 @@ class AsyncBroker(ABC):
                 if inner_task_name is None:
                     fmodule = func.__module__
                     if fmodule == "__main__":  # pragma: no cover
-                        if sys.version_info < (3, 9):
-                            fmodule = ".".join(
-                                remove_suffix(sys.argv[0], ".py").split(
-                                    os.path.sep,
-                                ),
-                            )
-                        else:
-                            fmodule = ".".join(
-                                sys.argv[0]
-                                .removesuffix(
-                                    ".py",
-                                )
-                                .split(
-                                    os.path.sep,
-                                ),
-                            )
+                        fmodule = ".".join(
+                            remove_suffix(sys.argv[0], ".py").split(
+                                os.path.sep,
+                            ),
+                        )
                     inner_task_name = f"{fmodule}:{func.__name__}"  # noqa: WPS442
                 wrapper = wraps(func)
 
