@@ -1,18 +1,17 @@
 import asyncio
 import inspect
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Executor
 from logging import getLogger
 from time import time
-from typing import Any, Callable, Dict, get_type_hints
+from typing import Any, Callable, Dict, Optional, get_type_hints
 
 from taskiq_dependencies import DependencyGraph
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
-from taskiq.cli.worker.args import WorkerArgs
-from taskiq.cli.worker.params_parser import parse_params
 from taskiq.context import Context
 from taskiq.message import BrokerMessage, TaskiqMessage
+from taskiq.receiver.params_parser import parse_params
 from taskiq.result import TaskiqResult
 from taskiq.state import TaskiqState
 from taskiq.utils import maybe_awaitable
@@ -37,9 +36,16 @@ def _run_sync(target: Callable[..., Any], message: TaskiqMessage) -> Any:
 class Receiver:
     """Class that uses as a callback handler."""
 
-    def __init__(self, broker: AsyncBroker, cli_args: WorkerArgs) -> None:
+    def __init__(
+        self,
+        broker: AsyncBroker,
+        executor: Optional[Executor] = None,
+        validate_params: bool = True,
+        max_async_tasks: int = 20,
+    ) -> None:
         self.broker = broker
-        self.cli_args = cli_args
+        self.executor = executor
+        self.validate_params = validate_params
         self.task_signatures: Dict[str, inspect.Signature] = {}
         self.task_hints: Dict[str, Dict[str, Any]] = {}
         self.dependency_graphs: Dict[str, DependencyGraph] = {}
@@ -47,10 +53,7 @@ class Receiver:
             self.task_signatures[task.task_name] = inspect.signature(task.original_func)
             self.task_hints[task.task_name] = get_type_hints(task.original_func)
             self.dependency_graphs[task.task_name] = DependencyGraph(task.original_func)
-        self.executor = ThreadPoolExecutor(
-            max_workers=cli_args.max_threadpool_threads,
-        )
-        self.sem = asyncio.Semaphore(cli_args.max_async_tasks)
+        self.sem = asyncio.Semaphore(max_async_tasks)
 
     async def callback(  # noqa: C901, WPS213
         self,
@@ -152,10 +155,10 @@ class Receiver:
         loop = asyncio.get_running_loop()
         returned = None
         found_exception = None
-        signature = self.task_signatures.get(message.task_name)
+        signature = None
+        if self.validate_params:
+            signature = self.task_signatures.get(message.task_name)
         dependency_graph = self.dependency_graphs.get(message.task_name)
-        if self.cli_args.no_parse:
-            signature = None
         parse_params(signature, self.task_hints.get(message.task_name) or {}, message)
 
         dep_ctx = None
@@ -221,3 +224,25 @@ class Receiver:
                     )
 
         return result
+
+    async def listen(self) -> None:  # pragma: no cover
+        """
+        This function iterates over tasks asynchronously.
+
+        It uses listen() method of an AsyncBroker
+        to get new messages from queues.
+        """
+        logger.debug("Runing startup event.")
+        await self.broker.startup()
+        logger.info("Listening started.")
+        tasks = set()
+        async for message in self.broker.listen():
+            task = asyncio.create_task(self.callback(message=message, raise_err=False))
+            tasks.add(task)
+
+            # We want the task to remove itself from the set when it's done.
+            #
+            # Because python's GC can silently cancel task
+            # and it considered to be Hisenbug.
+            # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
+            task.add_done_callback(tasks.discard)
