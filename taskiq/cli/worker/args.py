@@ -23,7 +23,7 @@ class WorkerArgs:
     shutdown_timeout: float = 5
     reload: bool = False
     no_gitignore: bool = False
-    max_async_tasks: int = 100
+    max_async_tasks: int = 10
 
     @classmethod
     def from_cli(  # noqa: WPS213
@@ -128,9 +128,8 @@ class WorkerArgs:
             "--max-async-tasks",
             type=int,
             dest="max_async_tasks",
-            default=100,
-            help="Maximum simultaneous async tasks per worker process. "
-            + "Infinite if less than 1",
+            default=10,
+            help="Maximum simultaneous async tasks per worker process. ",
         )
 
         namespace = parser.parse_args(args)
