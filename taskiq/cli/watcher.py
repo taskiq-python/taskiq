@@ -24,7 +24,7 @@ class FileWatcher:  # pragma: no cover
             self.gitignore = parse_gitignore(gpath)
         self.callback_kwargs = callback_kwargs
 
-    def dispatch(self, event: FileSystemEvent) -> None:  # noqa: C901
+    def dispatch(self, event: FileSystemEvent) -> None:
         """
         React to event.
 

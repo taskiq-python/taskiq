@@ -47,7 +47,7 @@ async def shutdown_broker(broker: AsyncBroker, timeout: float) -> None:
         )
 
 
-def start_listen(args: WorkerArgs) -> None:  # noqa: C901, WPS213
+def start_listen(args: WorkerArgs) -> None:  # noqa: WPS213
     """
     This function starts actual listening process.
 
