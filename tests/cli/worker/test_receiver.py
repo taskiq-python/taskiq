@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any, Optional
 
 import pytest
@@ -15,23 +16,27 @@ from taskiq.result import TaskiqResult
 def get_receiver(
     broker: Optional[AsyncBroker] = None,
     no_parse: bool = False,
+    cli_args: Optional[WorkerArgs] = None,
 ) -> Receiver:
     """
     Returns receiver with custom broker and args.
 
     :param broker: broker, defaults to None
     :param no_parse: parameter to taskiq_args, defaults to False
+    :param cli_args: Taskiq worker CLI arguments.
     :return: new receiver.
     """
     if broker is None:
         broker = InMemoryBroker()
-    return Receiver(
-        broker,
-        WorkerArgs(
+    if cli_args is None:
+        cli_args = WorkerArgs(
             broker="",
             modules=[],
             no_parse=no_parse,
-        ),
+        )
+    return Receiver(
+        broker,
+        cli_args,
     )
 
 
@@ -241,3 +246,38 @@ async def test_custom_ctx() -> None:
     # to the one we supplied.
     assert result.return_value == 11
     assert not result.is_err
+
+
+@pytest.mark.anyio
+async def test_callback_semaphore() -> None:
+    """Test that callback funcion semaphore works well."""
+    broker = InMemoryBroker()
+    sem_num = 0
+
+    @broker.task
+    async def task_sem() -> int:
+        nonlocal sem_num  # noqa: WPS420
+        sem_num += 1
+        await asyncio.sleep(1)
+        return 1
+
+    cli_args = WorkerArgs(
+        broker="",
+        modules=[],
+        no_parse=False,
+        max_async_tasks=3,
+    )
+    receiver = get_receiver(broker, cli_args=cli_args)
+
+    broker_message = broker.formatter.dumps(
+        TaskiqMessage(
+            task_id="test_sem",
+            task_name=task_sem.task_name,
+            labels={},
+            args=[],
+            kwargs=[],
+        ),
+    )
+    tasks = [asyncio.create_task(receiver.callback(broker_message)) for _ in range(5)]
+    await asyncio.sleep(0)
+    assert sem_num == 3
