@@ -24,5 +24,5 @@ class BrokerMessage(BaseModel):
 
     task_id: str
     task_name: str
-    message: str
+    message: bytes
     labels: Dict[str, str]

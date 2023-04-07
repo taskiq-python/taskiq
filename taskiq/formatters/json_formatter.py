@@ -15,7 +15,7 @@ class JSONFormatter(TaskiqFormatter):
         return BrokerMessage(
             task_id=message.task_id,
             task_name=message.task_name,
-            message=message.json(),
+            message=message.json().encode(),
             labels=message.labels,
         )
 
