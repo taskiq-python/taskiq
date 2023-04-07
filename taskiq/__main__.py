@@ -46,8 +46,8 @@ def main() -> None:  # noqa: WPS210  # pragma: no cover
     for entrypoint in entry_points().select(group="taskiq_cli"):
         try:
             cmd_class = entrypoint.load()
-        except ImportError:
-            print(f"Could not load {entrypoint.value}")  # noqa: WPS421
+        except ImportError as exc:
+            print(f"Could not load {entrypoint.value}. Cause: {exc}")  # noqa: WPS421
             continue
         if issubclass(cmd_class, TaskiqCMD):
             subparsers.add_parser(

@@ -116,7 +116,8 @@ class WorkerArgs:
             "--reload",
             "-r",
             action="store_true",
-            help="Reload workers if file is changed.",
+            help="Reload workers if file is changed. "
+            + "`reload` extra is required for this option.",
         )
         parser.add_argument(
             "--do-not-use-gitignore",

@@ -3,11 +3,16 @@ import signal
 from dataclasses import dataclass
 from multiprocessing import Process, Queue
 from time import sleep
-from typing import Any, Callable, List
+from typing import Any, Callable, List, Optional
 
-from watchdog.observers import Observer
+try:
+    from watchdog.observers import Observer  # noqa: WPS433
 
-from taskiq.cli.watcher import FileWatcher
+    from taskiq.cli.watcher import FileWatcher  # noqa: WPS433
+except ImportError:
+    Observer = None  # type: ignore
+    FileWatcher = None  # type: ignore
+
 from taskiq.cli.worker.args import WorkerArgs
 
 logger = logging.getLogger("taskiq.process-manager")
@@ -132,13 +137,13 @@ class ProcessManager:
     def __init__(
         self,
         args: WorkerArgs,
-        observer: Observer,
         worker_function: Callable[[WorkerArgs], None],
+        observer: Optional[Observer] = None,
     ) -> None:
         self.worker_function = worker_function
         self.action_queue: "Queue[ProcessActionBase]" = Queue(-1)
         self.args = args
-        if args.reload:
+        if args.reload and observer is not None:
             observer.schedule(
                 FileWatcher(
                     callback=schedule_workers_reload,
