@@ -1,22 +1,42 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Optional
+from typing import Any, AsyncGenerator, Callable, List, Optional, TypeVar
 
 import pytest
 from taskiq_dependencies import Depends
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
+from taskiq.abc.result_backend import AsyncResultBackend
 from taskiq.brokers.inmemory_broker import InMemoryBroker
 from taskiq.message import BrokerMessage, TaskiqMessage
 from taskiq.receiver import Receiver
 from taskiq.result import TaskiqResult
 
+_T = TypeVar("_T")
+
+
+class BrokerForTests(InMemoryBroker):
+    def __init__(
+        self,
+        result_backend: "Optional[AsyncResultBackend[_T]]" = None,
+        task_id_generator: Optional[Callable[[], str]] = None,
+    ) -> None:
+        super().__init__(
+            result_backend=result_backend,
+            task_id_generator=task_id_generator,
+        )
+        self.to_send: "List[TaskiqMessage]" = []
+
+    async def listen(self) -> AsyncGenerator[BrokerMessage, None]:
+        for message in self.to_send:
+            yield self.formatter.dumps(message)
+
 
 def get_receiver(
     broker: Optional[AsyncBroker] = None,
     no_parse: bool = False,
-    max_async_tasks: int = 10,
+    max_async_tasks: Optional[int] = None,
 ) -> Receiver:
     """
     Returns receiver with custom broker and args.
@@ -247,7 +267,8 @@ async def test_custom_ctx() -> None:
 @pytest.mark.anyio
 async def test_callback_semaphore() -> None:
     """Test that callback funcion semaphore works well."""
-    broker = InMemoryBroker()
+    max_async_tasks = 3
+    broker = BrokerForTests()
     sem_num = 0
 
     @broker.task
@@ -257,18 +278,23 @@ async def test_callback_semaphore() -> None:
         await asyncio.sleep(1)
         return 1
 
-    receiver = get_receiver(broker, max_async_tasks=3)
-
-    broker_message = broker.formatter.dumps(
+    broker.to_send = [
         TaskiqMessage(
             task_id="test_sem",
             task_name=task_sem.task_name,
             labels={},
             args=[],
             kwargs=[],
-        ),
-    )
-    tasks = [asyncio.create_task(receiver.callback(broker_message)) for _ in range(5)]
+        )
+        for _ in range(max_async_tasks + 2)
+    ]
+
+    # broker_message = broker.formatter.dumps(
+    # )
+    receiver = get_receiver(broker, max_async_tasks=3)
+
+    listen_task = asyncio.create_task(receiver.listen())
     await asyncio.sleep(0.3)
-    assert sem_num == 3
-    await asyncio.gather(*tasks)
+    assert sem_num == max_async_tasks
+    await listen_task
+    assert sem_num == max_async_tasks + 2
