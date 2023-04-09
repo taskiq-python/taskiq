@@ -1,5 +1,5 @@
 [flake8]
-max-complexity = 6
+max-complexity = 7
 inline-quotes = double
 max-line-length = 88
 extend-ignore = E203
@@ -90,6 +90,8 @@ ignore =
   N802,
   ; Do not perform function calls in argument defaults.
   B008,
+  ; Found too many public instance attributes
+  WPS230,
 
   ; all init files
   __init__.py:

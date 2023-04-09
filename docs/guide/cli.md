@@ -47,10 +47,29 @@ To disable this pass the `--no-parse` option to the taskiq.
 ### Hot reload
 
 This is annoying to restart workers every time you modify tasks. That's why taskiq supports hot-reload.
-To enable this option simply pass the `--reload` or `-r` option to taskiq CLI.
+Reload is unavailable by default. To enable this feature install taskiq with `reload` extra.
 
-Also this option supports `.gitignore` files. If you have such files in your directory. It won't reload worker
-if you ignore file's contents. To disable this functionality pass `--do-not-use-gitignore` option.
+::: tabs
+
+
+@tab pip
+
+```bash:no-line-numbers
+pip install "taskiq[reload]"
+```
+
+@tab poetry
+
+```bash:no-line-numbers
+poetry add taskiq -E reload
+```
+
+:::
+
+To enable this option simply pass the `--reload` or `-r` option to worker taskiq CLI.
+
+Also this option supports `.gitignore` files. If you have such file in your directory, it won't reload worker
+when you modify ignored files. To disable this functionality pass `--do-not-use-gitignore` option.
 
 ## Scheduler
 

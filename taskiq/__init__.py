@@ -14,6 +14,8 @@ from taskiq.events import TaskiqEvents
 from taskiq.exceptions import TaskiqError
 from taskiq.funcs import gather
 from taskiq.message import BrokerMessage, TaskiqMessage
+from taskiq.middlewares.prometheus_middleware import PrometheusMiddleware
+from taskiq.middlewares.retry_middleware import SimpleRetryMiddleware
 from taskiq.result import TaskiqResult
 from taskiq.scheduler import ScheduledTask, TaskiqScheduler
 from taskiq.state import TaskiqState
@@ -41,4 +43,6 @@ __all__ = [
     "AsyncResultBackend",
     "async_shared_broker",
     "AsyncTaskiqDecoratedTask",
+    "SimpleRetryMiddleware",
+    "PrometheusMiddleware",
 ]

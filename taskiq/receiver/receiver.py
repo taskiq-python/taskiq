@@ -1,18 +1,17 @@
 import asyncio
 import inspect
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Executor
 from logging import getLogger
 from time import time
-from typing import Any, Callable, Dict, get_type_hints
+from typing import Any, Callable, Dict, Optional, get_type_hints
 
 from taskiq_dependencies import DependencyGraph
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
-from taskiq.cli.worker.args import WorkerArgs
-from taskiq.cli.worker.params_parser import parse_params
 from taskiq.context import Context
-from taskiq.message import BrokerMessage, TaskiqMessage
+from taskiq.message import TaskiqMessage
+from taskiq.receiver.params_parser import parse_params
 from taskiq.result import TaskiqResult
 from taskiq.state import TaskiqState
 from taskiq.utils import maybe_awaitable
@@ -37,9 +36,16 @@ def _run_sync(target: Callable[..., Any], message: TaskiqMessage) -> Any:
 class Receiver:
     """Class that uses as a callback handler."""
 
-    def __init__(self, broker: AsyncBroker, cli_args: WorkerArgs) -> None:
+    def __init__(
+        self,
+        broker: AsyncBroker,
+        executor: Optional[Executor] = None,
+        validate_params: bool = True,
+        max_async_tasks: "Optional[int]" = None,
+    ) -> None:
         self.broker = broker
-        self.cli_args = cli_args
+        self.executor = executor
+        self.validate_params = validate_params
         self.task_signatures: Dict[str, inspect.Signature] = {}
         self.task_hints: Dict[str, Dict[str, Any]] = {}
         self.dependency_graphs: Dict[str, DependencyGraph] = {}
@@ -47,13 +53,18 @@ class Receiver:
             self.task_signatures[task.task_name] = inspect.signature(task.original_func)
             self.task_hints[task.task_name] = get_type_hints(task.original_func)
             self.dependency_graphs[task.task_name] = DependencyGraph(task.original_func)
-        self.executor = ThreadPoolExecutor(
-            max_workers=cli_args.max_threadpool_threads,
-        )
+        self.sem: "Optional[asyncio.Semaphore]" = None
+        if max_async_tasks is not None and max_async_tasks > 0:
+            self.sem = asyncio.Semaphore(max_async_tasks)
+        else:
+            logger.warning(
+                "Setting unlimited number of async tasks "
+                + "can result in undefined behavior",
+            )
 
     async def callback(  # noqa: C901, WPS213
         self,
-        message: BrokerMessage,
+        message: bytes,
         raise_err: bool = False,
     ) -> None:
         """
@@ -68,17 +79,6 @@ class Receiver:
         :param raise_err: raise an error if cannot save result in
             result_backend.
         """
-        logger.debug(f"Received message: {message}")
-        if message.task_name not in self.broker.available_tasks:
-            logger.warning(
-                'task "%s" is not found. Maybe you forgot to import it?',
-                message.task_name,
-            )
-            return
-        logger.debug(
-            "Function for task %s is resolved. Executing...",
-            message.task_name,
-        )
         try:
             taskiq_msg = self.broker.formatter.loads(message=message)
         except Exception as exc:
@@ -89,6 +89,17 @@ class Receiver:
                 exc_info=True,
             )
             return
+        logger.debug(f"Received message: {taskiq_msg}")
+        if taskiq_msg.task_name not in self.broker.available_tasks:
+            logger.warning(
+                'task "%s" is not found. Maybe you forgot to import it?',
+                taskiq_msg.task_name,
+            )
+            return
+        logger.debug(
+            "Function for task %s is resolved. Executing...",
+            taskiq_msg.task_name,
+        )
         for middleware in self.broker.middlewares:
             if middleware.__class__.pre_execute != TaskiqMiddleware.pre_execute:
                 taskiq_msg = await maybe_awaitable(
@@ -103,14 +114,17 @@ class Receiver:
             taskiq_msg.task_id,
         )
         result = await self.run_task(
-            target=self.broker.available_tasks[message.task_name].original_func,
+            target=self.broker.available_tasks[taskiq_msg.task_name].original_func,
             message=taskiq_msg,
         )
         for middleware in self.broker.middlewares:
             if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
                 await maybe_awaitable(middleware.post_execute(taskiq_msg, result))
         try:
-            await self.broker.result_backend.set_result(message.task_id, result)
+            await self.broker.result_backend.set_result(taskiq_msg.task_id, result)
+            for middleware in self.broker.middlewares:
+                if middleware.__class__.post_save != TaskiqMiddleware.post_save:
+                    await maybe_awaitable(middleware.post_save(taskiq_msg, result))
         except Exception as exc:
             logger.exception(
                 "Can't set result in result backend. Cause: %s",
@@ -119,10 +133,6 @@ class Receiver:
             )
             if raise_err:
                 raise exc
-
-        for middleware in self.broker.middlewares:
-            if middleware.__class__.post_save != TaskiqMiddleware.post_save:
-                await maybe_awaitable(middleware.post_save(taskiq_msg, result))
 
     async def run_task(  # noqa: C901, WPS210
         self,
@@ -150,10 +160,10 @@ class Receiver:
         loop = asyncio.get_running_loop()
         returned = None
         found_exception = None
-        signature = self.task_signatures.get(message.task_name)
+        signature = None
+        if self.validate_params:
+            signature = self.task_signatures.get(message.task_name)
         dependency_graph = self.dependency_graphs.get(message.task_name)
-        if self.cli_args.no_parse:
-            signature = None
         parse_params(signature, self.task_hints.get(message.task_name) or {}, message)
 
         dep_ctx = None
@@ -219,3 +229,42 @@ class Receiver:
                     )
 
         return result
+
+    async def listen(self) -> None:  # pragma: no cover
+        """
+        This function iterates over tasks asynchronously.
+
+        It uses listen() method of an AsyncBroker
+        to get new messages from queues.
+        """
+        await self.broker.startup()
+        logger.info("Listening started.")
+        tasks = set()
+
+        def task_cb(task: "asyncio.Task[Any]") -> None:
+            """
+            Callback for tasks.
+
+            This function used to remove task
+            from the list of active tasks and release
+            the semaphore, so other tasks can use it.
+
+            :param task: finished task
+            """
+            tasks.discard(task)
+            if self.sem is not None:
+                self.sem.release()
+
+        async for message in self.broker.listen():
+            # Waits for semaphore to be released.
+            if self.sem is not None:
+                await self.sem.acquire()
+            task = asyncio.create_task(self.callback(message=message, raise_err=False))
+            tasks.add(task)
+
+            # We want the task to remove itself from the set when it's done.
+            #
+            # Because python's GC can silently cancel task
+            # and it considered to be Hisenbug.
+            # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
+            task.add_done_callback(task_cb)

@@ -116,7 +116,8 @@ class WorkerArgs:
             "--reload",
             "-r",
             action="store_true",
-            help="Reload workers if file is changed.",
+            help="Reload workers if file is changed. "
+            + "`reload` extra is required for this option.",
         )
         parser.add_argument(
             "--do-not-use-gitignore",
@@ -129,8 +130,7 @@ class WorkerArgs:
             type=int,
             dest="max_async_tasks",
             default=100,
-            help="Maximum simultaneous async tasks per worker process. "
-            + "Infinite if less than 1",
+            help="Maximum simultaneous async tasks per worker process. ",
         )
 
         namespace = parser.parse_args(args)

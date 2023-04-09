@@ -1,16 +1,17 @@
+import asyncio
 import inspect
 from collections import OrderedDict
-from typing import Any, AsyncGenerator, Callable, Optional, TypeVar, get_type_hints
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any, AsyncGenerator, Callable, Optional, Set, TypeVar, get_type_hints
 
 from taskiq_dependencies import DependencyGraph
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.result_backend import AsyncResultBackend, TaskiqResult
-from taskiq.cli.worker.args import WorkerArgs
-from taskiq.cli.worker.receiver import Receiver
 from taskiq.events import TaskiqEvents
 from taskiq.exceptions import TaskiqError
 from taskiq.message import BrokerMessage
+from taskiq.receiver import Receiver
 from taskiq.utils import maybe_awaitable
 
 _ReturnType = TypeVar("_ReturnType")
@@ -90,11 +91,11 @@ class InMemoryBroker(AsyncBroker):
     def __init__(  # noqa: WPS211
         self,
         sync_tasks_pool_size: int = 4,
-        logs_format: Optional[str] = None,
         max_stored_results: int = 100,
         cast_types: bool = True,
         result_backend: Optional[AsyncResultBackend[Any]] = None,
         task_id_generator: Optional[Callable[[], str]] = None,
+        max_async_tasks: int = 30,
     ) -> None:
         if result_backend is None:
             result_backend = InmemoryResultBackend(
@@ -104,16 +105,14 @@ class InMemoryBroker(AsyncBroker):
             result_backend=result_backend,
             task_id_generator=task_id_generator,
         )
+        self.executor = ThreadPoolExecutor(sync_tasks_pool_size)
         self.receiver = Receiver(
-            self,
-            WorkerArgs(
-                broker="",
-                modules=[],
-                max_threadpool_threads=sync_tasks_pool_size,
-                no_parse=not cast_types,
-                log_collector_format=logs_format or WorkerArgs.log_collector_format,
-            ),
+            broker=self,
+            executor=self.executor,
+            validate_params=cast_types,
+            max_async_tasks=max_async_tasks,
         )
+        self._running_tasks: "Set[asyncio.Task[Any]]" = set()
 
     async def kick(self, message: BrokerMessage) -> None:
         """
@@ -128,6 +127,7 @@ class InMemoryBroker(AsyncBroker):
         target_task = self.available_tasks.get(message.task_name)
         if target_task is None:
             raise TaskiqError("Unknown task.")
+
         if not self.receiver.dependency_graphs.get(target_task.task_name):
             self.receiver.dependency_graphs[target_task.task_name] = DependencyGraph(
                 target_task.original_func,
@@ -141,9 +141,11 @@ class InMemoryBroker(AsyncBroker):
                 target_task.original_func,
             )
 
-        await self.receiver.callback(message=message)
+        task = asyncio.create_task(self.receiver.callback(message=message.message))
+        self._running_tasks.add(task)
+        task.add_done_callback(self._running_tasks.discard)
 
-    def listen(self) -> AsyncGenerator[BrokerMessage, None]:
+    def listen(self) -> AsyncGenerator[bytes, None]:
         """
         Inmemory broker cannot listen.
 
@@ -165,3 +167,4 @@ class InMemoryBroker(AsyncBroker):
         for event in (TaskiqEvents.CLIENT_SHUTDOWN, TaskiqEvents.WORKER_SHUTDOWN):
             for handler in self.event_handlers.get(event, []):
                 await maybe_awaitable(handler(self.state))
+        self.executor.shutdown()

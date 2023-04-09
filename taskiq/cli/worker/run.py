@@ -1,21 +1,25 @@
 import asyncio
 import logging
 import signal
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
-
-from watchdog.observers import Observer
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.cli.utils import import_object, import_tasks
 from taskiq.cli.worker.args import WorkerArgs
-from taskiq.cli.worker.async_task_runner import async_listen_messages
 from taskiq.cli.worker.process_manager import ProcessManager
+from taskiq.receiver import Receiver
 
 try:
     import uvloop  # noqa: WPS433
 except ImportError:
     uvloop = None  # type: ignore
 
+
+try:
+    from watchdog.observers import Observer  # noqa: WPS433
+except ImportError:
+    Observer = None  # type: ignore
 
 logger = logging.getLogger("taskiq.worker")
 
@@ -47,7 +51,7 @@ async def shutdown_broker(broker: AsyncBroker, timeout: float) -> None:
         )
 
 
-def start_listen(args: WorkerArgs) -> None:  # noqa: C901, WPS213
+def start_listen(args: WorkerArgs) -> None:  # noqa: WPS213
     """
     This function starts actual listening process.
 
@@ -102,7 +106,15 @@ def start_listen(args: WorkerArgs) -> None:  # noqa: C901, WPS213
 
     loop = asyncio.get_event_loop()
     try:
-        loop.run_until_complete(async_listen_messages(broker, args))
+        logger.debug("Initialize receiver.")
+        with ThreadPoolExecutor(args.max_threadpool_threads) as pool:
+            receiver = Receiver(
+                broker=broker,
+                executor=pool,
+                validate_params=not args.no_parse,
+                max_async_tasks=args.max_async_tasks,
+            )
+            loop.run_until_complete(receiver.listen())
     except KeyboardInterrupt:
         logger.warning("Worker process interrupted.")
         loop.run_until_complete(shutdown_broker(broker, args.shutdown_timeout))
@@ -124,9 +136,11 @@ def run_worker(args: WorkerArgs) -> None:  # noqa: WPS213
     logging.getLogger("watchdog.observers.inotify_buffer").setLevel(level=logging.INFO)
     logger.info("Starting %s worker processes.", args.workers)
 
-    observer = Observer()
+    observer = None
+    if Observer is not None:
+        observer = Observer()
 
-    if args.reload:
+    if observer is not None and args.reload:
         observer.start()
         args.workers = 1
         logging.warning(
@@ -137,7 +151,7 @@ def run_worker(args: WorkerArgs) -> None:  # noqa: WPS213
 
     manager.start()
 
-    if observer.is_alive():
+    if observer is not None and observer.is_alive():
         if args.reload:
             logger.info("Stopping watching files.")
         observer.stop()

@@ -1,37 +1,58 @@
-from typing import Any, Optional
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any, AsyncGenerator, Callable, List, Optional, TypeVar
 
 import pytest
 from taskiq_dependencies import Depends
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
+from taskiq.abc.result_backend import AsyncResultBackend
 from taskiq.brokers.inmemory_broker import InMemoryBroker
-from taskiq.cli.worker.args import WorkerArgs
-from taskiq.cli.worker.receiver import Receiver
-from taskiq.message import BrokerMessage, TaskiqMessage
+from taskiq.message import TaskiqMessage
+from taskiq.receiver import Receiver
 from taskiq.result import TaskiqResult
+
+_T = TypeVar("_T")
+
+
+class BrokerForTests(InMemoryBroker):
+    def __init__(
+        self,
+        result_backend: "Optional[AsyncResultBackend[_T]]" = None,
+        task_id_generator: Optional[Callable[[], str]] = None,
+    ) -> None:
+        super().__init__(
+            result_backend=result_backend,
+            task_id_generator=task_id_generator,
+        )
+        self.to_send: "List[TaskiqMessage]" = []
+
+    async def listen(self) -> AsyncGenerator[bytes, None]:
+        for message in self.to_send:
+            yield self.formatter.dumps(message).message
 
 
 def get_receiver(
     broker: Optional[AsyncBroker] = None,
     no_parse: bool = False,
+    max_async_tasks: Optional[int] = None,
 ) -> Receiver:
     """
     Returns receiver with custom broker and args.
 
     :param broker: broker, defaults to None
     :param no_parse: parameter to taskiq_args, defaults to False
+    :param cli_args: Taskiq worker CLI arguments.
     :return: new receiver.
     """
     if broker is None:
         broker = InMemoryBroker()
     return Receiver(
         broker,
-        WorkerArgs(
-            broker="",
-            modules=[],
-            no_parse=no_parse,
-        ),
+        executor=ThreadPoolExecutor(max_workers=10),
+        validate_params=not no_parse,
+        max_async_tasks=max_async_tasks,
     )
 
 
@@ -165,7 +186,7 @@ async def test_callback_success() -> None:
         ),
     )
 
-    await receiver.callback(broker_message)
+    await receiver.callback(broker_message.message)
     assert called_times == 1
 
 
@@ -175,12 +196,7 @@ async def test_callback_wrong_format() -> None:
     receiver = get_receiver()
 
     await receiver.callback(
-        BrokerMessage(
-            task_id="",
-            task_name="my_task.task_name",
-            message='{"aaaa": "bbb"}',
-            labels={},
-        ),
+        b"{some wrong bytes}",
     )
 
 
@@ -200,7 +216,7 @@ async def test_callback_unknown_task() -> None:
         ),
     )
 
-    await receiver.callback(broker_message)
+    await receiver.callback(broker_message.message)
 
 
 @pytest.mark.anyio
@@ -241,3 +257,39 @@ async def test_custom_ctx() -> None:
     # to the one we supplied.
     assert result.return_value == 11
     assert not result.is_err
+
+
+@pytest.mark.anyio
+async def test_callback_semaphore() -> None:
+    """Test that callback funcion semaphore works well."""
+    max_async_tasks = 3
+    broker = BrokerForTests()
+    sem_num = 0
+
+    @broker.task
+    async def task_sem() -> int:
+        nonlocal sem_num  # noqa: WPS420
+        sem_num += 1
+        await asyncio.sleep(1)
+        return 1
+
+    broker.to_send = [
+        TaskiqMessage(
+            task_id="test_sem",
+            task_name=task_sem.task_name,
+            labels={},
+            args=[],
+            kwargs=[],
+        )
+        for _ in range(max_async_tasks + 2)
+    ]
+
+    # broker_message = broker.formatter.dumps(
+    # )
+    receiver = get_receiver(broker, max_async_tasks=3)
+
+    listen_task = asyncio.create_task(receiver.listen())
+    await asyncio.sleep(0.3)
+    assert sem_num == max_async_tasks
+    await listen_task
+    assert sem_num == max_async_tasks + 2
