@@ -88,8 +88,10 @@ class PrometheusMiddleware(TaskiqMiddleware):
             "Tome of function execution",
             ["task_name"],
         )
-
-        start_http_server(port=server_port, addr=server_addr)
+        try:
+            start_http_server(port=server_port, addr=server_addr)
+        except OSError as exc:
+            logger.debug("Cannot start prometheus server: %s", exc)
 
     def pre_execute(
         self,
