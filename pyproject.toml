@@ -29,14 +29,18 @@ keywords = ["taskiq", "tasks", "distributed", "async"]
 python = "^3.7"
 typing-extensions = ">=3.10.0.0"
 pydantic = "^1.6.2"
-pyzmq = { version = "^23.2.0", optional = true }
-uvloop = { version = ">=0.16.0,<1", optional = true }
-watchdog = "^2.1.9"
-gitignore-parser = "^0"
 importlib-metadata = "*"
 pycron = "^3.0.0"
 taskiq_dependencies = "^1"
+# For prometheus metrics
 prometheus_client = { version = "^0", optional = true }
+# For ZMQBroker
+pyzmq = { version = "^23.2.0", optional = true }
+# For speed
+uvloop = { version = ">=0.16.0,<1", optional = true }
+# For hot-reload.
+watchdog = { version = "^2.1.9", optional = true }
+gitignore-parser = { version = "^0", optional = true }
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"
@@ -59,6 +63,7 @@ types-mock = "^4.0.15"
 zmq = ["pyzmq"]
 uv = ["uvloop"]
 metrics = ["prometheus_client"]
+reload = ["watchdog", "gitignore-parser"]
 
 [tool.poetry.scripts]
 taskiq = "taskiq.__main__:main"

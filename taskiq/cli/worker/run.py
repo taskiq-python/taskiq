@@ -4,8 +4,6 @@ import signal
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-from watchdog.observers import Observer
-
 from taskiq.abc.broker import AsyncBroker
 from taskiq.cli.utils import import_object, import_tasks
 from taskiq.cli.worker.args import WorkerArgs
@@ -17,6 +15,11 @@ try:
 except ImportError:
     uvloop = None  # type: ignore
 
+
+try:
+    from watchdog.observers import Observer  # noqa: WPS433
+except ImportError:
+    Observer = None  # type: ignore
 
 logger = logging.getLogger("taskiq.worker")
 
@@ -133,9 +136,11 @@ def run_worker(args: WorkerArgs) -> None:  # noqa: WPS213
     logging.getLogger("watchdog.observers.inotify_buffer").setLevel(level=logging.INFO)
     logger.info("Starting %s worker processes.", args.workers)
 
-    observer = Observer()
+    observer = None
+    if Observer is not None:
+        observer = Observer()
 
-    if args.reload:
+    if observer is not None and args.reload:
         observer.start()
         args.workers = 1
         logging.warning(
@@ -146,7 +151,7 @@ def run_worker(args: WorkerArgs) -> None:  # noqa: WPS213
 
     manager.start()
 
-    if observer.is_alive():
+    if observer is not None and observer.is_alive():
         if args.reload:
             logger.info("Stopping watching files.")
         observer.stop()
