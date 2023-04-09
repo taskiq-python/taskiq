@@ -9,7 +9,7 @@ from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.abc.result_backend import AsyncResultBackend
 from taskiq.brokers.inmemory_broker import InMemoryBroker
-from taskiq.message import BrokerMessage, TaskiqMessage
+from taskiq.message import TaskiqMessage
 from taskiq.receiver import Receiver
 from taskiq.result import TaskiqResult
 
@@ -28,9 +28,9 @@ class BrokerForTests(InMemoryBroker):
         )
         self.to_send: "List[TaskiqMessage]" = []
 
-    async def listen(self) -> AsyncGenerator[BrokerMessage, None]:
+    async def listen(self) -> AsyncGenerator[bytes, None]:
         for message in self.to_send:
-            yield self.formatter.dumps(message)
+            yield self.formatter.dumps(message).message
 
 
 def get_receiver(
@@ -186,7 +186,7 @@ async def test_callback_success() -> None:
         ),
     )
 
-    await receiver.callback(broker_message)
+    await receiver.callback(broker_message.message)
     assert called_times == 1
 
 
@@ -196,12 +196,7 @@ async def test_callback_wrong_format() -> None:
     receiver = get_receiver()
 
     await receiver.callback(
-        BrokerMessage(
-            task_id="",
-            task_name="my_task.task_name",
-            message='{"aaaa": "bbb"}',
-            labels={},
-        ),
+        b"{some wrong bytes}",
     )
 
 
@@ -221,7 +216,7 @@ async def test_callback_unknown_task() -> None:
         ),
     )
 
-    await receiver.callback(broker_message)
+    await receiver.callback(broker_message.message)
 
 
 @pytest.mark.anyio

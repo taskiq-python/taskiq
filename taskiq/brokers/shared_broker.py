@@ -59,7 +59,7 @@ class AsyncSharedBroker(AsyncBroker):
             "without setting the default_broker.",
         )
 
-    async def listen(self) -> AsyncGenerator[BrokerMessage, None]:  # type: ignore
+    async def listen(self) -> AsyncGenerator[bytes, None]:  # type: ignore
         """
         Shared broker cannot listen to tasks.
 

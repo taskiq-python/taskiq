@@ -141,11 +141,11 @@ class InMemoryBroker(AsyncBroker):
                 target_task.original_func,
             )
 
-        task = asyncio.create_task(self.receiver.callback(message=message))
+        task = asyncio.create_task(self.receiver.callback(message=message.message))
         self._running_tasks.add(task)
         task.add_done_callback(self._running_tasks.discard)
 
-    def listen(self) -> AsyncGenerator[BrokerMessage, None]:
+    def listen(self) -> AsyncGenerator[bytes, None]:
         """
         Inmemory broker cannot listen.
 

@@ -16,7 +16,7 @@ class TaskiqFormatter(ABC):
         """
 
     @abstractmethod
-    def loads(self, message: BrokerMessage) -> TaskiqMessage:
+    def loads(self, message: bytes) -> TaskiqMessage:
         """
         Parses broker message to TaskiqMessage.
 

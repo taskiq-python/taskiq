@@ -19,11 +19,11 @@ class JSONFormatter(TaskiqFormatter):
             labels=message.labels,
         )
 
-    def loads(self, message: BrokerMessage) -> TaskiqMessage:
+    def loads(self, message: bytes) -> TaskiqMessage:
         """
         Loads json from message.
 
         :param message: broker's message.
         :return: parsed taskiq message.
         """
-        return TaskiqMessage.parse_raw(message.message)
+        return TaskiqMessage.parse_raw(message)

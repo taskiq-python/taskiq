@@ -25,12 +25,12 @@ class MyBroker(AsyncBroker):
         return await super().shutdown()
 
     async def kick(self, message: BrokerMessage) -> None:
-        # Send a message.
+        # Send a message.message.
         pass
 
-    async def listen(self) -> AsyncGenerator[BrokerMessage, None]:
+    async def listen(self) -> AsyncGenerator[bytes, None]:
         while True:
             # Get new message.
-            new_message: BrokerMessage = ...  # type: ignore
+            new_message: bytes = ...  # type: ignore
             # Yield it!
             yield new_message

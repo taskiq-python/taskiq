@@ -1,3 +1,4 @@
+import math
 from logging import getLogger
 from typing import AsyncGenerator, Callable, Optional, TypeVar
 
@@ -58,21 +59,23 @@ class ZeroMQBroker(AsyncBroker):
 
         :param message: message to publish.
         """
+        part_len = 100
+        parts = [
+            message.message[
+                idx * part_len : min(idx * part_len + part_len, len(message.message))
+            ]
+            for idx in range(math.ceil(len(message.message) / part_len))
+        ]
         with self.socket.connect(self.sub_host) as sock:
-            await sock.send_string(message.json())
+            await sock.send_multipart(parts)
 
-    async def listen(self) -> AsyncGenerator[BrokerMessage, None]:
+    async def listen(self) -> AsyncGenerator[bytes, None]:
         """
         Start accepting new messages.
 
         :yields: incoming messages.
         """
         with self.socket.connect(self.sub_host) as sock:
-            while True:
-                received_str = await sock.recv_string()
-                try:
-                    broker_msg = BrokerMessage.parse_raw(received_str)
-                except ValueError:
-                    logger.warning("Cannot parse received message %s", received_str)
-                    continue
-                yield broker_msg
+            while True:  # noqa: WPS457
+                data = await sock.recv_multipart()
+                yield b"".join(data)
