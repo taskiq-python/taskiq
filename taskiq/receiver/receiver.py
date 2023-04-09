@@ -122,6 +122,9 @@ class Receiver:
                 await maybe_awaitable(middleware.post_execute(taskiq_msg, result))
         try:
             await self.broker.result_backend.set_result(message.task_id, result)
+            for middleware in self.broker.middlewares:
+                if middleware.__class__.post_save != TaskiqMiddleware.post_save:
+                    await maybe_awaitable(middleware.post_save(taskiq_msg, result))
         except Exception as exc:
             logger.exception(
                 "Can't set result in result backend. Cause: %s",
@@ -130,10 +133,6 @@ class Receiver:
             )
             if raise_err:
                 raise exc
-
-        for middleware in self.broker.middlewares:
-            if middleware.__class__.post_save != TaskiqMiddleware.post_save:
-                await maybe_awaitable(middleware.post_save(taskiq_msg, result))
 
     async def run_task(  # noqa: C901, WPS210
         self,
