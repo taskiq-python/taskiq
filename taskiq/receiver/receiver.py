@@ -10,7 +10,7 @@ from taskiq_dependencies import DependencyGraph
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.context import Context
-from taskiq.message import BrokerMessage, TaskiqMessage
+from taskiq.message import TaskiqMessage
 from taskiq.receiver.params_parser import parse_params
 from taskiq.result import TaskiqResult
 from taskiq.state import TaskiqState
@@ -64,7 +64,7 @@ class Receiver:
 
     async def callback(  # noqa: C901, WPS213
         self,
-        message: BrokerMessage,
+        message: bytes,
         raise_err: bool = False,
     ) -> None:
         """
@@ -79,17 +79,6 @@ class Receiver:
         :param raise_err: raise an error if cannot save result in
             result_backend.
         """
-        logger.debug(f"Received message: {message}")
-        if message.task_name not in self.broker.available_tasks:
-            logger.warning(
-                'task "%s" is not found. Maybe you forgot to import it?',
-                message.task_name,
-            )
-            return
-        logger.debug(
-            "Function for task %s is resolved. Executing...",
-            message.task_name,
-        )
         try:
             taskiq_msg = self.broker.formatter.loads(message=message)
         except Exception as exc:
@@ -100,6 +89,17 @@ class Receiver:
                 exc_info=True,
             )
             return
+        logger.debug(f"Received message: {taskiq_msg}")
+        if taskiq_msg.task_name not in self.broker.available_tasks:
+            logger.warning(
+                'task "%s" is not found. Maybe you forgot to import it?',
+                taskiq_msg.task_name,
+            )
+            return
+        logger.debug(
+            "Function for task %s is resolved. Executing...",
+            taskiq_msg.task_name,
+        )
         for middleware in self.broker.middlewares:
             if middleware.__class__.pre_execute != TaskiqMiddleware.pre_execute:
                 taskiq_msg = await maybe_awaitable(
@@ -114,14 +114,14 @@ class Receiver:
             taskiq_msg.task_id,
         )
         result = await self.run_task(
-            target=self.broker.available_tasks[message.task_name].original_func,
+            target=self.broker.available_tasks[taskiq_msg.task_name].original_func,
             message=taskiq_msg,
         )
         for middleware in self.broker.middlewares:
             if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
                 await maybe_awaitable(middleware.post_execute(taskiq_msg, result))
         try:
-            await self.broker.result_backend.set_result(message.task_id, result)
+            await self.broker.result_backend.set_result(taskiq_msg.task_id, result)
             for middleware in self.broker.middlewares:
                 if middleware.__class__.post_save != TaskiqMiddleware.post_save:
                     await maybe_awaitable(middleware.post_save(taskiq_msg, result))

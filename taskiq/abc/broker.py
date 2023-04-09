@@ -158,11 +158,14 @@ class AsyncBroker(ABC):
         Using this method tasks are sent to
         workers.
 
+        You don't need to send broker message. It's helper for brokers,
+        please send only bytes from message.message.
+
         :param message: name of a task.
         """
 
     @abstractmethod
-    def listen(self) -> AsyncGenerator[BrokerMessage, None]:
+    def listen(self) -> AsyncGenerator[bytes, None]:
         """
         This function listens to new messages and yields them.
 

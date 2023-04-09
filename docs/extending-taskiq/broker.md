@@ -11,6 +11,20 @@ Here is a template for new brokers:
 
 @[code python](../examples/extending/broker.py)
 
+
+# About kick and listen
+
+The `kick` method takes a `BrokerMessage` as a parameter. The `BrokerMessage` class is a handy helper class for brokers. You can use information from the BrokerMessage to alter the delivery method.
+
+::: warning "cool warning!"
+
+As a broker developer, please send only raw bytes from the `message` field of a BrokerMessage if possible. Serializing it to the string may result in a problem if message bytes are not utf-8 compatible.
+
+:::
+
+
+The `listen` method should yield raw bytes that were sent over the network.
+
 ## Conventions
 
 For brokers, we have several conventions. It's good if your broker implements them.
