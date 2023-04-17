@@ -180,7 +180,7 @@ class AsyncBroker(ABC):
     def task(
         self,
         task_name: Callable[_FuncParams, _ReturnType],
-        **lavels: Any,
+        **labels: Any,
     ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]:  # pragma: no cover
         ...
 

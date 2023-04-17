@@ -128,6 +128,8 @@ def run_worker(args: WorkerArgs) -> None:  # noqa: WPS213
     and joins them all.
 
     :param args: CLI arguments.
+
+    :raises ValueError: if reload flag is used, but dependencies are not installed.
     """
     logging.basicConfig(
         level=logging.getLevelName(args.log_level),
@@ -137,10 +139,12 @@ def run_worker(args: WorkerArgs) -> None:  # noqa: WPS213
     logger.info("Starting %s worker processes.", args.workers)
 
     observer = None
-    if Observer is not None:
-        observer = Observer()
 
-    if observer is not None and args.reload:
+    if args.reload and Observer is None:
+        raise ValueError("To use '--reload' flag, please install 'taskiq[reload]'.")
+
+    if Observer is not None and args.reload:
+        observer = Observer()
         observer.start()
         args.workers = 1
         logging.warning(
