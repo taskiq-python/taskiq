@@ -57,11 +57,10 @@ class PrometheusMiddleware(TaskiqMiddleware):
                 Histogram,
                 start_http_server,
             )
-        except ImportError:
-            logger.warn(
-                "Cannot initialize metrics. Please install 'taskiq[metrics]' extra.",
-            )
-            raise
+        except ImportError as exc:
+            raise ImportError(
+                "Cannot initialize metrics. Please install 'taskiq[metrics]'.",
+            ) from exc
 
         self.found_errors = Counter(
             "found_errors",
