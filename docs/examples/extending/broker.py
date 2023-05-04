@@ -5,7 +5,8 @@ from taskiq import AsyncBroker, BrokerMessage
 
 class MyBroker(AsyncBroker):
     def __init__(self) -> None:
-        # Please call this super and allow people to use their result_backends.
+        # Please call this super method to set default values to
+        # many different fields.
         super().__init__()
 
     async def startup(self) -> None:
