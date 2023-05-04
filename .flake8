@@ -6,6 +6,8 @@ extend-ignore = E203
 docstring_style=sphinx
 
 ignore =
+  ; Found `no cover` comments overuse
+  WPS403
   ; Found a line that starts with a dot
   WPS348,
   ; Found overly complex type annotation
