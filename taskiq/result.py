@@ -12,6 +12,6 @@ class TaskiqResult(GenericModel, Generic[_ReturnType]):
     # Log is a deprecated field. It would be removed in future
     # releases of not, if we find a way to capture logs in async
     # environment.
-    log: Optional[str]
+    log: Optional[str] = None
     return_value: _ReturnType
     execution_time: float

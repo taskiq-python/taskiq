@@ -26,7 +26,7 @@ async def test_successfull_retry(broker: AsyncMock) -> None:
             task_id="test_id",
             task_name="meme",
             labels={
-                "retry_on_error": True,
+                "retry_on_error": "True",
             },
             args=[],
             kwargs={},
@@ -67,8 +67,8 @@ async def test_max_retries(broker: AsyncMock) -> None:
             task_id="test_id",
             task_name="meme",
             labels={
-                "retry_on_error": True,
-                "_retries": 2,
+                "retry_on_error": "True",
+                "_retries": "2",
             },
             args=[],
             kwargs={},
