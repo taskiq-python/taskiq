@@ -6,8 +6,7 @@ from taskiq_redis import RedisAsyncResultBackend
 
 broker = AioPikaBroker(
     "amqp://guest:guest@localhost:5672",
-    result_backend=RedisAsyncResultBackend("redis://localhost"),
-)
+).with_result_backend(RedisAsyncResultBackend("redis://localhost"))
 
 
 @broker.task
