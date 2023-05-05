@@ -214,7 +214,7 @@ class Receiver:
             is_err=found_exception is not None,
             log=None,
             return_value=returned,
-            execution_time=execution_time,
+            execution_time=round(execution_time, 2),
         )
         # If exception is found we execute middlewares.
         if found_exception is not None:
