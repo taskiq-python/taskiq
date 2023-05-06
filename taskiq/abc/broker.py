@@ -1,5 +1,6 @@
 import os
 import sys
+import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from functools import wraps
@@ -10,7 +11,6 @@ from typing import (  # noqa: WPS235
     AsyncGenerator,
     Awaitable,
     Callable,
-    Coroutine,
     DefaultDict,
     Dict,
     List,
@@ -21,7 +21,7 @@ from typing import (  # noqa: WPS235
 )
 from uuid import uuid4
 
-from typing_extensions import ParamSpec, TypeAlias
+from typing_extensions import ParamSpec, Self, TypeAlias
 
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.decor import AsyncTaskiqDecoratedTask
@@ -31,6 +31,7 @@ from taskiq.message import BrokerMessage
 from taskiq.result_backends.dummy import DummyResultBackend
 from taskiq.state import TaskiqState
 from taskiq.utils import maybe_awaitable, remove_suffix
+from taskiq.warnings import TaskiqDeprecationWarning
 
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.formatter import TaskiqFormatter
@@ -76,8 +77,20 @@ class AsyncBroker(ABC):
     ) -> None:
         if result_backend is None:
             result_backend = DummyResultBackend()
+        else:
+            warnings.warn(
+                "Setting result backend with constructor is deprecated. "
+                "Please use `with_result_backend` instead.",
+                TaskiqDeprecationWarning,
+            )
         if task_id_generator is None:
             task_id_generator = default_id_generator
+        else:
+            warnings.warn(
+                "Setting id generator with constructor is deprecated. "
+                "Please use `with_id_generator` instead.",
+                TaskiqDeprecationWarning,
+            )
         self.middlewares: "List[TaskiqMiddleware]" = []
         self.result_backend = result_backend
         self.decorator_class = AsyncTaskiqDecoratedTask
@@ -297,7 +310,7 @@ class AsyncBroker(ABC):
         self,
         event: TaskiqEvents,
         handler: EventHandler,
-    ) -> None:
+    ) -> None:  # pragma: no cover
         """
         Adds event handler.
 
@@ -315,3 +328,71 @@ class AsyncBroker(ABC):
         :param handler: handler to call when event is started.
         """
         self.event_handlers[event].append(handler)
+
+    def with_result_backend(
+        self,
+        result_backend: "AsyncResultBackend[_T]",
+    ) -> "Self":  # pragma: no cover
+        """
+        Set a result backend and return updated broker.
+
+        :param result_backend: new result backend.
+        :return: self
+        """
+        self.result_backend = result_backend
+        return self
+
+    def with_id_generator(
+        self,
+        task_id_generator: Callable[[], str],
+    ) -> "Self":  # pragma: no cover
+        """
+        Set a new Id generator and return an updated broker.
+
+        :param task_id_generator: new generator function.
+        :return: self
+        """
+        self.id_generator = task_id_generator
+        return self
+
+    def with_middlewares(
+        self,
+        *middlewares: "TaskiqMiddleware",
+    ) -> "Self":  # pragma: no cover
+        """
+        Add middewares to broker.
+
+        This method adds new middlewares to broker
+        and returns and updated broker.
+
+        :param middlewares: list of middlewares.
+        :return: self
+        """
+        for middleware in middlewares:
+            if not isinstance(middleware, TaskiqMiddleware):
+                logger.warning(
+                    f"Middleware {middleware} is not an instance of TaskiqMiddleware. "
+                    "Skipping...",
+                )
+                continue
+            middleware.set_broker(self)
+            self.middlewares.append(middleware)
+        return self
+
+    def with_event_handlers(
+        self,
+        event: TaskiqEvents,
+        *handlers: EventHandler,
+    ) -> "Self":  # pragma: no cover
+        """
+        Set new event handlers.
+
+        It takes an event to handle, list of handlers
+        and sets it to broker, returning an updated broker.
+
+        :param event: event to handle.
+        :param handlers: event handlers.
+        :return: self
+        """
+        self.event_handlers[event].extend(handlers)
+        return self

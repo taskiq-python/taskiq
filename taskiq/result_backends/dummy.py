@@ -17,9 +17,7 @@ class DummyResultBackend(AsyncResultBackend[_ReturnType]):  # pragma: no cover
 
         :param task_id: current task id.
         :param result: result of execution.
-        :return: nothing.
         """
-        return await super().set_result(task_id, result)
 
     async def is_result_ready(self, task_id: str) -> bool:
         """

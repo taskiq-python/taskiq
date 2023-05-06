@@ -7,7 +7,6 @@ order: 3
 Result backends are used to store execution results.
 This includes:
 
-- Captured logs;
 - return value;
 - Execution time in seconds.
 
