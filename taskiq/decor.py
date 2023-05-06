@@ -1,4 +1,13 @@
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Coroutine,
+    Dict,
+    Generic,
+    TypeVar,
+    overload,
+)
 
 from typing_extensions import ParamSpec
 
@@ -50,11 +59,36 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
     ) -> _ReturnType:
         return self.original_func(*args, **kwargs)
 
+    @overload
+    async def kiq(
+        self: "AsyncTaskiqDecoratedTask[_FuncParams, Coroutine[Any, Any, _T]]",
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> AsyncTaskiqTask[_T]:
+        ...
+
+    @overload
+    async def kiq(
+        self: "AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]",
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> AsyncTaskiqTask[_ReturnType]:
+        ...
+
+    # This is a patch to pycharm type hints todo
+    @overload
+    async def kiq(
+        self: "AsyncTaskiqDecoratedTask[_FuncParams, Any]",
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> AsyncTaskiqTask[Any]:
+        ...
+
     async def kiq(
         self,
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
-    ) -> AsyncTaskiqTask[Any]:
+    ) -> Any:
         """
         This method sends function call over the network.
 
@@ -68,7 +102,26 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         """
         return await self.kicker().kiq(*args, **kwargs)
 
-    def kicker(self) -> AsyncKicker[Any, Any]:
+    @overload
+    def kicker(
+        self: "AsyncTaskiqDecoratedTask[_FuncParams, Coroutine[Any, Any, _T]]",
+    ) -> AsyncKicker[_FuncParams, _T]:
+        ...
+
+    @overload
+    def kicker(
+        self: "AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]",
+    ) -> AsyncKicker[_FuncParams, _ReturnType]:
+        ...
+
+    # This is a patch to pycharm type hints  todo
+    @overload
+    def kicker(
+        self: "AsyncTaskiqDecoratedTask[Any, Any]",
+    ) -> AsyncKicker[Any, Any]:
+        ...
+
+    def kicker(self) -> Any:
         """
         This function returns kicker object.
 
