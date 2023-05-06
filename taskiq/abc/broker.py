@@ -132,6 +132,8 @@ class AsyncBroker(ABC):
         for handler in self.event_handlers[event]:
             await maybe_awaitable(handler(self.state))
 
+        await self.result_backend.startup()
+
     async def shutdown(self) -> None:
         """
         Close the broker.
@@ -146,6 +148,8 @@ class AsyncBroker(ABC):
         # Call all shutdown events.
         for handler in self.event_handlers[event]:
             await maybe_awaitable(handler(self.state))
+
+        await self.result_backend.shutdown()
 
     @abstractmethod
     async def kick(
