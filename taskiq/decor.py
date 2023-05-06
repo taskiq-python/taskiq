@@ -1,13 +1,4 @@
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Coroutine,
-    Dict,
-    Generic,
-    TypeVar,
-    overload,
-)
+from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, TypeVar
 
 from typing_extensions import ParamSpec
 
@@ -59,27 +50,11 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
     ) -> _ReturnType:
         return self.original_func(*args, **kwargs)
 
-    @overload
-    async def kiq(
-        self: "AsyncTaskiqDecoratedTask[_FuncParams, Coroutine[Any, Any, _T]]",
-        *args: _FuncParams.args,
-        **kwargs: _FuncParams.kwargs,
-    ) -> AsyncTaskiqTask[_T]:
-        ...
-
-    @overload
-    async def kiq(
-        self: "AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]",
-        *args: _FuncParams.args,
-        **kwargs: _FuncParams.kwargs,
-    ) -> AsyncTaskiqTask[Any]:
-        ...
-
     async def kiq(
         self,
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
-    ) -> Any:
+    ) -> AsyncTaskiqTask[Any]:
         """
         This method sends function call over the network.
 
@@ -93,19 +68,7 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         """
         return await self.kicker().kiq(*args, **kwargs)
 
-    @overload
-    def kicker(
-        self: "AsyncTaskiqDecoratedTask[_FuncParams, Coroutine[Any, Any, _T]]",
-    ) -> AsyncKicker[_FuncParams, _T]:
-        ...
-
-    @overload
-    def kicker(
-        self: "AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]",
-    ) -> AsyncKicker[Any, Any]:
-        ...
-
-    def kicker(self) -> Any:
+    def kicker(self) -> AsyncKicker[Any, Any]:
         """
         This function returns kicker object.
 
