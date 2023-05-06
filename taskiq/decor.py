@@ -94,13 +94,15 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         return await self.kicker().kiq(*args, **kwargs)
 
     @overload
-    def kicker(self: "AsyncTaskiqDecoratedTask[_FuncParams, Coroutine[Any, Any, _T]]"
-               ) -> AsyncKicker[_FuncParams, _T]:
+    def kicker(
+        self: "AsyncTaskiqDecoratedTask[_FuncParams, Coroutine[Any, Any, _T]]",
+    ) -> AsyncKicker[_FuncParams, _T]:
         ...
 
     @overload
-    def kicker(self: "AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]",
-               ) -> AsyncKicker[Any, Any]:
+    def kicker(
+        self: "AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]",
+    ) -> AsyncKicker[Any, Any]:
         ...
 
     def kicker(self) -> Any:
