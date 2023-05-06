@@ -14,10 +14,7 @@ from taskiq import Context, TaskiqDepends, TaskiqEvents, TaskiqState
 
 broker = AioPikaBroker(
     "amqp://localhost",
-    result_backend=RedisAsyncResultBackend(
-        "redis://localhost/0",
-    ),
-)
+).with_result_backend(RedisAsyncResultBackend("redis://localhost"))
 
 
 @broker.on_event(TaskiqEvents.WORKER_STARTUP)

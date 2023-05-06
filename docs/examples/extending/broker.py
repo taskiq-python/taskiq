@@ -1,18 +1,13 @@
-from typing import AsyncGenerator, Callable, Optional, TypeVar
+from typing import AsyncGenerator
 
-from taskiq import AsyncBroker, AsyncResultBackend, BrokerMessage
-
-_T = TypeVar("_T")
+from taskiq import AsyncBroker, BrokerMessage
 
 
 class MyBroker(AsyncBroker):
-    def __init__(
-        self,
-        result_backend: "Optional[AsyncResultBackend[_T]]" = None,
-        task_id_generator: Optional[Callable[[], str]] = None,
-    ) -> None:
-        # Please call this super and allow people to use their result_backends.
-        super().__init__(result_backend, task_id_generator)
+    def __init__(self) -> None:
+        # Please call this super method to set default values to
+        # many different fields.
+        super().__init__()
 
     async def startup(self) -> None:
         # Here you can do some startup magic.

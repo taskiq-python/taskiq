@@ -182,7 +182,7 @@ async def test_callback_success() -> None:
             task_name=my_task.task_name,
             labels={},
             args=[],
-            kwargs=[],
+            kwargs={},
         ),
     )
 
@@ -212,7 +212,7 @@ async def test_callback_unknown_task() -> None:
             task_name="unknown",
             labels={},
             args=[],
-            kwargs=[],
+            kwargs={},
         ),
     )
 
@@ -279,7 +279,7 @@ async def test_callback_semaphore() -> None:
             task_name=task_sem.task_name,
             labels={},
             args=[],
-            kwargs=[],
+            kwargs={},
         )
         for _ in range(max_async_tasks + 2)
     ]

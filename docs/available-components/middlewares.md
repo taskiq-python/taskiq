@@ -15,11 +15,11 @@ the task would be resent with same parameters.
 To enable this middleware, add it to the list of middlewares for a broker.
 
 ```python
-from taskiq import SimpleRetryMiddleware
+from taskiq import ZeroMQBroker, SimpleRetryMiddleware
 
-broker = ...
-
-broker.add_middlewares(SimpleRetryMiddleware(default_retry_count=3))
+broker = ZeroMQBroker().with_middlewares(
+    SimpleRetryMiddleware(default_retry_count=3),
+)
 ```
 
 After that you can add a label to task that you want to restart on error.
@@ -58,11 +58,11 @@ pip install "taskiq[metrics]"
 
 
 ```python
-from taskiq import PrometheusMiddleware
+from taskiq import ZeroMQBroker, PrometheusMiddleware
 
-broker = ...
-
-broker.add_middlewares(PrometheusMiddleware(server_addr="0.0.0.0", server_port=9000))
+broker = ZeroMQBroker().with_middlewares(
+    PrometheusMiddleware(server_addr="0.0.0.0", server_port=9000),
+)
 ```
 
 After that, metrics will be available at port 9000. Of course, this parameter can be configured.

@@ -1,5 +1,7 @@
 from typing import AsyncGenerator, Optional, TypeVar
 
+from typing_extensions import ParamSpec
+
 from taskiq.abc.broker import AsyncBroker
 from taskiq.decor import AsyncTaskiqDecoratedTask
 from taskiq.exceptions import TaskiqError
@@ -7,7 +9,7 @@ from taskiq.kicker import AsyncKicker
 from taskiq.message import BrokerMessage
 
 _ReturnType = TypeVar("_ReturnType")
-_Params = TypeVar("_Params")
+_Params = ParamSpec("_Params")
 
 
 class SharedDecoratedTask(AsyncTaskiqDecoratedTask[_Params, _ReturnType]):

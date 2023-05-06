@@ -39,7 +39,7 @@ class SimpleRetryMiddleware(TaskiqMiddleware):
         """
         retry_on_error = message.labels.get("retry_on_error")
         # Check if retrying is enabled for the task.
-        if retry_on_error != "True":
+        if retry_on_error is None or retry_on_error.lower() != "true":
             return
         new_msg = deepcopy(message)
         # Getting number of previous retries.
