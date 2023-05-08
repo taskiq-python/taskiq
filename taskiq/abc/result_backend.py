@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar
+from typing import Any, Generic, Optional, TypeVar
 
 from taskiq.result import TaskiqResult
 
@@ -49,4 +49,19 @@ class AsyncResultBackend(ABC, Generic[_ReturnType]):
         :param task_id: task's id.
         :param with_logs: if True it will download task's logs.
         :return: task's return value.
+        """
+
+    async def set_progress(self, task_id: str, progress: Any) -> None:
+        """
+        Saves progress.
+
+        :param task_id: task's id.
+        :param progress: progress of execution.
+        """
+
+    async def get_progress(self, task_id: str) -> Optional[Any]:
+        """
+        Gets progress.
+
+        :param task_id: task's id.
         """

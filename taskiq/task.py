@@ -1,7 +1,7 @@
 import asyncio
 from abc import ABC, abstractmethod
 from time import time
-from typing import TYPE_CHECKING, Any, Coroutine, Generic, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Coroutine, Generic, Optional, TypeVar, Union
 
 from taskiq.exceptions import (
     ResultGetError,
@@ -137,3 +137,11 @@ class AsyncTaskiqTask(_Task[_ReturnType]):
             if 0 < timeout < time() - start_time:
                 raise TaskiqResultTimeoutError()
         return await self.get_result(with_logs=with_logs)
+
+    async def get_progress(self) -> Optional[Any]:
+        """
+        Get task progress.
+
+        :return: task's progress.
+        """
+        return await self.result_backend.get_progress(self.task_id)
