@@ -211,6 +211,7 @@ class Receiver:
 
         # Assemble result.
         result: "TaskiqResult[Any]" = TaskiqResult(
+            task_id=message.task_id,
             is_err=found_exception is not None,
             log=None,
             return_value=returned,

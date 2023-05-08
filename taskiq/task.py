@@ -1,7 +1,7 @@
 import asyncio
 from abc import ABC, abstractmethod
 from time import time
-from typing import TYPE_CHECKING, Any, Coroutine, Generic, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Generic, TypeVar, Union
 
 from taskiq.exceptions import (
     ResultGetError,
@@ -73,9 +73,11 @@ class AsyncTaskiqTask(_Task[_ReturnType]):
         self,
         task_id: str,
         result_backend: "AsyncResultBackend[_ReturnType]",
+        original_func: Callable[..., _ReturnType],
     ) -> None:
         self.task_id = task_id
         self.result_backend = result_backend
+        self.original_func = original_func
 
     async def is_ready(self) -> bool:
         """

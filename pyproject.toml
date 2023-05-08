@@ -83,6 +83,7 @@ implicit_reexport = true
 allow_untyped_decorators = true
 warn_return_any = false
 warn_unused_ignores = false
+plugins = ["pydantic.mypy"]
 
 [tool.isort]
 profile = "black"

@@ -3,7 +3,7 @@ from typing import Any, Dict, List
 from pydantic import BaseModel
 
 
-class TaskiqMessage(BaseModel):
+class TaskiqMessage(BaseModel):  # type: ignore[no-redef]
     """
     Message abstractions.
 

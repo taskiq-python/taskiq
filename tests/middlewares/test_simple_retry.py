@@ -31,7 +31,12 @@ async def test_successfull_retry(broker: AsyncMock) -> None:
             args=[],
             kwargs={},
         ),
-        TaskiqResult(is_err=True, return_value=None, execution_time=0.0),
+        TaskiqResult(
+            task_id="test_id",
+            is_err=True,
+            return_value=None,
+            execution_time=0.0,
+        ),
         Exception(),
     )
     resend: TaskiqMessage = broker.kick.await_args.args[0]
@@ -52,7 +57,12 @@ async def test_no_retry(broker: AsyncMock) -> None:
             args=[],
             kwargs={},
         ),
-        TaskiqResult(is_err=True, return_value=None, execution_time=0.0),
+        TaskiqResult(
+            task_id="test_id",
+            is_err=True,
+            return_value=None,
+            execution_time=0.0,
+        ),
         Exception(),
     )
     broker.kick.assert_not_called()
@@ -73,7 +83,12 @@ async def test_max_retries(broker: AsyncMock) -> None:
             args=[],
             kwargs={},
         ),
-        TaskiqResult(is_err=True, return_value=None, execution_time=0.0),
+        TaskiqResult(
+            task_id="test_id",
+            is_err=True,
+            return_value=None,
+            execution_time=0.0,
+        ),
         Exception(),
     )
     broker.kick.assert_not_called()

@@ -1,5 +1,6 @@
 import os
 import sys
+import uuid
 import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
@@ -19,7 +20,6 @@ from typing import (  # noqa: WPS235
     Union,
     overload,
 )
-from uuid import uuid4
 
 from typing_extensions import ParamSpec, Self, TypeAlias
 
@@ -55,7 +55,7 @@ def default_id_generator() -> str:
 
     :return: new task_id.
     """
-    return uuid4().hex
+    return uuid.uuid4().hex
 
 
 class AsyncBroker(ABC):
@@ -96,6 +96,8 @@ class AsyncBroker(ABC):
         self.decorator_class = AsyncTaskiqDecoratedTask
         self.formatter: "TaskiqFormatter" = JSONFormatter()
         self.id_generator = task_id_generator
+        self.instance_id_generator: Callable[[], str] = lambda: uuid.uuid4().hex
+        self.instance_id: str = None  # type: ignore
         # Every event has a list of handlers.
         # Every handler is a function which takes state as a first argument.
         # And handler can be either sync or async.
@@ -138,6 +140,7 @@ class AsyncBroker(ABC):
 
     async def startup(self) -> None:
         """Do something when starting broker."""
+        self.instance_id = self.instance_id_generator()
         event = TaskiqEvents.CLIENT_STARTUP
         if self.is_worker_process:
             event = TaskiqEvents.WORKER_STARTUP
@@ -391,4 +394,8 @@ class AsyncBroker(ABC):
         :return: self
         """
         self.event_handlers[event].extend(handlers)
+        return self
+
+    def with_instance_id_generator(self, new_generator: Callable[[], str]) -> "Self":
+        self.instance_id_generator = new_generator
         return self

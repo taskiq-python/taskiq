@@ -3,6 +3,7 @@ from logging import getLogger
 from typing import (  # noqa: WPS235
     TYPE_CHECKING,
     Any,
+    Callable,
     Coroutine,
     Dict,
     Generic,
@@ -39,11 +40,13 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         task_name: str,
         broker: "AsyncBroker",
         labels: Dict[str, Any],
+        original_func: Callable[_FuncParams, _ReturnType],
     ) -> None:
         self.task_name = task_name
         self.broker = broker
         self.labels = labels
         self.custom_task_id: Optional[str] = None
+        self.original_func = original_func
 
     def with_labels(
         self,
@@ -140,6 +143,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         return AsyncTaskiqTask(
             task_id=message.task_id,
             result_backend=self.broker.result_backend,
+            original_func=self.original_func,
         )
 
     @classmethod

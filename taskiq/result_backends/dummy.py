@@ -42,6 +42,7 @@ class DummyResultBackend(AsyncResultBackend[_ReturnType]):  # pragma: no cover
         :returns: TaskiqResult.
         """
         return TaskiqResult(
+            task_id=task_id,
             is_err=False,
             log=None,
             return_value=None,

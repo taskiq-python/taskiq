@@ -106,6 +106,7 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
             task_name=self.task_name,
             broker=self.broker,
             labels=self.labels,
+            original_func=self.original_func,
         )
 
     def __repr__(self) -> str:
