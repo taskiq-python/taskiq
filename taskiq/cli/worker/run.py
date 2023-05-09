@@ -2,7 +2,7 @@ import asyncio
 import logging
 import signal
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any
+from typing import Any, Type
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.cli.utils import import_object, import_tasks
@@ -51,7 +51,21 @@ async def shutdown_broker(broker: AsyncBroker, timeout: float) -> None:
         )
 
 
-def start_listen(args: WorkerArgs) -> None:  # noqa: WPS213
+def get_receiver_type(args: WorkerArgs) -> Type[Receiver]:
+    """
+    Import Receiver from args.
+
+    :param args: CLI arguments.
+    :raises ValueError: if receiver is not a Receiver type.
+    :return: Receiver type.
+    """
+    receiver_type = import_object(args.receiver)
+    if not (isinstance(receiver_type, type) and issubclass(receiver_type, Receiver)):
+        raise ValueError("Unknown receiver type. Please use Receiver class.")
+    return receiver_type
+
+
+def start_listen(args: WorkerArgs) -> None:  # noqa: WPS210, WPS213
     """
     This function starts actual listening process.
 
@@ -63,6 +77,7 @@ def start_listen(args: WorkerArgs) -> None:  # noqa: WPS213
 
     :param args: CLI arguments.
     :raises ValueError: if broker is not an AsyncBroker instance.
+    :raises ValueError: if receiver is not a Receiver type.
     """
     if uvloop is not None:
         logger.debug("UVLOOP found. Installing policy.")
@@ -76,6 +91,9 @@ def start_listen(args: WorkerArgs) -> None:  # noqa: WPS213
     import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
     if not isinstance(broker, AsyncBroker):
         raise ValueError("Unknown broker type. Please use AsyncBroker instance.")
+
+    receiver_type = get_receiver_type(args)
+    receiver_args = dict(args.receiver_arg)
 
     # Here how we manage interruptions.
     # We have to remember shutting_down state,
@@ -105,14 +123,16 @@ def start_listen(args: WorkerArgs) -> None:  # noqa: WPS213
     signal.signal(signal.SIGTERM, interrupt_handler)
 
     loop = asyncio.get_event_loop()
+
     try:
         logger.debug("Initialize receiver.")
         with ThreadPoolExecutor(args.max_threadpool_threads) as pool:
-            receiver = Receiver(
+            receiver = receiver_type(
                 broker=broker,
                 executor=pool,
                 validate_params=not args.no_parse,
                 max_async_tasks=args.max_async_tasks,
+                **receiver_args,
             )
             loop.run_until_complete(receiver.listen())
     except KeyboardInterrupt:
