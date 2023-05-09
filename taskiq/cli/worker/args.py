@@ -1,8 +1,22 @@
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
-from dataclasses import dataclass
-from typing import List, Optional, Sequence
+from dataclasses import dataclass, field
+from typing import List, Optional, Sequence, Tuple
 
 from taskiq.cli.common_args import LogLevel
+
+
+def receiver_arg_type(string: str) -> Tuple[str, str]:
+    """
+    Parse cli --receiver_arg argument value.
+
+    :param string: cli argument value in format key=value.
+    :raises ValueError: if value not in format.
+    :return: (key, value) pair.
+    """
+    args = string.split("=", 1)
+    if len(args) != 2:
+        raise ValueError(f"Invalid value: {string}")
+    return args[0], args[1]
 
 
 @dataclass
@@ -25,6 +39,7 @@ class WorkerArgs:
     no_gitignore: bool = False
     max_async_tasks: int = 100
     receiver: str = "taskiq.receiver:Receiver"
+    receiver_arg: List[Tuple[str, str]] = field(default_factory=list)
 
     @classmethod
     def from_cli(  # noqa: WPS213
@@ -53,6 +68,17 @@ class WorkerArgs:
                 "Where to search for receiver. "
                 "This string must be specified in "
                 "'module.module:variable' format."
+            ),
+        )
+        parser.add_argument(
+            "--receiver_arg",
+            action="append",
+            type=receiver_arg_type,
+            default=[],
+            help=(
+                "List of args fot receiver. "
+                "This string must be specified in "
+                "`key=value` format."
             ),
         )
         parser.add_argument(
