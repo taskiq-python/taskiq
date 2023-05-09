@@ -93,17 +93,11 @@ class InMemoryBroker(AsyncBroker):
         sync_tasks_pool_size: int = 4,
         max_stored_results: int = 100,
         cast_types: bool = True,
-        result_backend: Optional[AsyncResultBackend[Any]] = None,
-        task_id_generator: Optional[Callable[[], str]] = None,
         max_async_tasks: int = 30,
     ) -> None:
-        if result_backend is None:
-            result_backend = InmemoryResultBackend(
-                max_stored_results=max_stored_results,
-            )
-        super().__init__(
-            result_backend=result_backend,
-            task_id_generator=task_id_generator,
+        super().__init__()
+        self.result_backend = InmemoryResultBackend(
+            max_stored_results=max_stored_results,
         )
         self.executor = ThreadPoolExecutor(sync_tasks_pool_size)
         self.receiver = Receiver(

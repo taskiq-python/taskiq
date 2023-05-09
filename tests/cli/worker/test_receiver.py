@@ -7,7 +7,6 @@ from taskiq_dependencies import Depends
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
-from taskiq.abc.result_backend import AsyncResultBackend
 from taskiq.brokers.inmemory_broker import InMemoryBroker
 from taskiq.message import TaskiqMessage
 from taskiq.receiver import Receiver
@@ -17,15 +16,8 @@ _T = TypeVar("_T")
 
 
 class BrokerForTests(InMemoryBroker):
-    def __init__(
-        self,
-        result_backend: "Optional[AsyncResultBackend[_T]]" = None,
-        task_id_generator: Optional[Callable[[], str]] = None,
-    ) -> None:
-        super().__init__(
-            result_backend=result_backend,
-            task_id_generator=task_id_generator,
-        )
+    def __init__(self) -> None:
+        super().__init__()
         self.to_send: "List[TaskiqMessage]" = []
 
     async def listen(self) -> AsyncGenerator[bytes, None]:
@@ -142,8 +134,7 @@ async def test_run_task_exception_middlewares() -> None:
     def test_func() -> None:
         raise ValueError()
 
-    broker = InMemoryBroker()
-    broker.add_middlewares(_TestMiddleware())
+    broker = InMemoryBroker().with_middlewares(_TestMiddleware())
     receiver = get_receiver(broker)
 
     result = await receiver.run_task(
