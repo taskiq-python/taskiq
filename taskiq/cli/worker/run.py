@@ -93,6 +93,7 @@ def start_listen(args: WorkerArgs) -> None:  # noqa: WPS210, WPS213
         raise ValueError("Unknown broker type. Please use AsyncBroker instance.")
 
     receiver_type = get_receiver_type(args)
+    receiver_args = dict(args.receiver_arg)
 
     # Here how we manage interruptions.
     # We have to remember shutting_down state,
@@ -131,6 +132,7 @@ def start_listen(args: WorkerArgs) -> None:  # noqa: WPS210, WPS213
                 executor=pool,
                 validate_params=not args.no_parse,
                 max_async_tasks=args.max_async_tasks,
+                **receiver_args,
             )
             loop.run_until_complete(receiver.listen())
     except KeyboardInterrupt:
