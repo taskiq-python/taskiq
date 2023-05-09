@@ -24,6 +24,7 @@ class WorkerArgs:
     reload: bool = False
     no_gitignore: bool = False
     max_async_tasks: int = 100
+    receiver: str = "taskiq.receiver:Receiver"
 
     @classmethod
     def from_cli(  # noqa: WPS213
@@ -41,6 +42,15 @@ class WorkerArgs:
             "broker",
             help=(
                 "Where to search for broker. "
+                "This string must be specified in "
+                "'module.module:variable' format."
+            ),
+        )
+        parser.add_argument(
+            "--receiver",
+            default="taskiq.receiver:Receiver",
+            help=(
+                "Where to search for receiver. "
                 "This string must be specified in "
                 "'module.module:variable' format."
             ),
