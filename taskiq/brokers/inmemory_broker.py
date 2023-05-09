@@ -2,7 +2,7 @@ import asyncio
 import inspect
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, AsyncGenerator, Callable, Optional, Set, TypeVar, get_type_hints
+from typing import Any, AsyncGenerator, Set, TypeVar, get_type_hints
 
 from taskiq_dependencies import DependencyGraph
 
@@ -88,7 +88,7 @@ class InMemoryBroker(AsyncBroker):
     It's useful for local development, if you don't want to setup real broker.
     """
 
-    def __init__(  # noqa: WPS211
+    def __init__(
         self,
         sync_tasks_pool_size: int = 4,
         max_stored_results: int = 100,

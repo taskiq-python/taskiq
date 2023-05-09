@@ -1,6 +1,6 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, AsyncGenerator, Callable, List, Optional, TypeVar
+from typing import Any, AsyncGenerator, List, Optional, TypeVar
 
 import pytest
 from taskiq_dependencies import Depends
