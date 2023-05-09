@@ -60,7 +60,7 @@ def get_receiver_type(args: WorkerArgs) -> Type[Receiver]:
     :return: Receiver type.
     """
     receiver_type = import_object(args.receiver)
-    if not issubclass(receiver_type, Receiver):
+    if not (isinstance(receiver_type, type) and issubclass(receiver_type, Receiver)):
         raise ValueError("Unknown receiver type. Please use Receiver class.")
     return receiver_type
 
