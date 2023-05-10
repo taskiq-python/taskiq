@@ -18,7 +18,7 @@ from taskiq.state import TaskiqState
 from taskiq.utils import maybe_awaitable
 
 logger = getLogger(__name__)
-QUEUE_DONE = object()
+QUEUE_DONE = b"-1"
 
 
 def _run_sync(target: Callable[..., Any], message: TaskiqMessage) -> Any:
