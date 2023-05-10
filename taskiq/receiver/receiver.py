@@ -3,8 +3,9 @@ import inspect
 from concurrent.futures import Executor
 from logging import getLogger
 from time import time
-from typing import Any, Callable, Dict, Optional, get_type_hints
+from typing import Any, Callable, Dict, Optional, Set, get_type_hints
 
+import anyio
 from taskiq_dependencies import DependencyGraph
 
 from taskiq.abc.broker import AsyncBroker
@@ -17,6 +18,7 @@ from taskiq.state import TaskiqState
 from taskiq.utils import maybe_awaitable
 
 logger = getLogger(__name__)
+QUEUE_DONE = b"-1"
 
 
 def _run_sync(target: Callable[..., Any], message: TaskiqMessage) -> Any:
@@ -36,12 +38,13 @@ def _run_sync(target: Callable[..., Any], message: TaskiqMessage) -> Any:
 class Receiver:
     """Class that uses as a callback handler."""
 
-    def __init__(
+    def __init__(  # noqa: WPS211
         self,
         broker: AsyncBroker,
         executor: Optional[Executor] = None,
         validate_params: bool = True,
         max_async_tasks: "Optional[int]" = None,
+        max_prefetch: int = 0,
     ) -> None:
         self.broker = broker
         self.executor = executor
@@ -61,6 +64,7 @@ class Receiver:
                 "Setting unlimited number of async tasks "
                 + "can result in undefined behavior",
             )
+        self.sem_prefetch = asyncio.Semaphore(max_prefetch)
 
     async def callback(  # noqa: C901, WPS213
         self,
@@ -239,7 +243,38 @@ class Receiver:
         """
         await self.broker.startup()
         logger.info("Listening started.")
-        tasks = set()
+        queue: asyncio.Queue[bytes] = asyncio.Queue()
+
+        async with anyio.create_task_group() as gr:
+            gr.start_soon(self.prefetcher, queue)
+            gr.start_soon(self.runner, queue)
+
+    async def prefetcher(self, queue: "asyncio.Queue[Any]") -> None:
+        """
+        Prefetch tasks data.
+
+        :param queue: queue for prefetched data.
+        """
+        iterator = self.broker.listen()
+
+        while True:
+            try:
+                await self.sem_prefetch.acquire()
+                message = await iterator.__anext__()  # noqa: WPS609
+                await queue.put(message)
+
+            except StopAsyncIteration:
+                break
+
+        await queue.put(QUEUE_DONE)
+
+    async def runner(self, queue: "asyncio.Queue[bytes]") -> None:
+        """
+        Run tasks.
+
+        :param queue: queue with prefetched data.
+        """
+        tasks: Set[asyncio.Task[Any]] = set()
 
         def task_cb(task: "asyncio.Task[Any]") -> None:
             """
@@ -255,11 +290,19 @@ class Receiver:
             if self.sem is not None:
                 self.sem.release()
 
-        async for message in self.broker.listen():
+        while True:
             # Waits for semaphore to be released.
             if self.sem is not None:
                 await self.sem.acquire()
-            task = asyncio.create_task(self.callback(message=message, raise_err=False))
+
+            self.sem_prefetch.release()
+            message = await queue.get()
+            if message is QUEUE_DONE:
+                break
+
+            task = asyncio.create_task(
+                self.callback(message=message, raise_err=False),
+            )
             tasks.add(task)
 
             # We want the task to remove itself from the set when it's done.
