@@ -234,7 +234,7 @@ class Receiver:
 
         return result
 
-    async def listen(self) -> None:  # pragma: no cover # noqa:
+    async def listen(self) -> None:  # pragma: no cover
         """
         This function iterates over tasks asynchronously.
 
@@ -243,50 +243,11 @@ class Receiver:
         """
         await self.broker.startup()
         logger.info("Listening started.")
-        tasks: Set[asyncio.Task[Any]] = set()
         queue: asyncio.Queue[bytes] = asyncio.Queue()
-
-        def task_cb(task: "asyncio.Task[Any]") -> None:
-            """
-            Callback for tasks.
-
-            This function used to remove task
-            from the list of active tasks and release
-            the semaphore, so other tasks can use it.
-
-            :param task: finished task
-            """
-            tasks.discard(task)
-            if self.sem is not None:
-                self.sem.release()
-
-        async def runner() -> None:
-            """Run tasks."""
-            while True:
-                # Waits for semaphore to be released.
-                if self.sem is not None:
-                    await self.sem.acquire()
-
-                self.sem_prefetch.release()
-                message = await queue.get()
-                if message is QUEUE_DONE:
-                    break
-
-                task = asyncio.create_task(
-                    self.callback(message=message, raise_err=False),
-                )
-                tasks.add(task)
-
-                # We want the task to remove itself from the set when it's done.
-                #
-                # Because python's GC can silently cancel task
-                # and it considered to be Hisenbug.
-                # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
-                task.add_done_callback(task_cb)
 
         async with anyio.create_task_group() as gr:
             gr.start_soon(self.prefetcher, queue)
-            gr.start_soon(runner, queue)
+            gr.start_soon(self.runner, queue)
 
     async def prefetcher(self, queue: "asyncio.Queue[Any]") -> None:
         """
@@ -306,3 +267,47 @@ class Receiver:
                 break
 
         await queue.put(QUEUE_DONE)
+
+    async def runner(self, queue: "asyncio.Queue[bytes]") -> None:
+        """
+        Run tasks.
+
+        :param queue: queue with prefetched data.
+        """
+        tasks: Set[asyncio.Task[Any]] = set()
+
+        def task_cb(task: "asyncio.Task[Any]") -> None:
+            """
+            Callback for tasks.
+
+            This function used to remove task
+            from the list of active tasks and release
+            the semaphore, so other tasks can use it.
+
+            :param task: finished task
+            """
+            tasks.discard(task)
+            if self.sem is not None:
+                self.sem.release()
+
+        while True:
+            # Waits for semaphore to be released.
+            if self.sem is not None:
+                await self.sem.acquire()
+
+            self.sem_prefetch.release()
+            message = await queue.get()
+            if message is QUEUE_DONE:
+                break
+
+            task = asyncio.create_task(
+                self.callback(message=message, raise_err=False),
+            )
+            tasks.add(task)
+
+            # We want the task to remove itself from the set when it's done.
+            #
+            # Because python's GC can silently cancel task
+            # and it considered to be Hisenbug.
+            # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
+            task.add_done_callback(task_cb)
