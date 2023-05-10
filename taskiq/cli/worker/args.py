@@ -40,6 +40,7 @@ class WorkerArgs:
     max_async_tasks: int = 100
     receiver: str = "taskiq.receiver:Receiver"
     receiver_arg: List[Tuple[str, str]] = field(default_factory=list)
+    max_prefetch: int = 0
 
     @classmethod
     def from_cli(  # noqa: WPS213
@@ -167,6 +168,13 @@ class WorkerArgs:
             dest="max_async_tasks",
             default=100,
             help="Maximum simultaneous async tasks per worker process. ",
+        )
+        parser.add_argument(
+            "--max-prefetch",
+            type=int,
+            dest="max_prefetch",
+            default=0,
+            help="Maximum prefetched tasks per worker process. ",
         )
 
         namespace = parser.parse_args(args)
