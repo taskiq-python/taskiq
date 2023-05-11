@@ -41,6 +41,7 @@ class WorkerArgs:
     receiver: str = "taskiq.receiver:Receiver"
     receiver_arg: List[Tuple[str, str]] = field(default_factory=list)
     max_prefetch: int = 0
+    max_idle_tasks: Optional[int] = None
 
     @classmethod
     def from_cli(  # noqa: WPS213
@@ -175,6 +176,13 @@ class WorkerArgs:
             dest="max_prefetch",
             default=0,
             help="Maximum prefetched tasks per worker process. ",
+        )
+        parser.add_argument(
+            "--max-idle-tasks",
+            type=int,
+            dest="max_idle_tasks",
+            default=None,
+            help="Maximum idle tasks per worker process. ",
         )
 
         namespace = parser.parse_args(args)

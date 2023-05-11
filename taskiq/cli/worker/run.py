@@ -133,6 +133,7 @@ def start_listen(args: WorkerArgs) -> None:  # noqa: WPS210, WPS213
                 validate_params=not args.no_parse,
                 max_async_tasks=args.max_async_tasks,
                 max_prefetch=args.max_prefetch,
+                max_idle_tasks=args.max_idle_tasks,
                 **receiver_args,
             )
             loop.run_until_complete(receiver.listen())

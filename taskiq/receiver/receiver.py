@@ -15,10 +15,11 @@ from taskiq.message import TaskiqMessage
 from taskiq.receiver.params_parser import parse_params
 from taskiq.result import TaskiqResult
 from taskiq.state import TaskiqState
-from taskiq.utils import maybe_awaitable
+from taskiq.utils import DequeQueue, DequeSemaphore, maybe_awaitable
 
 logger = getLogger(__name__)
 QUEUE_DONE = b"-1"
+QUEUE_SKIP = b"-2"
 
 
 def _run_sync(target: Callable[..., Any], message: TaskiqMessage) -> Any:
@@ -45,6 +46,7 @@ class Receiver:
         validate_params: bool = True,
         max_async_tasks: "Optional[int]" = None,
         max_prefetch: int = 0,
+        max_idle_tasks: Optional[int] = None,
     ) -> None:
         self.broker = broker
         self.executor = executor
@@ -56,15 +58,20 @@ class Receiver:
             self.task_signatures[task.task_name] = inspect.signature(task.original_func)
             self.task_hints[task.task_name] = get_type_hints(task.original_func)
             self.dependency_graphs[task.task_name] = DependencyGraph(task.original_func)
-        self.sem: "Optional[asyncio.Semaphore]" = None
+        self.sem: "Optional[DequeSemaphore]" = None
         if max_async_tasks is not None and max_async_tasks > 0:
-            self.sem = asyncio.Semaphore(max_async_tasks)
+            self.sem = DequeSemaphore(max_async_tasks)
         else:
             logger.warning(
                 "Setting unlimited number of async tasks "
                 + "can result in undefined behavior",
             )
-        self.sem_prefetch = asyncio.Semaphore(max_prefetch)
+        self.sem_prefetch = DequeSemaphore(max_prefetch)
+        self.queue: DequeQueue[bytes] = DequeQueue()
+
+        self.sem_idle: Optional[asyncio.Semaphore] = None
+        if max_idle_tasks and max_idle_tasks > 0:
+            self.sem_idle = asyncio.Semaphore(max_idle_tasks)
 
     async def callback(  # noqa: C901, WPS213
         self,
@@ -176,7 +183,7 @@ class Receiver:
             broker_ctx = self.broker.custom_dependency_context
             broker_ctx.update(
                 {
-                    Context: Context(message, self.broker),
+                    Context: Context(message, self.broker, self.task_idler),
                     TaskiqState: self.broker.state,
                 },
             )
@@ -243,11 +250,10 @@ class Receiver:
         """
         await self.broker.startup()
         logger.info("Listening started.")
-        queue: asyncio.Queue[bytes] = asyncio.Queue()
 
         async with anyio.create_task_group() as gr:
-            gr.start_soon(self.prefetcher, queue)
-            gr.start_soon(self.runner, queue)
+            gr.start_soon(self.prefetcher, self.queue)
+            gr.start_soon(self.runner, self.queue)
 
     async def prefetcher(self, queue: "asyncio.Queue[Any]") -> None:
         """
@@ -268,7 +274,7 @@ class Receiver:
 
         await queue.put(QUEUE_DONE)
 
-    async def runner(self, queue: "asyncio.Queue[bytes]") -> None:
+    async def runner(self, queue: "asyncio.Queue[bytes]") -> None:  # noqa: C901, WPS213
         """
         Run tasks.
 
@@ -299,6 +305,15 @@ class Receiver:
             message = await queue.get()
             if message is QUEUE_DONE:
                 break
+            if message is QUEUE_SKIP:
+                # Decrease max_prefetch
+                prefetch_dec = asyncio.create_task(self.sem_prefetch.acquire_first())
+                prefetch_dec.add_done_callback(tasks.discard)
+                tasks.add(prefetch_dec)
+
+                if self.sem is not None:
+                    self.sem.release()
+                continue
 
             task = asyncio.create_task(
                 self.callback(message=message, raise_err=False),
@@ -311,3 +326,32 @@ class Receiver:
             # and it considered to be Hisenbug.
             # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
             task.add_done_callback(task_cb)
+
+    async def task_idler(self, wait: float) -> None:
+        """
+        Temporary increasing `max_async_tasks` for at least `wait` amount of time.
+
+        :param wait: time
+        """
+        if not self.sem:
+            await asyncio.sleep(wait)
+            return
+
+        if not self.sem_idle:
+            logger.warning("`max_idle_tasks` is undefined. Idle is unavailable.")
+            await asyncio.sleep(wait)
+            return
+
+        start_time = time()
+        async with self.sem_idle:
+            # Increase max_tasks
+            # Increase max_prefetch in runner
+            self.sem.release()
+
+            # Wait
+            await asyncio.sleep(wait - (time() - start_time))
+
+            # Decrease max_prefetch in runner
+            await self.queue.put_first(QUEUE_SKIP)
+            # Decrease max_tasks
+            await self.sem.acquire_first()

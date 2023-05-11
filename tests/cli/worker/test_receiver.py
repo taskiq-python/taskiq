@@ -5,9 +5,12 @@ from typing import Any, AsyncGenerator, List, Optional, TypeVar
 import pytest
 from taskiq_dependencies import Depends
 
+from taskiq import Context
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.brokers.inmemory_broker import InMemoryBroker
+from taskiq.brokers.inmemory_queue_broker import InMemoryQueueBroker
+from taskiq.exceptions import TaskiqResultTimeoutError
 from taskiq.message import TaskiqMessage
 from taskiq.receiver import Receiver
 from taskiq.result import TaskiqResult
@@ -29,6 +32,7 @@ def get_receiver(
     broker: Optional[AsyncBroker] = None,
     no_parse: bool = False,
     max_async_tasks: Optional[int] = None,
+    max_idle_tasks: Optional[int] = None,
 ) -> Receiver:
     """
     Returns receiver with custom broker and args.
@@ -45,6 +49,7 @@ def get_receiver(
         executor=ThreadPoolExecutor(max_workers=10),
         validate_params=not no_parse,
         max_async_tasks=max_async_tasks,
+        max_idle_tasks=max_idle_tasks,
     )
 
 
@@ -284,3 +289,62 @@ async def test_callback_semaphore() -> None:
     assert sem_num == max_async_tasks
     await listen_task
     assert sem_num == max_async_tasks + 2
+
+
+@pytest.mark.anyio
+async def test_tasks_chain_without_idler() -> None:
+    """"""
+    broker = InMemoryQueueBroker()
+
+    @broker.task
+    async def task_add_one(val: int) -> int:
+        return val + 1
+
+    @broker.task
+    async def task_map(vals: List[int]) -> List[int]:
+        tasks = [await task_add_one.kiq(val) for val in vals]
+        resps_tasks = [asyncio.create_task(t.wait_result(timeout=1)) for t in tasks]
+        resps = await asyncio.gather(*resps_tasks)
+
+        return [r.return_value for r in resps]
+
+    await broker.startup()
+    receiver = get_receiver(broker, max_async_tasks=1)
+    listen_task = asyncio.create_task(receiver.listen())
+
+    task = await task_map.kiq(list(range(0, 10)))
+    with pytest.raises(TaskiqResultTimeoutError):
+        await task.wait_result(timeout=1)
+
+    await broker.shutdown()
+    await listen_task
+
+
+@pytest.mark.anyio
+async def test_tasks_chain_with_idler() -> None:
+    """"""
+    broker = InMemoryQueueBroker()
+
+    @broker.task
+    async def task_add_one(val: int) -> int:
+        return val + 1
+
+    @broker.task
+    async def task_map(vals: List[int], ctx: Context = Depends()) -> List[int]:
+        tasks = [await task_add_one.kiq(val) for val in vals]
+        await ctx.task_idler(0.1)
+        resps_tasks = [asyncio.create_task(t.wait_result(timeout=1)) for t in tasks]
+        resps = await asyncio.gather(*resps_tasks)
+        res = [r.return_value for r in resps]
+        return res
+
+    await broker.startup()
+    receiver = get_receiver(broker, max_async_tasks=1, max_idle_tasks=1)
+    listen_task = asyncio.create_task(receiver.listen())
+
+    task = await task_map.kiq(list(range(0, 10)))
+    resp = await task.wait_result(timeout=1)
+    assert resp.return_value == list(range(1, 11))
+
+    await broker.shutdown()
+    await listen_task
