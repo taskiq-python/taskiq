@@ -2,8 +2,6 @@ import asyncio
 import inspect
 from typing import TYPE_CHECKING, Any, Coroutine, Deque, Generic, TypeVar, Union
 
-from typing_extensions import Literal
-
 _T = TypeVar("_T")  # noqa: WPS111
 
 
@@ -38,37 +36,6 @@ def remove_suffix(text: str, suffix: str) -> str:
     if text.endswith(suffix):
         return text[: -len(suffix)]
     return text
-
-
-class DequeSemaphore(asyncio.Semaphore):
-    """Deque based Semaphore."""
-
-    if TYPE_CHECKING:  # noqa: WPS604
-        _loop: asyncio.BaseEventLoop
-
-    async def acquire_first(self) -> Literal[True]:
-        """
-        Acquire as soon as possible. LIFO style.
-
-        :raises BaseException: exception
-        :return: true
-        """
-        self._value -= 1
-
-        while self._value < 0:
-            fut: asyncio.Future[Any] = self._loop.create_future()
-            self._waiters.appendleft(fut)
-            try:
-                await fut
-            except BaseException:  # noqa: WPS424
-                self._value += 1
-
-                fut.cancel()
-                if not self.locked() and not fut.cancelled():
-                    self._wake_up_next()
-                raise
-
-        return True
 
 
 class DequeQueue(

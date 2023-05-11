@@ -14,8 +14,9 @@ from taskiq.context import Context
 from taskiq.message import TaskiqMessage
 from taskiq.receiver.params_parser import parse_params
 from taskiq.result import TaskiqResult
+from taskiq.semaphore import DequeSemaphore
 from taskiq.state import TaskiqState
-from taskiq.utils import DequeQueue, DequeSemaphore, maybe_awaitable
+from taskiq.utils import DequeQueue, maybe_awaitable
 
 logger = getLogger(__name__)
 QUEUE_DONE = b"-1"
