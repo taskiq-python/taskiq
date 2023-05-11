@@ -332,7 +332,7 @@ async def test_tasks_chain_with_idler() -> None:
     @broker.task
     async def task_map(vals: List[int], ctx: Context = Depends()) -> List[int]:
         tasks = [await task_add_one.kiq(val) for val in vals]
-        await ctx.task_idler(0.1)
+        await ctx.task_idler(0.5)
         resps_tasks = [asyncio.create_task(t.wait_result(timeout=1)) for t in tasks]
         resps = await asyncio.gather(*resps_tasks)
         res = [r.return_value for r in resps]

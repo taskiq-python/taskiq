@@ -351,9 +351,10 @@ class Receiver:
             self.sem.release()
 
             # Wait
-            await asyncio.sleep(wait - (time() - start_time))
+            await asyncio.sleep(max(wait - (time() - start_time), 0))
 
             # Decrease max_prefetch in runner
-            await self.queue.put_first(QUEUE_SKIP)
+            task = asyncio.create_task(self.queue.put_first(QUEUE_SKIP))
             # Decrease max_tasks
             await self.sem.acquire_first()
+            await task
