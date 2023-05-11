@@ -1,6 +1,8 @@
 import asyncio
 import sys
-from typing import TYPE_CHECKING, Any, Deque, Literal
+from typing import TYPE_CHECKING, Any, Deque
+
+from typing_extensions import Literal
 
 
 class DequeSemaphore(asyncio.Semaphore):
