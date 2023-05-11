@@ -70,7 +70,9 @@ class Receiver:
         self.queue: DequeQueue[bytes] = DequeQueue()
 
         self.sem_idle: Optional[asyncio.Semaphore] = None
-        if max_idle_tasks and max_idle_tasks > 0:
+        if max_idle_tasks is not None and max_idle_tasks <= 0:
+            raise ValueError("`max_idle_tasks` should be greater then zero or None.")
+        if max_idle_tasks is not None and max_idle_tasks > 0:
             self.sem_idle = asyncio.Semaphore(max_idle_tasks)
 
     async def callback(  # noqa: C901, WPS213
