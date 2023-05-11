@@ -6,7 +6,11 @@ from typing_extensions import Literal
 
 
 class DequeSemaphore:
-    """Custom deque based semaphore."""
+    """
+    Custom deque based semaphore.
+
+    https://neopythonic.blogspot.com/2022/10/reasoning-about-asynciosemaphore.html
+    """
 
     def __init__(self, value: int) -> None:
         self._value = value
@@ -27,7 +31,9 @@ class DequeSemaphore:
 
         :returns: true or false
         """
-        return self._value == 0
+        return self._value == 0 or (
+            any(not waiter.cancelled() for waiter in (self._waiters or ()))
+        )
 
     def release(self) -> None:
         """Release a semaphore, incrementing the internal counter by one.
@@ -46,7 +52,7 @@ class DequeSemaphore:
         :raises asyncio.exceptions.CancelledError: task cancelled
         :returns: true
         """
-        if not self.locked() and not self._waiters:
+        if not self.locked():
             # No need to wait as the semaphore is not locked
             # and no one is waiting
             self._value -= 1
@@ -72,7 +78,7 @@ class DequeSemaphore:
                 self._wakeup_next()
             raise
 
-        if not self.locked():
+        if self._value > 0:
             # This is required for strict FIFO ordering
             # otherwise it can cause starvation on the waiting tasks
             # The next loop iteration will wake up the task and switch
