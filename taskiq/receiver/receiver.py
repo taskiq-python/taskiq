@@ -330,7 +330,7 @@ class Receiver:
             # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
             task.add_done_callback(task_cb)
 
-    async def task_idler(self, wait: float) -> None:
+    async def task_idler(self, wait: float) -> None:  # noqa: WPS213, WPS217
         """
         Temporary increasing `max_async_tasks` for at least `wait` amount of time.
 
@@ -346,7 +346,13 @@ class Receiver:
             return
 
         start_time = time()
-        async with self.sem_idle:
+        with anyio.move_on_after(wait) as scope:
+            await self.sem_idle.acquire()
+
+        if scope.cancel_called:  # noqa: WPS441
+            return
+
+        try:  # noqa: WPS501
             # Increase max_tasks
             # Increase max_prefetch in runner
             self.sem.release()
@@ -357,6 +363,8 @@ class Receiver:
             # Decrease max_prefetch in runner
             task = asyncio.create_task(self.queue.put_first(QUEUE_SKIP))
             # Decrease max_tasks
-
             await self.sem.acquire_first()
             await task
+
+        finally:
+            self.sem_idle.release()

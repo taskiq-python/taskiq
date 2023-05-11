@@ -2,6 +2,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, AsyncGenerator, List, Optional, TypeVar
 
+import anyio
 import pytest
 from taskiq_dependencies import Depends
 
@@ -385,6 +386,33 @@ async def test_tasks_chain_deep() -> None:
     task = await task_run.kiq(10, "hello world!")
     resp = await task.wait_result(timeout=1)
     assert resp.return_value == "hello world!"
+
+    await broker.shutdown()
+    await listen_task
+
+
+@pytest.mark.anyio
+async def test_tasks_sleep() -> None:
+    """"""
+    broker = InMemoryQueueBroker()
+
+    @broker.task
+    async def task_run(ind: int, ctx: Context = Depends()) -> int:
+        await ctx.task_idler(0.1)
+        return ind
+
+    receiver = get_receiver(broker, max_async_tasks=1, max_idle_tasks=20)
+    listen_task = asyncio.create_task(receiver.listen())
+
+    with anyio.fail_after(1):
+        tasks_tasks = [asyncio.create_task(task_run.kiq(ind)) for ind in range(100)]
+        tasks = await asyncio.gather(*tasks_tasks)
+        resps_tasks = [
+            asyncio.create_task(task.wait_result(timeout=1)) for task in tasks
+        ]
+        resps = await asyncio.gather(*resps_tasks)
+        value = [resp.return_value for resp in resps]
+        assert value == list(range(100))
 
     await broker.shutdown()
     await listen_task
