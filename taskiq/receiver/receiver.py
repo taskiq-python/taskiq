@@ -14,6 +14,7 @@ from taskiq.context import Context
 from taskiq.message import TaskiqMessage
 from taskiq.receiver.params_parser import parse_params
 from taskiq.result import TaskiqResult
+from taskiq.semaphore import DequeSemaphore
 from taskiq.state import TaskiqState
 from taskiq.utils import DequeQueue, maybe_awaitable
 
@@ -58,15 +59,15 @@ class Receiver:
             self.task_signatures[task.task_name] = inspect.signature(task.original_func)
             self.task_hints[task.task_name] = get_type_hints(task.original_func)
             self.dependency_graphs[task.task_name] = DependencyGraph(task.original_func)
-        self.sem: "Optional[asyncio.Semaphore]" = None
+        self.sem: "Optional[DequeSemaphore]" = None
         if max_async_tasks is not None and max_async_tasks > 0:
-            self.sem = asyncio.Semaphore(max_async_tasks)
+            self.sem = DequeSemaphore(max_async_tasks)
         else:
             logger.warning(
                 "Setting unlimited number of async tasks "
                 + "can result in undefined behavior",
             )
-        self.sem_prefetch = asyncio.Semaphore(max_prefetch)
+        self.sem_prefetch = DequeSemaphore(max_prefetch)
         self.queue: DequeQueue[bytes] = DequeQueue()
 
         self.sem_idle: Optional[asyncio.Semaphore] = None
@@ -309,7 +310,7 @@ class Receiver:
                 break
             if message is QUEUE_SKIP:
                 # Decrease max_prefetch
-                prefetch_dec = asyncio.create_task(self.sem_prefetch.acquire())
+                prefetch_dec = asyncio.create_task(self.sem_prefetch.acquire_first())
                 prefetch_dec.add_done_callback(tasks.discard)
                 tasks.add(prefetch_dec)
 
@@ -356,5 +357,5 @@ class Receiver:
             # Decrease max_prefetch in runner
             task = asyncio.create_task(self.queue.put_first(QUEUE_SKIP))
             # Decrease max_tasks
-            await self.sem.acquire()
+            await self.sem.acquire_first()
             await task
