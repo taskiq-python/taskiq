@@ -308,7 +308,6 @@ async def test_tasks_chain_without_idler() -> None:
 
         return [r.return_value for r in resps]
 
-    await broker.startup()
     receiver = get_receiver(broker, max_async_tasks=1)
     listen_task = asyncio.create_task(receiver.listen())
 
@@ -338,7 +337,6 @@ async def test_tasks_chain_with_idler() -> None:
         res = [r.return_value for r in resps]
         return res
 
-    await broker.startup()
     receiver = get_receiver(broker, max_async_tasks=1, max_idle_tasks=1)
     listen_task = asyncio.create_task(receiver.listen())
 
