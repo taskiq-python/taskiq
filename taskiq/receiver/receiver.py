@@ -357,5 +357,6 @@ class Receiver:
             # Decrease max_prefetch in runner
             task = asyncio.create_task(self.queue.put_first(QUEUE_SKIP))
             # Decrease max_tasks
+
             await self.sem.acquire_first()
             await task

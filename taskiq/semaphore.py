@@ -15,6 +15,7 @@ class DequeSemaphore:
     def __init__(self, value: int) -> None:
         self._value = value
         self._waiters: Deque[asyncio.Future[Any]] = collections.deque()
+        self._waiters_first: Deque[asyncio.Future[Any]] = collections.deque()
 
         if self._value < 0:
             raise ValueError("Value should be >= 0")
@@ -31,8 +32,10 @@ class DequeSemaphore:
 
         :returns: true or false
         """
-        return self._value == 0 or (
-            any(not waiter.cancelled() for waiter in (self._waiters or ()))
+        return (
+            self._value == 0
+            or any(not waiter.cancelled() for waiter in (self._waiters or ()))
+            or any(not waiter.cancelled() for waiter in (self._waiters_first or ()))
         )
 
     def release(self) -> None:
@@ -62,7 +65,7 @@ class DequeSemaphore:
         fut: asyncio.Future[Any] = asyncio.Future()
 
         if first:
-            self._waiters.appendleft(fut)
+            self._waiters_first.append(fut)
         else:
             self._waiters.append(fut)
 
@@ -70,7 +73,10 @@ class DequeSemaphore:
             try:  # noqa: WPS501, WPS505
                 await fut
             finally:
-                self._waiters.remove(fut)
+                if first:
+                    self._waiters_first.remove(fut)
+                else:
+                    self._waiters.remove(fut)
 
         except asyncio.exceptions.CancelledError:
             if not fut.cancelled():
@@ -95,8 +101,14 @@ class DequeSemaphore:
         return await self.acquire(True)
 
     def _wakeup_next(self) -> None:
-        if not self._waiters:
+        if not self._waiters and not self._waiters_first:
             return
+
+        for fut in self._waiters_first:
+            if not fut.done():
+                self._value -= 1
+                fut.set_result(True)
+                return
 
         for fut in self._waiters:
             if not fut.done():

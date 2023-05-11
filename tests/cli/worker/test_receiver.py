@@ -14,6 +14,7 @@ from taskiq.exceptions import TaskiqResultTimeoutError
 from taskiq.message import TaskiqMessage
 from taskiq.receiver import Receiver
 from taskiq.result import TaskiqResult
+from taskiq.task import AsyncTaskiqTask
 
 _T = TypeVar("_T")
 
@@ -343,6 +344,47 @@ async def test_tasks_chain_with_idler() -> None:
     task = await task_map.kiq(list(range(0, 10)))
     resp = await task.wait_result(timeout=1)
     assert resp.return_value == list(range(1, 11))
+
+    await broker.shutdown()
+    await listen_task
+
+
+@pytest.mark.anyio
+async def test_tasks_chain_deep() -> None:
+    """"""
+    broker = InMemoryQueueBroker()
+
+    @broker.task
+    async def task_run(depth: int, val: Any, ctx: Context = Depends()) -> Any:
+        if depth == 0:
+            return val
+
+        t = await task_run.kiq(depth - 1, val)
+        resp = await wait_for_task(t, interval=0.05, ctx=ctx)
+        return resp.return_value
+
+    async def wait_for_task(
+        task: AsyncTaskiqTask[Any],
+        interval: float,
+        ctx: Context,
+    ) -> TaskiqResult[Any]:
+        while True:
+            resp_task = asyncio.create_task(
+                task.wait_result(interval * 0.4, timeout=interval),
+            )
+            await ctx.task_idler(interval)
+
+            try:
+                return await resp_task
+            except TaskiqResultTimeoutError:
+                continue
+
+    receiver = get_receiver(broker, max_async_tasks=1, max_idle_tasks=10)
+    listen_task = asyncio.create_task(receiver.listen())
+
+    task = await task_run.kiq(10, "hello world!")
+    resp = await task.wait_result(timeout=1)
+    assert resp.return_value == "hello world!"
 
     await broker.shutdown()
     await listen_task
