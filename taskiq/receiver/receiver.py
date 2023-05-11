@@ -307,6 +307,8 @@ class Receiver:
             self.sem_prefetch.release()
             message = await queue.get()
             if message is QUEUE_DONE:
+                if self.sem is not None:
+                    self.sem.release()
                 break
             if message is QUEUE_SKIP:
                 # Decrease max_prefetch

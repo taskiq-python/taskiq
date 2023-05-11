@@ -349,6 +349,9 @@ async def test_tasks_chain_with_idler() -> None:
     await broker.shutdown()
     await listen_task
 
+    assert receiver.sem_idle._value == 1  # type: ignore
+    assert receiver.sem._value == 1  # type: ignore
+
 
 @pytest.mark.anyio
 async def test_tasks_chain_deep() -> None:
@@ -390,6 +393,9 @@ async def test_tasks_chain_deep() -> None:
     await broker.shutdown()
     await listen_task
 
+    assert receiver.sem_idle._value == 10  # type: ignore
+    assert receiver.sem._value == 1  # type: ignore
+
 
 @pytest.mark.anyio
 async def test_tasks_sleep() -> None:
@@ -416,3 +422,6 @@ async def test_tasks_sleep() -> None:
 
     await broker.shutdown()
     await listen_task
+
+    assert receiver.sem_idle._value == 20  # type: ignore
+    assert receiver.sem._value == 1  # type: ignore
