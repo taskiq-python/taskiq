@@ -34,5 +34,5 @@ async def test_semaphore() -> None:
     sem.release()
     t2.cancel()
 
-    async with anyio.maybe_async_cm(anyio.move_on_after(1)):
+    with anyio.fail_after(1):
         await asyncio.gather(t1, t2, t3, return_exceptions=True)
