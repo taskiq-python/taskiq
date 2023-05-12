@@ -2,7 +2,7 @@ import asyncio
 import inspect
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, AsyncGenerator, Set, TypeVar, get_type_hints
+from typing import Any, AsyncGenerator, Optional, Set, TypeVar, get_type_hints
 
 from taskiq_dependencies import DependencyGraph
 from typing_extensions import TypeAlias

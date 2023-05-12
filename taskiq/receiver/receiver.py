@@ -138,7 +138,7 @@ class Receiver:
             if raise_err:
                 raise exc
 
-    async def run_task(  # noqa: C901, WPS210
+    async def run_task(  # noqa: C901, WPS210, WPS217
         self,
         target: Callable[..., Any],
         message: TaskiqMessage,
@@ -201,6 +201,9 @@ class Receiver:
                     target,
                     message,
                 )
+
+            while asyncio.iscoroutine(returned):
+                returned = await returned
         except Exception as exc:
             found_exception = exc
             logger.error(
