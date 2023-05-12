@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from time import time
 from typing import TYPE_CHECKING, Any, Coroutine, Generic, Optional, Union
 
-from typing_extensions import TypeAlias, TypeVar
+from typing_extensions import TypeVar
 
 from taskiq.exceptions import (
     ResultGetError,
@@ -17,10 +17,6 @@ if TYPE_CHECKING:  # pragma: no cover
     from taskiq.result import TaskiqResult
 
 _ReturnType = TypeVar("_ReturnType")
-
-# TODO: PEP 696
-# _ProgressType = TypeVar("_ProgressType", default=Any) # noqa: E800
-_ProgressType: TypeAlias = Any
 
 
 class _Task(ABC, Generic[_ReturnType]):
@@ -76,8 +72,8 @@ class _Task(ABC, Generic[_ReturnType]):
     def get_progress(
         self,
     ) -> Union[
-        "Optional[TaskProgress[_ProgressType]]",
-        Coroutine[Any, Any, "Optional[TaskProgress[_ProgressType]]"],
+        "Optional[TaskProgress[Any]]",
+        Coroutine[Any, Any, "Optional[TaskProgress[Any]]"],
     ]:
         """
         Get task progress.
@@ -158,7 +154,7 @@ class AsyncTaskiqTask(_Task[_ReturnType]):
                 raise TaskiqResultTimeoutError()
         return await self.get_result(with_logs=with_logs)
 
-    async def get_progress(self) -> "Optional[TaskProgress[_ProgressType]]":
+    async def get_progress(self) -> "Optional[TaskProgress[Any]]":
         """
         Get task progress.
 
