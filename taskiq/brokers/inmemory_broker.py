@@ -104,7 +104,10 @@ class InmemoryResultBackend(AsyncResultBackend[_ReturnType]):
 
         self.progress[task_id] = progress
 
-    async def get_progress(self, task_id: str) -> Optional[TaskProgress[_ProgressType]]:
+    async def get_progress(
+        self,
+        task_id: str,
+    ) -> "Optional[TaskProgress[_ProgressType]]":
         """
         Get progress of task execution.
 
