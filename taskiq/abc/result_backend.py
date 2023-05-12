@@ -1,9 +1,19 @@
 from abc import ABC, abstractmethod
-from typing import Any, Generic, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Optional, TypeVar
+
+from typing_extensions import TypeAlias
 
 from taskiq.result import TaskiqResult
 
+if TYPE_CHECKING:  # pragma: no cover
+    from taskiq.depends.progress_tracker import TaskProgress
+
+
 _ReturnType = TypeVar("_ReturnType")
+
+# TODO: PEP 696
+# _ProgressType = TypeVar("_ProgressType", default=Any) # noqa: E800
+_ProgressType: TypeAlias = Any
 
 
 class AsyncResultBackend(ABC, Generic[_ReturnType]):
@@ -51,7 +61,11 @@ class AsyncResultBackend(ABC, Generic[_ReturnType]):
         :return: task's return value.
         """
 
-    async def set_progress(self, task_id: str, progress: Any) -> None:
+    async def set_progress(
+        self,
+        task_id: str,
+        progress: "TaskProgress[_ProgressType]",
+    ) -> None:
         """
         Saves progress.
 
@@ -59,7 +73,10 @@ class AsyncResultBackend(ABC, Generic[_ReturnType]):
         :param progress: progress of execution.
         """
 
-    async def get_progress(self, task_id: str) -> Optional[Any]:
+    async def get_progress(
+        self,
+        task_id: str,
+    ) -> "Optional[TaskProgress[_ProgressType]]":
         """
         Gets progress.
 

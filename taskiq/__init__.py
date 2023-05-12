@@ -10,6 +10,7 @@ from taskiq.brokers.inmemory_broker import InMemoryBroker
 from taskiq.brokers.shared_broker import async_shared_broker
 from taskiq.brokers.zmq_broker import ZeroMQBroker
 from taskiq.context import Context
+from taskiq.depends.progress_tracker import ProgressTracker, TaskProgress, TaskState
 from taskiq.events import TaskiqEvents
 from taskiq.exceptions import TaskiqError
 from taskiq.funcs import gather
@@ -45,4 +46,7 @@ __all__ = [
     "AsyncTaskiqDecoratedTask",
     "SimpleRetryMiddleware",
     "PrometheusMiddleware",
+    "ProgressTracker",
+    "TaskProgress",
+    "TaskState",
 ]

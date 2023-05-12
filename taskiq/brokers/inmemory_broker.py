@@ -5,9 +5,11 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, AsyncGenerator, Callable, Optional, Set, TypeVar, get_type_hints
 
 from taskiq_dependencies import DependencyGraph
+from typing_extensions import TypeAlias
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.result_backend import AsyncResultBackend, TaskiqResult
+from taskiq.depends.progress_tracker import TaskProgress
 from taskiq.events import TaskiqEvents
 from taskiq.exceptions import TaskiqError
 from taskiq.message import BrokerMessage
@@ -15,6 +17,10 @@ from taskiq.receiver import Receiver
 from taskiq.utils import maybe_awaitable
 
 _ReturnType = TypeVar("_ReturnType")
+
+# TODO: PEP696
+# _ProgressType = TypeVar('_ProgressType', default=Any) # noqa: E800
+_ProgressType: TypeAlias = Any
 
 
 class InmemoryResultBackend(AsyncResultBackend[_ReturnType]):
@@ -30,6 +36,7 @@ class InmemoryResultBackend(AsyncResultBackend[_ReturnType]):
     def __init__(self, max_stored_results: int = 100) -> None:
         self.max_stored_results = max_stored_results
         self.results: OrderedDict[str, TaskiqResult[_ReturnType]] = OrderedDict()
+        self.progress: OrderedDict[str, TaskProgress[_ProgressType]] = OrderedDict()
 
     async def set_result(self, task_id: str, result: TaskiqResult[_ReturnType]) -> None:
         """
@@ -79,6 +86,32 @@ class InmemoryResultBackend(AsyncResultBackend[_ReturnType]):
         :return: result of a task execution.
         """
         return self.results[task_id]
+
+    async def set_progress(
+        self,
+        task_id: str,
+        progress: TaskProgress[_ProgressType],
+    ) -> None:
+        """
+        Set progress of task exection.
+
+        :param task_id: task id
+        :param progress: task execution progress
+        """
+        if self.max_stored_results != -1:
+            if len(self.progress) >= self.max_stored_results:
+                self.progress.popitem(last=False)
+
+        self.progress[task_id] = progress
+
+    async def get_progress(self, task_id: str) -> Optional[TaskProgress[_ProgressType]]:
+        """
+        Get progress of task execution.
+
+        :param task_id: task id
+        :return: progress or None
+        """
+        return self.progress.get(task_id)
 
 
 class InMemoryBroker(AsyncBroker):

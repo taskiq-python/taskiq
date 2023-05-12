@@ -1537,14 +1537,14 @@ pbr = ">=2.0.0,<2.1.0 || >2.1.0"
 
 [[package]]
 name = "taskiq-dependencies"
-version = "1.2.2"
+version = "1.2.3"
 description = "FastAPI like dependency injection implementation"
 category = "main"
 optional = false
 python-versions = ">=3.7,<4.0"
 files = [
-    {file = "taskiq_dependencies-1.2.2-py3-none-any.whl", hash = "sha256:52606fdccbf0ca8faee07e502637d7ae0c3fd179ac38f09e9a279ccf912a3ea1"},
-    {file = "taskiq_dependencies-1.2.2.tar.gz", hash = "sha256:c5bdfff285490cf0c02908de40d58b3704de333be372400d60a2ed117894119c"},
+    {file = "taskiq_dependencies-1.2.3-py3-none-any.whl", hash = "sha256:504792d7e505f0db7b4a0b57c20d5b6fd6f1598103eb2c5b8cbbb4d07e0c1f29"},
+    {file = "taskiq_dependencies-1.2.3.tar.gz", hash = "sha256:22157aa538c3650ebdc8bdbc4618047d9bf7c29ce8697d7151def79e834ac2d1"},
 ]
 
 [package.dependencies]

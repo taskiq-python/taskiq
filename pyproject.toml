@@ -31,7 +31,7 @@ typing-extensions = ">=3.10.0.0"
 pydantic = "^1.6.2"
 importlib-metadata = "*"
 pycron = "^3.0.0"
-taskiq_dependencies = "^1"
+taskiq_dependencies = "^1.2.3"
 # For prometheus metrics
 prometheus_client = { version = "^0", optional = true }
 # For ZMQBroker
