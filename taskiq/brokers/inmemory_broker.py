@@ -2,16 +2,7 @@ import asyncio
 import inspect
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
-from typing import (
-    Any,
-    AsyncGenerator,
-    Callable,
-    Optional,
-    Set,
-    TypeVar,
-    Union,
-    get_type_hints,
-)
+from typing import Any, AsyncGenerator, Callable, Optional, Set, TypeVar, get_type_hints
 
 from taskiq_dependencies import DependencyGraph
 from typing_extensions import TypeAlias
@@ -116,7 +107,7 @@ class InmemoryResultBackend(AsyncResultBackend[_ReturnType]):
     async def get_progress(
         self,
         task_id: str,
-    ) -> Union[TaskProgress[_ProgressType], None]:
+    ) -> Optional[TaskProgress[_ProgressType]]:
         """
         Get progress of task execution.
 
