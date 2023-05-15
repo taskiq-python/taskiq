@@ -108,7 +108,7 @@ def get_signal_handler(
     action_queue: "Queue[ProcessActionBase]",
 ) -> Callable[[int, Any], None]:
     """
-    Generate singnal handler for main process.
+    Generate signal handler for main process.
 
     The signal handler will just put the SHUTDOWN event in
     the action queue.

@@ -72,7 +72,7 @@ async def test_run_task_successfull_async() -> None:
 
 
 @pytest.mark.anyio
-async def test_run_task_successfull_sync() -> None:
+async def test_run_task_successful_sync() -> None:
     """Tests that run_task can run sync tasks."""
 
     def test_func(param: int) -> int:
@@ -155,7 +155,7 @@ async def test_run_task_exception_middlewares() -> None:
 
 @pytest.mark.anyio
 async def test_callback_success() -> None:
-    """Test that callback funcion works well."""
+    """Test that callback function works well."""
     broker = InMemoryBroker()
     called_times = 0
 
@@ -252,7 +252,7 @@ async def test_custom_ctx() -> None:
 
 @pytest.mark.anyio
 async def test_callback_semaphore() -> None:
-    """Test that callback funcion semaphore works well."""
+    """Test that callback function semaphore works well."""
     max_async_tasks = 3
     broker = BrokerForTests()
     sem_num = 0

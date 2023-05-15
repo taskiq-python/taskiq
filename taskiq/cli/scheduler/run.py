@@ -20,7 +20,7 @@ async def schedules_updater(
     """
     Periodic update to schedules.
 
-    This task preiodicaly checks for new schedules,
+    This task periodically checks for new schedules,
     assembles the final list and replaces current
     schedule with a new one.
 

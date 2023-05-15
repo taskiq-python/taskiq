@@ -78,7 +78,7 @@ class Receiver:
         that came from brokers.
 
         :raises Exception: if raise_err is true,
-            and excpetion were found while saving result.
+            and exception were found while saving result.
         :param message: received message.
         :param raise_err: raise an error if cannot save result in
             result_backend.

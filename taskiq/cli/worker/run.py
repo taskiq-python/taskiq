@@ -28,13 +28,13 @@ async def shutdown_broker(broker: AsyncBroker, timeout: float) -> None:
     """
     This function used to shutdown broker.
 
-    Broker can throw erorrs during shutdown,
+    Broker can throw errors during shutdown,
     or it may return some value.
 
     We need to handle such situations.
 
     :param broker: current broker.
-    :param timeout: maximum amout of time to shutdown the broker.
+    :param timeout: maximum amount of time to shutdown the broker.
     """
     logger.warning("Shutting down the broker.")
     try:
@@ -70,7 +70,7 @@ def start_listen(args: WorkerArgs) -> None:  # noqa: WPS210, WPS213
     This function starts actual listening process.
 
     It imports broker and all tasks.
-    Since tasks registers themselfs in a global set,
+    Since tasks registers themselves in a global set,
     it's easy to just import module where you have decorated
     function and they will be available in broker's `available_tasks`
     field.
@@ -110,7 +110,7 @@ def start_listen(args: WorkerArgs) -> None:  # noqa: WPS210, WPS213
 
         :param signum: received signal number.
         :param _frame: current execution frame.
-        :raises KeyboardInterrupt: if termiation hasn't begun.
+        :raises KeyboardInterrupt: if termination hasn't begun.
         """
         logger.debug(f"Got signal {signum}.")
         nonlocal shutting_down  # noqa: WPS420
@@ -169,7 +169,7 @@ def run_worker(args: WorkerArgs) -> None:  # noqa: WPS213
         observer.start()
         args.workers = 1
         logging.warning(
-            "Reload on chage enabled. Number of worker processes set to 1.",
+            "Reload on change enabled. Number of worker processes set to 1.",
         )
 
     manager = ProcessManager(args=args, observer=observer, worker_function=start_listen)

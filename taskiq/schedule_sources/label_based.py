@@ -19,7 +19,7 @@ class LabelScheduleSource(ScheduleSource):
         tasks available to the broker.
 
         If task has a schedule label,
-        it will be parsed and retuned.
+        it will be parsed and returned.
 
         :return: list of schedules.
         """

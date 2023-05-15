@@ -18,7 +18,7 @@ def broker() -> AsyncMock:
 
 
 @pytest.mark.anyio
-async def test_successfull_retry(broker: AsyncMock) -> None:
+async def test_successful_retry(broker: AsyncMock) -> None:
     middleware = SimpleRetryMiddleware()
     middleware.set_broker(broker)
     await middleware.on_error(

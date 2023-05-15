@@ -9,7 +9,7 @@ class TaskiqMessage(BaseModel):
 
     This an internal class used
     by brokers. Every remote call
-    recieve such messages.
+    receive such messages.
     """
 
     task_id: str

@@ -4,7 +4,7 @@ order: 9
 
 # Testing with taskiq
 
-Everytime we write programs, we want them to be correct. To achieve this, we use tests.
+Every time we write programs, we want them to be correct. To achieve this, we use tests.
 Taskiq allows you to write tests easily as if tasks were normal functions.
 
 Let's dive into examples.
@@ -76,7 +76,7 @@ After the preparations are done, we need to modify the broker's file in your pro
 
 As you can see, we added an `if` statement. If the expression is true, we replace our broker with an imemory broker.
 The main point here is to not have an actual connection during testing. It's useful because inmemory broker has
-the same interface as a real broker, but it doesn't send tasks acutally.
+the same interface as a real broker, but it doesn't send tasks actually.
 
 ## Testing tasks
 
