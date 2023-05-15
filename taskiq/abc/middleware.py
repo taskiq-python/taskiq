@@ -55,7 +55,7 @@ class TaskiqMiddleware:  # pragma: no cover
         """
         This hook is called before executing task.
 
-        This is a worker-side hook, wich means it
+        This is a worker-side hook, which means it
         executes in the worker process.
 
         :param message: incoming parsed taskiq message.

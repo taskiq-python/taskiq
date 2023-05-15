@@ -8,7 +8,7 @@ FastAPI is one of the most popular async web frameworks in python. It has gained
 1. It's easy to use;
 2. It has a cool dependency injection.
 
-In taskiq we try to make our libraries easy to use and we too have a depenndency injection. But our dependencies
+In taskiq we try to make our libraries easy to use and we too have a dependency injection. But our dependencies
 are not compatible with FastAPI's dependencies by default. That is why we have created a library "[taskiq-fastapi](https://pypi.org/project/taskiq-fastapi/)" to make integration with
 FastAPI as smooth as possible.
 
