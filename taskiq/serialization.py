@@ -8,16 +8,14 @@ from typing import (  # noqa: WPS235
     Iterable,
     List,
     Optional,
-    Protocol,
     Set,
     Tuple,
     Type,
     Union,
-    runtime_checkable,
 )
 
 import pydantic
-from typing_extensions import TypeVar
+from typing_extensions import Protocol, TypeVar, runtime_checkable
 
 import taskiq.exceptions  # noqa: WPS301
 
