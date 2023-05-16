@@ -223,7 +223,7 @@ class Test_serialization:
             error = exc
 
         value = exception_to_python(prepare_exception(error, json))
-        text = traceback.format_exception(value)
+        text = traceback.format_exception(value)  # type: ignore
 
         assert traceback.format_exception_only(error1)[0] in text  # type: ignore
         assert traceback.format_exception_only(error3)[0] in text  # type: ignore
@@ -243,7 +243,7 @@ class Test_serialization:
             error = exc
 
         value = exception_to_python(prepare_exception(error, json))
-        text = traceback.format_exception(value)
+        text = traceback.format_exception(value)  # type: ignore
 
         assert traceback.format_exception_only(error2)[0] in text  # type: ignore
         assert traceback.format_exception_only(error3)[0] in text  # type: ignore
@@ -263,7 +263,7 @@ class Test_serialization:
             error = exc
 
         value = exception_to_python(prepare_exception(error, pickle))
-        text = traceback.format_exception(value)
+        text = traceback.format_exception(value)  # type: ignore
 
         assert traceback.format_exception_only(error1)[0] in text  # type: ignore
         assert traceback.format_exception_only(error3)[0] in text  # type: ignore
@@ -283,7 +283,7 @@ class Test_serialization:
             error = exc
 
         value = exception_to_python(prepare_exception(error, pickle))
-        text = traceback.format_exception(value)
+        text = traceback.format_exception(value)  # type: ignore
 
         assert traceback.format_exception_only(error2)[0] in text  # type: ignore
         assert traceback.format_exception_only(error3)[0] in text  # type: ignore
