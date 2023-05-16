@@ -103,6 +103,8 @@ ignore =
   F403,
   ; Found wrong metadata variable
   WPS410,
+  ; Found commented out cod
+  E800,
 
 per-file-ignores =
   ; all tests
