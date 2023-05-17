@@ -27,7 +27,7 @@ SEEN_EXCEPTIONS_CACHE: Set[int] = set()
 
 
 @runtime_checkable
-class Coder(Protocol, Generic[DecodedType, EncodedType]):
+class Coder(Protocol, Generic[DecodedType, EncodedType]):  # pragma: no cover
     """Serializer protocol to check methods `loads` and `dumps`."""
 
     def loads(self, s: EncodedType) -> DecodedType:  # noqa: D102, WPS111

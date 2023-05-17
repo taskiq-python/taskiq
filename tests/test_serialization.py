@@ -51,6 +51,41 @@ Lookalike = subclass_exception(
 )
 
 
+class ReprStrException:
+    def __repr__(self) -> str:
+        raise ValueError("Repr Exception")
+
+
+class ReprException(ReprStrException):
+    def __str__(self) -> str:
+        return "123"
+
+
+class UnrepresentableStr(str):
+    def __repr__(self) -> str:
+        raise ValueError("Repr Exception")
+
+
+class Test_safe_repr:
+    @pytest.mark.parametrize(
+        ("obj", "repr"),
+        [
+            ["123", repr("123")],
+            [int, repr(int)],
+            [123, "123"],
+            [ReprException(), "123"],
+            [UnrepresentableStr("123123"), "123123"],
+        ],
+    )
+    def test_representable(self, obj: Any, repr: str) -> None:
+        assert serialization.safe_repr(obj=obj) == repr
+
+    def test_unrepresentable(self) -> None:
+        obj = ReprStrException()
+        repr = serialization.safe_repr(obj=obj)
+        assert repr.startswith("<Unrepresentable {!r}".format(type(obj)))
+
+
 class Test_create_exceptions_cls:
     def test_create_exception_cls(self) -> None:
         assert serialization.create_exception_cls("FooError", "m")
@@ -157,6 +192,18 @@ class Test_prepare_exception:
             exc_module="builtins",
         )
 
+    def test_unpickleable_exception_wrapper(self) -> None:
+        class SubException(Exception):
+            pass
+
+        error = SubException(lambda x: "123")
+        x = prepare_exception(error, pickle)
+        assert isinstance(x, _UnpickleableExceptionWrapper)
+        assert str(x) == serialization.safe_repr(error)
+        y = exception_to_python(x)
+        assert isinstance(y, Exception)
+        assert y.__class__.__name__ == error.__class__.__name__
+
 
 class Test_exception_to_python:
     def test_exception_to_python_when_None(self) -> None:
@@ -194,6 +241,19 @@ class Test_exception_to_python:
         result_exc = exception_to_python(test_exception)  # type: ignore
         assert str(result_exc) == "Raise Custom Message"
 
+    def test_exception_to_python_when_no_module(self) -> None:
+        test_exception = {
+            "exc_type": "TestParamException",
+            "exc_module": None,
+            "exc_message": ["Raise Custom Message"],
+        }
+
+        result_exc = exception_to_python(test_exception)  # type: ignore
+        assert isinstance(result_exc, Exception)
+        assert result_exc.__module__ == serialization.__name__
+        assert result_exc.__class__.__name__ == "TestParamException"
+        assert str(result_exc) == "Raise Custom Message"
+
     def test_exception_to_python_when_type_error(self) -> None:
         taskiq.TestParamException = paramexception  # type: ignore
         test_exception = {
@@ -204,7 +264,7 @@ class Test_exception_to_python:
 
         result_exc = exception_to_python(test_exception)  # type: ignore
         del taskiq.TestParamException  # type: ignore
-        assert str(result_exc) == "<class 'serialization.paramexception'>(())"
+        assert str(result_exc) == "<class 'test_serialization.paramexception'>(())"
 
 
 class Test_serialization:
