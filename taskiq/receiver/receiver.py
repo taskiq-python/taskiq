@@ -201,7 +201,7 @@ class Receiver:
                     target,
                     message,
                 )
-        except Exception as exc:
+        except BaseException as exc:  # noqa: WPS424
             found_exception = exc
             logger.error(
                 "Exception found while executing function: %s",
@@ -219,6 +219,7 @@ class Receiver:
             log=None,
             return_value=returned,
             execution_time=round(execution_time, 2),
+            error=found_exception,
         )
         # If exception is found we execute middlewares.
         if found_exception is not None:

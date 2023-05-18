@@ -28,3 +28,7 @@ class ResultSetError(ResultBackendError):
 
 class ResultIsReadyError(ResultBackendError):
     """Error if ResultBackend was unable to find out if the task is ready."""
+
+
+class SecurityError(TaskiqError):
+    """Security related exception."""
