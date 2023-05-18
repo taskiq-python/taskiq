@@ -318,3 +318,19 @@ async def test_result() -> None:
 
     assert resp.return_value == "some value"
     assert not broker._running_tasks
+
+
+@pytest.mark.anyio
+async def test_error_result() -> None:
+    broker = InMemoryBroker()
+
+    @broker.task
+    async def task_no_result() -> str:
+        raise ValueError("some error")
+
+    task = await task_no_result.kiq()
+    resp = await task.wait_result(timeout=1)
+
+    assert resp.return_value is None
+    assert not broker._running_tasks
+    assert isinstance(resp.error, ValueError)
