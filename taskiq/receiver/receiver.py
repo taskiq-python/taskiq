@@ -11,6 +11,7 @@ from taskiq_dependencies import DependencyGraph
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.context import Context
+from taskiq.exceptions import NoResultError
 from taskiq.message import TaskiqMessage
 from taskiq.receiver.params_parser import parse_params
 from taskiq.result import TaskiqResult
@@ -125,10 +126,11 @@ class Receiver:
             if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
                 await maybe_awaitable(middleware.post_execute(taskiq_msg, result))
         try:
-            await self.broker.result_backend.set_result(taskiq_msg.task_id, result)
-            for middleware in self.broker.middlewares:
-                if middleware.__class__.post_save != TaskiqMiddleware.post_save:
-                    await maybe_awaitable(middleware.post_save(taskiq_msg, result))
+            if not isinstance(result.error, NoResultError):
+                await self.broker.result_backend.set_result(taskiq_msg.task_id, result)
+                for middleware in self.broker.middlewares:
+                    if middleware.__class__.post_save != TaskiqMiddleware.post_save:
+                        await maybe_awaitable(middleware.post_save(taskiq_msg, result))
         except Exception as exc:
             logger.exception(
                 "Can't set result in result backend. Cause: %s",

@@ -32,3 +32,7 @@ class ResultIsReadyError(ResultBackendError):
 
 class SecurityError(TaskiqError):
     """Security related exception."""
+
+
+class NoResultError(TaskiqError):
+    """Error if user does not want to set result."""
