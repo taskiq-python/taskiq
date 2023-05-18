@@ -201,7 +201,7 @@ class Receiver:
                     target,
                     message,
                 )
-        except Exception as exc:
+        except BaseException as exc:  # noqa: WPS424
             found_exception = exc
             logger.error(
                 "Exception found while executing function: %s",

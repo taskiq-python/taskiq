@@ -127,7 +127,7 @@ async def test_run_task_exception_middlewares() -> None:
             self,
             message: "TaskiqMessage",
             result: "TaskiqResult[Any]",
-            exception: Exception,
+            exception: BaseException,
         ) -> None:
             self.found_exceptions.append(exception)
 

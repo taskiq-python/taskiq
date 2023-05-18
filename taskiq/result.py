@@ -5,6 +5,7 @@ from typing import Any, Callable, Dict, Generic, Optional, TypeVar
 
 from pydantic import validator
 from pydantic.generics import GenericModel
+from typing_extensions import Self
 
 from taskiq.serialization import exception_to_python, prepare_exception
 
@@ -40,13 +41,23 @@ class TaskiqResult(GenericModel, Generic[_ReturnType]):
         json_dumps = _json_dumps  # type: ignore
         json_loads = json.loads
 
+    def raise_for_error(self) -> "Self":
+        """Raise exception if `error`.
+
+        :raises error: task execution exception
+        :returns: TaskiqResult
+        """
+        if self.error is not None:
+            raise self.error
+        return self
+
     def __getstate__(self) -> Dict[Any, Any]:
         dict = super().__getstate__()  # noqa: WPS125
         vals: Dict[str, Any] = dict["__dict__"]
 
-        if "error" in vals:
-            vals["error"] = prepare_exception(  # noqa: WPS529
-                vals["error"],  # noqa: WPS529
+        if "error" in vals and vals["error"] is not None:
+            vals["error"] = prepare_exception(
+                vals["error"],
                 pickle,
             )
 

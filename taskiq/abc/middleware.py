@@ -97,7 +97,7 @@ class TaskiqMiddleware:  # pragma: no cover
         self,
         message: "TaskiqMessage",
         result: "TaskiqResult[Any]",
-        exception: Exception,
+        exception: BaseException,
     ) -> "Union[None, Coroutine[Any, Any, None]]":
         """
         This function is called when exception is found.
