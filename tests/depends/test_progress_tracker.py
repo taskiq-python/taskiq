@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, Optional
 
 import pytest
+from pydantic import ValidationError
 
 from taskiq import (
     AsyncTaskiqDecoratedTask,
@@ -92,5 +93,22 @@ async def test_progress_tracker_ctx_none() -> None:
     result = await receiver.run_task(test_func, get_message(test_func, "task_id"))
 
     assert not result.is_err
+    progress = await broker.result_backend.get_progress("task_id")
+    assert progress is None
+
+
+@pytest.mark.anyio
+async def test_progress_tracker_validation_error() -> None:
+    broker = InMemoryBroker()
+
+    @broker.task
+    async def test_func(progress: ProgressTracker[int] = TaskiqDepends()) -> None:
+        await progress.set_progress(("hello", "world"), 123)  # type: ignore
+
+    receiver = get_receiver(broker)
+    result = await receiver.run_task(test_func, get_message(test_func, "task_id"))
+    with pytest.raises(ValidationError):
+        result.raise_for_error()
+
     progress = await broker.result_backend.get_progress("task_id")
     assert progress is None
