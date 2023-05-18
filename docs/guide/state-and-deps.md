@@ -102,7 +102,7 @@ For example:
 
 @[code python](../examples/state/dependencies_tree.py)
 
-In this code, the dependency `common_dep` is going to be evaluated only once and the `dep1` and the `dep2` are going to recevie the same value. You can control this behavior by using the `use_cache=False` parameter to you dependency. This parameter will force the
+In this code, the dependency `common_dep` is going to be evaluated only once and the `dep1` and the `dep2` are going to receive the same value. You can control this behavior by using the `use_cache=False` parameter to you dependency. This parameter will force the
 dependency to reevaluate all it's subdependencies.
 
 In this example we cannot predict the result. Since the `dep2` doesn't use cache for the `common_dep` function.
@@ -167,7 +167,7 @@ If you want to do something asynchronously, convert this function to an asynchro
 
 ### Default dependencies
 
-By default taskiq has only two deendencies:
+By default taskiq has only two dependencies:
 
 - Context from `taskiq.context.Context`
 - TaskiqState from `taskiq.state.TaskiqState`

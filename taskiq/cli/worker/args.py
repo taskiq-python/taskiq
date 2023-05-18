@@ -100,7 +100,7 @@ class WorkerArgs:
             help=(
                 "If this option is on, "
                 "taskiq will try to find tasks modules "
-                "in current directory recursievly. Name of file to search for "
+                "in current directory recursively. Name of file to search for "
                 "can be configured using `--tasks-pattern` option."
             ),
         )
@@ -127,7 +127,7 @@ class WorkerArgs:
                 "[%(module)s:%(funcName)s:%(lineno)d] "
                 "%(message)s"
             ),
-            help="Format wich is used when collecting logs from function execution",
+            help="Format which is used when collecting logs from function execution",
         )
         parser.add_argument(
             "--no-parse",

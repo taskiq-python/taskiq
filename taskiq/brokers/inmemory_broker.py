@@ -145,7 +145,7 @@ class InMemoryBroker(AsyncBroker):
 
         This method just executes given task.
 
-        :param message: incomming message.
+        :param message: incoming message.
 
         :raises TaskiqError: if someone wants to kick unknown task.
         """

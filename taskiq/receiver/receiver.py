@@ -11,6 +11,7 @@ from taskiq_dependencies import DependencyGraph
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.context import Context
+from taskiq.exceptions import NoResultError
 from taskiq.message import TaskiqMessage
 from taskiq.receiver.params_parser import parse_params
 from taskiq.result import TaskiqResult
@@ -78,7 +79,7 @@ class Receiver:
         that came from brokers.
 
         :raises Exception: if raise_err is true,
-            and excpetion were found while saving result.
+            and exception were found while saving result.
         :param message: received message.
         :param raise_err: raise an error if cannot save result in
             result_backend.
@@ -125,10 +126,11 @@ class Receiver:
             if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
                 await maybe_awaitable(middleware.post_execute(taskiq_msg, result))
         try:
-            await self.broker.result_backend.set_result(taskiq_msg.task_id, result)
-            for middleware in self.broker.middlewares:
-                if middleware.__class__.post_save != TaskiqMiddleware.post_save:
-                    await maybe_awaitable(middleware.post_save(taskiq_msg, result))
+            if not isinstance(result.error, NoResultError):
+                await self.broker.result_backend.set_result(taskiq_msg.task_id, result)
+                for middleware in self.broker.middlewares:
+                    if middleware.__class__.post_save != TaskiqMiddleware.post_save:
+                        await maybe_awaitable(middleware.post_save(taskiq_msg, result))
         except Exception as exc:
             logger.exception(
                 "Can't set result in result backend. Cause: %s",
@@ -204,7 +206,8 @@ class Receiver:
 
             while asyncio.iscoroutine(returned):
                 returned = await returned
-        except Exception as exc:
+
+        except BaseException as exc:  # noqa: WPS424
             found_exception = exc
             logger.error(
                 "Exception found while executing function: %s",
@@ -222,6 +225,7 @@ class Receiver:
             log=None,
             return_value=returned,
             execution_time=round(execution_time, 2),
+            error=found_exception,
         )
         # If exception is found we execute middlewares.
         if found_exception is not None:

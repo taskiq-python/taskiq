@@ -58,10 +58,10 @@ class _Task(ABC, Generic[_ReturnType]):
         """
         Wait for result to become ready and get it.
 
-        This function constantly checks wheter result is ready
+        This function constantly checks whether result is ready
         and fetches it when it becomes available.
 
-        :param check_interval: how ofen availability is checked.
+        :param check_interval: how often availability is checked.
         :param timeout: maximum amount of time it will wait
             before raising TaskiqResultTimeoutError.
         :param with_logs: whether you need to download logs.
@@ -97,7 +97,7 @@ class AsyncTaskiqTask(_Task[_ReturnType]):
         """
         Checks if task is completed.
 
-        :raises ResultIsReadyError: if we can't get info about task readyness.
+        :raises ResultIsReadyError: if we can't get info about task readiness.
 
         :return: True if task is completed.
         """
