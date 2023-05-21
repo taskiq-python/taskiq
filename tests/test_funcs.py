@@ -10,7 +10,7 @@ from taskiq.task import AsyncTaskiqTask
 
 @pytest.mark.anyio
 async def test_gather() -> None:
-    """Test successfull task gathering."""
+    """Test successful task gathering."""
     rb_mock = AsyncMock()
     rb_mock.is_result_ready.return_value = True
     rb_mock.get_result.return_value = 1

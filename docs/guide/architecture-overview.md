@@ -119,13 +119,13 @@ test_project
 You can specify all tasks modules to import manually.
 
 ```bash
-taskiq test_project.broker:broker test_projec.submodule.tasks test_projec.utils.tasks
+taskiq worker test_project.broker:broker test_project.submodule.tasks test_project.utils.tasks
 ```
 
 Or you can let taskiq find all python modules named tasks in current directory recursively.
 
 ```bash
-taskiq test_project.broker:broker -fsd
+taskiq worker test_project.broker:broker -fsd
 ```
 
 If you have uvloop installed, taskiq will automatically install new policies to event loop.

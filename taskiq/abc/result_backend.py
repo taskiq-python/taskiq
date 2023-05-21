@@ -20,7 +20,7 @@ class AsyncResultBackend(ABC, Generic[_ReturnType]):
         """
         Saves result to the result backend.
 
-        Result must be save so it can be accesed later
+        Result must be save so it can be accessed later
         by the calling side of the system.
 
         :param task_id: id of a task to save.

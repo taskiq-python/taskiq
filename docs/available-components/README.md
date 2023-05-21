@@ -1,7 +1,7 @@
 ---
 order: 1
 dir:
-  order: 3
+  order: 4
 ---
 
 # Available components
