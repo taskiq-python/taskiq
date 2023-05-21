@@ -181,3 +181,33 @@ Taskiq have an ability to add new first-level dependencies using brokers.
 The AsyncBroker interface has a function called `add_dependency_context` and you can add
 more default dependencies to the taskiq. This may be useful for libraries if you want to
 add new dependencies to users.
+
+
+### Exception handling
+
+Dependencies can handle exceptions that happen in tasks. This feature is handy if you want your system to be more atomic.
+
+For example, if you open a database transaction in your dependency and want to commit it only if the function is completed successfully.
+
+```python
+async def get_transaction(db_driver: DBDriver = TaskiqDepends(get_driver)) -> AsyncGenerator[Transaction, None]:
+    trans = db_driver.begin_transaction():
+    try:
+        # Here we give transaction to our dependant function.
+        yield trans
+    # If exception was found in dependant function,
+    # we rollback our transaction.
+    except Exception:
+        await trans.rollback()
+        return
+    # Here we commit if everything is fine.
+    await trans.commit()
+```
+
+If you don't want to propagate exceptions in dependencies, you can add `--no-propagate-errors` option to `worker` command.
+
+```bash
+taskiq worker my_file:broker --no-propagate-errors
+```
+
+In this case, no exception will ever going to be propagated to any dependency.

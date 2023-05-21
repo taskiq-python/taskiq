@@ -41,6 +41,7 @@ class WorkerArgs:
     receiver: str = "taskiq.receiver:Receiver"
     receiver_arg: List[Tuple[str, str]] = field(default_factory=list)
     max_prefetch: int = 0
+    no_propagate_errors: bool = False
 
     @classmethod
     def from_cli(  # noqa: WPS213
@@ -136,6 +137,16 @@ class WorkerArgs:
                 "If this parameter is on,"
                 " taskiq doesn't parse incoming parameters "
                 " with pydantic."
+            ),
+        )
+        parser.add_argument(
+            "--no-propagate-errors",
+            action="store_true",
+            dest="no_propagate_errors",
+            help=(
+                "If this parameter is on,"
+                " all errors that happen in tasks "
+                " won't be propagated to generator dependencies."
             ),
         )
         parser.add_argument(
