@@ -119,12 +119,13 @@ class InMemoryBroker(AsyncBroker):
     It's useful for local development, if you don't want to setup real broker.
     """
 
-    def __init__(
+    def __init__(  # noqa: WPS211
         self,
         sync_tasks_pool_size: int = 4,
         max_stored_results: int = 100,
         cast_types: bool = True,
         max_async_tasks: int = 30,
+        propagate_exceptions: bool = True,
     ) -> None:
         super().__init__()
         self.result_backend = InmemoryResultBackend(
@@ -136,6 +137,7 @@ class InMemoryBroker(AsyncBroker):
             executor=self.executor,
             validate_params=cast_types,
             max_async_tasks=max_async_tasks,
+            propagate_exceptions=propagate_exceptions,
         )
         self._running_tasks: "Set[asyncio.Task[Any]]" = set()
 

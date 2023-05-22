@@ -46,6 +46,7 @@ class Receiver:
         validate_params: bool = True,
         max_async_tasks: "Optional[int]" = None,
         max_prefetch: int = 0,
+        propagate_exceptions: bool = True,
     ) -> None:
         self.broker = broker
         self.executor = executor
@@ -53,6 +54,7 @@ class Receiver:
         self.task_signatures: Dict[str, inspect.Signature] = {}
         self.task_hints: Dict[str, Dict[str, Any]] = {}
         self.dependency_graphs: Dict[str, DependencyGraph] = {}
+        self.propagate_exceptions = propagate_exceptions
         for task in self.broker.available_tasks.values():
             self.task_signatures[task.task_name] = inspect.signature(task.original_func)
             self.task_hints[task.task_name] = get_type_hints(task.original_func)
@@ -217,7 +219,14 @@ class Receiver:
         # Stop the timer.
         execution_time = time() - start_time
         if dep_ctx:
-            await dep_ctx.close()
+            args = (None, None, None)
+            if found_exception and self.propagate_exceptions:
+                args = (  # type: ignore
+                    type(found_exception),
+                    found_exception,
+                    found_exception.__traceback__,
+                )
+            await dep_ctx.close(*args)
 
         # Assemble result.
         result: "TaskiqResult[Any]" = TaskiqResult(
