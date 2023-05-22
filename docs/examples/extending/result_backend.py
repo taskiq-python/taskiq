@@ -53,7 +53,7 @@ class MyResultBackend(AsyncResultBackend[_ReturnType]):
         Check if result exists.
 
         This function must check whether result
-        is available in your resul backend
+        is available in your result backend
         without fetching the result.
 
         :param task_id: id of a task.

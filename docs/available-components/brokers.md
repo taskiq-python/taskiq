@@ -10,7 +10,7 @@ In this section we'll list officially supported brokers.
 
 This is a special broker for local development. It uses the same functions to execute tasks,
 but all tasks are executed locally in the current thread.
-By default it uses `InMemoryResultBackend` but this can be overriden.
+By default it uses `InMemoryResultBackend` but this can be overridden.
 
 ## ZeroMQBroker
 

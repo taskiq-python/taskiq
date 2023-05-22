@@ -55,7 +55,7 @@ class TaskiqMiddleware:  # pragma: no cover
         """
         This hook is called before executing task.
 
-        This is a worker-side hook, wich means it
+        This is a worker-side hook, which means it
         executes in the worker process.
 
         :param message: incoming parsed taskiq message.
@@ -97,7 +97,7 @@ class TaskiqMiddleware:  # pragma: no cover
         self,
         message: "TaskiqMessage",
         result: "TaskiqResult[Any]",
-        exception: Exception,
+        exception: BaseException,
     ) -> "Union[None, Coroutine[Any, Any, None]]":
         """
         This function is called when exception is found.

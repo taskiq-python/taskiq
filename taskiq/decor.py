@@ -50,7 +50,7 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         self.original_func = original_func
         self.labels = labels
 
-    # Docs for this method are ommited in order to help
+    # Docs for this method are omitted in order to help
     # your IDE resolve correct docs for it.
     def __call__(  # noqa: D102
         self,
@@ -97,8 +97,8 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         """
         This function returns kicker object.
 
-        Kicker is a object that can modyfy kiq request
-        before sendig it.
+        Kicker is a object that can modify kiq request
+        before sending it.
 
         :return: AsyncKicker instance.
         """

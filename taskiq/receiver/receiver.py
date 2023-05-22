@@ -3,13 +3,15 @@ import inspect
 from concurrent.futures import Executor
 from logging import getLogger
 from time import time
-from typing import Any, Callable, Dict, Optional, get_type_hints
+from typing import Any, Callable, Dict, Optional, Set, get_type_hints
 
+import anyio
 from taskiq_dependencies import DependencyGraph
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.context import Context
+from taskiq.exceptions import NoResultError
 from taskiq.message import TaskiqMessage
 from taskiq.receiver.params_parser import parse_params
 from taskiq.result import TaskiqResult
@@ -17,6 +19,7 @@ from taskiq.state import TaskiqState
 from taskiq.utils import maybe_awaitable
 
 logger = getLogger(__name__)
+QUEUE_DONE = b"-1"
 
 
 def _run_sync(target: Callable[..., Any], message: TaskiqMessage) -> Any:
@@ -36,12 +39,14 @@ def _run_sync(target: Callable[..., Any], message: TaskiqMessage) -> Any:
 class Receiver:
     """Class that uses as a callback handler."""
 
-    def __init__(
+    def __init__(  # noqa: WPS211
         self,
         broker: AsyncBroker,
         executor: Optional[Executor] = None,
         validate_params: bool = True,
         max_async_tasks: "Optional[int]" = None,
+        max_prefetch: int = 0,
+        propagate_exceptions: bool = True,
     ) -> None:
         self.broker = broker
         self.executor = executor
@@ -49,6 +54,7 @@ class Receiver:
         self.task_signatures: Dict[str, inspect.Signature] = {}
         self.task_hints: Dict[str, Dict[str, Any]] = {}
         self.dependency_graphs: Dict[str, DependencyGraph] = {}
+        self.propagate_exceptions = propagate_exceptions
         for task in self.broker.available_tasks.values():
             self.task_signatures[task.task_name] = inspect.signature(task.original_func)
             self.task_hints[task.task_name] = get_type_hints(task.original_func)
@@ -61,6 +67,7 @@ class Receiver:
                 "Setting unlimited number of async tasks "
                 + "can result in undefined behavior",
             )
+        self.sem_prefetch = asyncio.Semaphore(max_prefetch)
 
     async def callback(  # noqa: C901, WPS213
         self,
@@ -74,7 +81,7 @@ class Receiver:
         that came from brokers.
 
         :raises Exception: if raise_err is true,
-            and excpetion were found while saving result.
+            and exception were found while saving result.
         :param message: received message.
         :param raise_err: raise an error if cannot save result in
             result_backend.
@@ -121,10 +128,11 @@ class Receiver:
             if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
                 await maybe_awaitable(middleware.post_execute(taskiq_msg, result))
         try:
-            await self.broker.result_backend.set_result(taskiq_msg.task_id, result)
-            for middleware in self.broker.middlewares:
-                if middleware.__class__.post_save != TaskiqMiddleware.post_save:
-                    await maybe_awaitable(middleware.post_save(taskiq_msg, result))
+            if not isinstance(result.error, NoResultError):
+                await self.broker.result_backend.set_result(taskiq_msg.task_id, result)
+                for middleware in self.broker.middlewares:
+                    if middleware.__class__.post_save != TaskiqMiddleware.post_save:
+                        await maybe_awaitable(middleware.post_save(taskiq_msg, result))
         except Exception as exc:
             logger.exception(
                 "Can't set result in result backend. Cause: %s",
@@ -197,7 +205,7 @@ class Receiver:
                     target,
                     message,
                 )
-        except Exception as exc:
+        except BaseException as exc:  # noqa: WPS424
             found_exception = exc
             logger.error(
                 "Exception found while executing function: %s",
@@ -207,7 +215,14 @@ class Receiver:
         # Stop the timer.
         execution_time = time() - start_time
         if dep_ctx:
-            await dep_ctx.close()
+            args = (None, None, None)
+            if found_exception and self.propagate_exceptions:
+                args = (  # type: ignore
+                    type(found_exception),
+                    found_exception,
+                    found_exception.__traceback__,
+                )
+            await dep_ctx.close(*args)
 
         # Assemble result.
         result: "TaskiqResult[Any]" = TaskiqResult(
@@ -215,6 +230,7 @@ class Receiver:
             log=None,
             return_value=returned,
             execution_time=round(execution_time, 2),
+            error=found_exception,
         )
         # If exception is found we execute middlewares.
         if found_exception is not None:
@@ -239,7 +255,38 @@ class Receiver:
         """
         await self.broker.startup()
         logger.info("Listening started.")
-        tasks = set()
+        queue: asyncio.Queue[bytes] = asyncio.Queue()
+
+        async with anyio.create_task_group() as gr:
+            gr.start_soon(self.prefetcher, queue)
+            gr.start_soon(self.runner, queue)
+
+    async def prefetcher(self, queue: "asyncio.Queue[Any]") -> None:
+        """
+        Prefetch tasks data.
+
+        :param queue: queue for prefetched data.
+        """
+        iterator = self.broker.listen()
+
+        while True:
+            try:
+                await self.sem_prefetch.acquire()
+                message = await iterator.__anext__()  # noqa: WPS609
+                await queue.put(message)
+
+            except StopAsyncIteration:
+                break
+
+        await queue.put(QUEUE_DONE)
+
+    async def runner(self, queue: "asyncio.Queue[bytes]") -> None:
+        """
+        Run tasks.
+
+        :param queue: queue with prefetched data.
+        """
+        tasks: Set[asyncio.Task[Any]] = set()
 
         def task_cb(task: "asyncio.Task[Any]") -> None:
             """
@@ -255,11 +302,19 @@ class Receiver:
             if self.sem is not None:
                 self.sem.release()
 
-        async for message in self.broker.listen():
+        while True:
             # Waits for semaphore to be released.
             if self.sem is not None:
                 await self.sem.acquire()
-            task = asyncio.create_task(self.callback(message=message, raise_err=False))
+
+            self.sem_prefetch.release()
+            message = await queue.get()
+            if message is QUEUE_DONE:
+                break
+
+            task = asyncio.create_task(
+                self.callback(message=message, raise_err=False),
+            )
             tasks.add(task)
 
             # We want the task to remove itself from the set when it's done.

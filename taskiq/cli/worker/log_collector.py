@@ -12,7 +12,7 @@ class Redirector:
 
     def write(self, message: Any) -> None:
         """
-        This write request writes to all avaialble streams.
+        This write request writes to all available streams.
 
         :param message: message to write.
         """
