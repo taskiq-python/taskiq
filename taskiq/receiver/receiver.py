@@ -17,7 +17,7 @@ from taskiq.receiver.params_parser import parse_params
 from taskiq.result import TaskiqResult
 from taskiq.semaphore import PrioritySemaphore
 from taskiq.state import TaskiqState
-from taskiq.utils import DequeQueue, maybe_awaitable
+from taskiq.utils import PriorityQueue, maybe_awaitable
 
 logger = getLogger(__name__)
 QUEUE_DONE = b"-1"
@@ -71,7 +71,7 @@ class Receiver:
                 + "can result in undefined behavior",
             )
         self.sem_prefetch = PrioritySemaphore(max_prefetch)
-        self.queue: DequeQueue[bytes] = DequeQueue()
+        self.queue: PriorityQueue[bytes] = PriorityQueue()
 
         self.sem_sleeping: Optional[asyncio.Semaphore] = None
         if max_sleeping_tasks is not None and max_sleeping_tasks <= 0:
@@ -270,7 +270,7 @@ class Receiver:
             gr.start_soon(self.prefetcher, self.queue)
             gr.start_soon(self.runner, self.queue)
 
-    async def prefetcher(self, queue: "asyncio.Queue[Any]") -> None:
+    async def prefetcher(self, queue: "PriorityQueue[Any]") -> None:
         """
         Prefetch tasks data.
 
@@ -282,14 +282,14 @@ class Receiver:
             try:
                 await self.sem_prefetch.acquire()
                 message = await iterator.__anext__()  # noqa: WPS609
-                await queue.put(message)
+                await queue.put_last(message)
 
             except StopAsyncIteration:
                 break
 
-        await queue.put(QUEUE_DONE)
+        await queue.put_last(QUEUE_DONE)
 
-    async def runner(self, queue: "asyncio.Queue[bytes]") -> None:  # noqa: C901, WPS213
+    async def runner(self, queue: "PriorityQueue[bytes]") -> None:  # noqa: C901, WPS213
         """
         Run tasks.
 
@@ -317,7 +317,7 @@ class Receiver:
                 await self.sem.acquire()
 
             self.sem_prefetch.release()
-            message = await queue.get()
+            _, _, message = await queue.get()
             if message is QUEUE_DONE:
                 if self.sem is not None:
                     self.sem.release()
