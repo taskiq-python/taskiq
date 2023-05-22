@@ -293,138 +293,177 @@ async def test_callback_semaphore() -> None:
     assert sem_num == max_async_tasks + 2
 
 
-@pytest.mark.anyio
-async def test_tasks_chain_without_idler() -> None:
-    """"""
-    broker = InMemoryQueueBroker()
+class Test_sleeping_tasks:
+    @pytest.mark.anyio
+    async def test_max_sleeping_task_arg_error(self) -> None:
+        with pytest.raises(ValueError):
+            get_receiver(max_sleeping_tasks=-1)
 
-    @broker.task
-    async def task_add_one(val: int) -> int:
-        return val + 1
+    @pytest.mark.anyio
+    async def test_tasks_chain_without_nonblocking_sleep(self) -> None:
+        """"""
+        broker = InMemoryQueueBroker()
 
-    @broker.task
-    async def task_map(vals: List[int]) -> List[int]:
-        tasks = [await task_add_one.kiq(val) for val in vals]
-        resps_tasks = [asyncio.create_task(t.wait_result(timeout=1)) for t in tasks]
-        resps = await asyncio.gather(*resps_tasks)
+        @broker.task
+        async def task_add_one(val: int) -> int:
+            return val + 1
 
-        return [r.return_value for r in resps]
+        @broker.task
+        async def task_map(vals: List[int]) -> List[int]:
+            tasks = [await task_add_one.kiq(val) for val in vals]
+            resps_tasks = [asyncio.create_task(t.wait_result(timeout=1)) for t in tasks]
+            resps = await asyncio.gather(*resps_tasks)
 
-    receiver = get_receiver(broker, max_async_tasks=1)
-    listen_task = asyncio.create_task(receiver.listen())
+            return [r.return_value for r in resps]
 
-    task = await task_map.kiq(list(range(0, 10)))
-    with pytest.raises(TaskiqResultTimeoutError):
-        await task.wait_result(timeout=1)
+        receiver = get_receiver(broker, max_async_tasks=1)
+        listen_task = asyncio.create_task(receiver.listen())
 
-    await broker.shutdown()
-    await listen_task
+        task = await task_map.kiq(list(range(0, 10)))
+        with pytest.raises(TaskiqResultTimeoutError):
+            await task.wait_result(timeout=1)
 
+        await broker.shutdown()
+        await listen_task
 
-@pytest.mark.anyio
-async def test_tasks_chain_with_idler() -> None:
-    """"""
-    broker = InMemoryQueueBroker()
+    @pytest.mark.anyio
+    async def test_tasks_chain_with_nonblocking_sleep(self) -> None:
+        """"""
+        broker = InMemoryQueueBroker()
 
-    @broker.task
-    async def task_add_one(val: int) -> int:
-        return val + 1
+        @broker.task
+        async def task_add_one(val: int) -> int:
+            return val + 1
 
-    @broker.task
-    async def task_map(vals: List[int], ctx: Context = Depends()) -> List[int]:
-        tasks = [await task_add_one.kiq(val) for val in vals]
-        await ctx.sleep(0.5)
-        resps_tasks = [asyncio.create_task(t.wait_result(timeout=1)) for t in tasks]
-        resps = await asyncio.gather(*resps_tasks)
-        res = [r.return_value for r in resps]
-        return res
+        @broker.task
+        async def task_map(vals: List[int], ctx: Context = Depends()) -> List[int]:
+            tasks = [await task_add_one.kiq(val) for val in vals]
+            await ctx.sleep(0.5)
+            resps_tasks = [asyncio.create_task(t.wait_result(timeout=1)) for t in tasks]
+            resps = await asyncio.gather(*resps_tasks)
+            res = [r.return_value for r in resps]
+            return res
 
-    receiver = get_receiver(broker, max_async_tasks=1, max_sleeping_tasks=1)
-    listen_task = asyncio.create_task(receiver.listen())
+        receiver = get_receiver(broker, max_async_tasks=1, max_sleeping_tasks=1)
+        listen_task = asyncio.create_task(receiver.listen())
 
-    task = await task_map.kiq(list(range(0, 10)))
-    resp = await task.wait_result(timeout=1)
-    assert resp.return_value == list(range(1, 11))
+        task = await task_map.kiq(list(range(0, 10)))
+        resp = await task.wait_result(timeout=1)
+        assert resp.return_value == list(range(1, 11))
 
-    await broker.shutdown()
-    await listen_task
+        await broker.shutdown()
+        await listen_task
 
-    assert receiver.sem_sleeping._value == 1  # type: ignore
-    assert receiver.sem._value == 1  # type: ignore
+        assert receiver.sem_sleeping._value == 1  # type: ignore
+        assert receiver.sem._value == 1  # type: ignore
 
+    @pytest.mark.anyio
+    async def test_tasks_long_chain(self) -> None:
+        """"""
+        broker = InMemoryQueueBroker()
 
-@pytest.mark.anyio
-async def test_tasks_chain_deep() -> None:
-    """"""
-    broker = InMemoryQueueBroker()
+        @broker.task
+        async def task_run(depth: int, val: Any, ctx: Context = Depends()) -> Any:
+            if depth == 0:
+                return val
 
-    @broker.task
-    async def task_run(depth: int, val: Any, ctx: Context = Depends()) -> Any:
-        if depth == 0:
-            return val
+            t = await task_run.kiq(depth - 1, val)
+            resp = await wait_for_task(t, interval=0.05, ctx=ctx)
+            return resp.return_value
 
-        t = await task_run.kiq(depth - 1, val)
-        resp = await wait_for_task(t, interval=0.05, ctx=ctx)
-        return resp.return_value
+        async def wait_for_task(
+            task: AsyncTaskiqTask[Any],
+            interval: float,
+            ctx: Context,
+        ) -> TaskiqResult[Any]:
+            while True:
+                resp_task = asyncio.create_task(
+                    task.wait_result(interval * 0.4, timeout=interval),
+                )
+                await ctx.sleep(interval)
 
-    async def wait_for_task(
-        task: AsyncTaskiqTask[Any],
-        interval: float,
-        ctx: Context,
-    ) -> TaskiqResult[Any]:
-        while True:
-            resp_task = asyncio.create_task(
-                task.wait_result(interval * 0.4, timeout=interval),
-            )
-            await ctx.sleep(interval)
+                try:
+                    return await resp_task
+                except TaskiqResultTimeoutError:
+                    continue
 
-            try:
-                return await resp_task
-            except TaskiqResultTimeoutError:
-                continue
+        receiver = get_receiver(broker, max_async_tasks=1, max_sleeping_tasks=10)
+        listen_task = asyncio.create_task(receiver.listen())
 
-    receiver = get_receiver(broker, max_async_tasks=1, max_sleeping_tasks=10)
-    listen_task = asyncio.create_task(receiver.listen())
+        task = await task_run.kiq(10, "hello world!")
+        resp = await task.wait_result(timeout=1)
+        assert resp.return_value == "hello world!"
 
-    task = await task_run.kiq(10, "hello world!")
-    resp = await task.wait_result(timeout=1)
-    assert resp.return_value == "hello world!"
+        await broker.shutdown()
+        await listen_task
 
-    await broker.shutdown()
-    await listen_task
+        assert receiver.sem_sleeping._value == 10  # type: ignore
+        assert receiver.sem._value == 1  # type: ignore
 
-    assert receiver.sem_sleeping._value == 10  # type: ignore
-    assert receiver.sem._value == 1  # type: ignore
+    @pytest.mark.parametrize(
+        ("max_async_tasks", "max_sleeping_tasks"),
+        [(1, 20), (None, None), (None, 20), (0, None), (0, 20), (0, 0)],
+    )
+    @pytest.mark.anyio
+    async def test_tasks_sleep(
+        self,
+        max_async_tasks: Any,
+        max_sleeping_tasks: Any,
+    ) -> None:
+        """"""
+        broker = InMemoryQueueBroker()
 
+        @broker.task
+        async def task_run(ind: int, ctx: Context = Depends()) -> int:
+            await ctx.sleep(0.1)
+            return ind
 
-@pytest.mark.anyio
-async def test_tasks_sleep() -> None:
-    """"""
-    broker = InMemoryQueueBroker()
+        receiver = get_receiver(
+            broker,
+            max_async_tasks=max_async_tasks,
+            max_sleeping_tasks=max_sleeping_tasks,
+        )
+        listen_task = asyncio.create_task(receiver.listen())
 
-    @broker.task
-    async def task_run(ind: int, ctx: Context = Depends()) -> int:
-        await ctx.sleep(0.1)
-        return ind
+        with anyio.fail_after(1):
+            tasks_tasks = [asyncio.create_task(task_run.kiq(ind)) for ind in range(100)]
+            tasks = await asyncio.gather(*tasks_tasks)
+            resps_tasks = [
+                asyncio.create_task(task.wait_result(timeout=1)) for task in tasks
+            ]
+            resps = await asyncio.gather(*resps_tasks)
+            value = [resp.return_value for resp in resps]
+            assert value == list(range(100))
 
-    receiver = get_receiver(broker, max_async_tasks=1, max_sleeping_tasks=20)
-    listen_task = asyncio.create_task(receiver.listen())
+        await broker.shutdown()
+        await listen_task
 
-    with anyio.fail_after(1):
-        tasks_tasks = [asyncio.create_task(task_run.kiq(ind)) for ind in range(100)]
-        tasks = await asyncio.gather(*tasks_tasks)
-        resps_tasks = [
-            asyncio.create_task(task.wait_result(timeout=1)) for task in tasks
-        ]
-        resps = await asyncio.gather(*resps_tasks)
-        value = [resp.return_value for resp in resps]
-        assert value == list(range(100))
+        if max_sleeping_tasks is not None and max_sleeping_tasks > 0:
+            assert receiver.sem_sleeping._value == max_sleeping_tasks  # type: ignore
 
-    await broker.shutdown()
-    await listen_task
+        if max_async_tasks is not None and max_async_tasks > 0:
+            assert receiver.sem._value == 1  # type: ignore
 
-    assert receiver.sem_sleeping._value == 20  # type: ignore
-    assert receiver.sem._value == 1  # type: ignore
+    @pytest.mark.anyio
+    async def test_max_sleeping_task_arg_none(self) -> None:
+        """"""
+        broker = InMemoryQueueBroker()
+
+        @broker.task
+        async def task_run(ind: int, ctx: Context = Depends()) -> int:
+            await ctx.sleep(0.1)
+            return ind
+
+        receiver = get_receiver(broker, max_async_tasks=1, max_sleeping_tasks=None)
+        listen_task = asyncio.create_task(receiver.listen())  # type: ignore
+
+        with pytest.raises(TaskiqResultTimeoutError):
+            tasks_tasks = [asyncio.create_task(task_run.kiq(ind)) for ind in range(100)]
+            tasks = await asyncio.gather(*tasks_tasks)
+            resps_tasks = [
+                asyncio.create_task(task.wait_result(timeout=1)) for task in tasks
+            ]
+            await asyncio.gather(*resps_tasks)
 
 
 @pytest.mark.anyio

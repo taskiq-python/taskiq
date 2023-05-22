@@ -74,8 +74,10 @@ class Receiver:
         self.queue: PriorityQueue[bytes] = PriorityQueue()
 
         self.sem_sleeping: Optional[asyncio.Semaphore] = None
-        if max_sleeping_tasks is not None and max_sleeping_tasks <= 0:
-            raise ValueError("`max_idle_tasks` should be greater then zero or None.")
+        if max_sleeping_tasks is not None and max_sleeping_tasks < 0:
+            raise ValueError(
+                "`max_sleeping_tasks` should be greater than zero or None.",
+            )
         if max_sleeping_tasks is not None and max_sleeping_tasks > 0:
             self.sem_sleeping = asyncio.Semaphore(max_sleeping_tasks)
 
