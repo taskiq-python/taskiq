@@ -11,6 +11,7 @@ from taskiq_dependencies import DependencyGraph
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.context import Context
+from taskiq.exceptions import NoResultError
 from taskiq.message import TaskiqMessage
 from taskiq.receiver.params_parser import parse_params
 from taskiq.result import TaskiqResult
@@ -48,6 +49,7 @@ class Receiver:
         max_async_tasks: "Optional[int]" = None,
         max_prefetch: int = 0,
         max_idle_tasks: Optional[int] = None,
+        propagate_exceptions: bool = True,
     ) -> None:
         self.broker = broker
         self.executor = executor
@@ -55,6 +57,7 @@ class Receiver:
         self.task_signatures: Dict[str, inspect.Signature] = {}
         self.task_hints: Dict[str, Dict[str, Any]] = {}
         self.dependency_graphs: Dict[str, DependencyGraph] = {}
+        self.propagate_exceptions = propagate_exceptions
         for task in self.broker.available_tasks.values():
             self.task_signatures[task.task_name] = inspect.signature(task.original_func)
             self.task_hints[task.task_name] = get_type_hints(task.original_func)
@@ -88,7 +91,7 @@ class Receiver:
         that came from brokers.
 
         :raises Exception: if raise_err is true,
-            and excpetion were found while saving result.
+            and exception were found while saving result.
         :param message: received message.
         :param raise_err: raise an error if cannot save result in
             result_backend.
@@ -135,10 +138,11 @@ class Receiver:
             if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
                 await maybe_awaitable(middleware.post_execute(taskiq_msg, result))
         try:
-            await self.broker.result_backend.set_result(taskiq_msg.task_id, result)
-            for middleware in self.broker.middlewares:
-                if middleware.__class__.post_save != TaskiqMiddleware.post_save:
-                    await maybe_awaitable(middleware.post_save(taskiq_msg, result))
+            if not isinstance(result.error, NoResultError):
+                await self.broker.result_backend.set_result(taskiq_msg.task_id, result)
+                for middleware in self.broker.middlewares:
+                    if middleware.__class__.post_save != TaskiqMiddleware.post_save:
+                        await maybe_awaitable(middleware.post_save(taskiq_msg, result))
         except Exception as exc:
             logger.exception(
                 "Can't set result in result backend. Cause: %s",
@@ -211,7 +215,7 @@ class Receiver:
                     target,
                     message,
                 )
-        except Exception as exc:
+        except BaseException as exc:  # noqa: WPS424
             found_exception = exc
             logger.error(
                 "Exception found while executing function: %s",
@@ -221,7 +225,14 @@ class Receiver:
         # Stop the timer.
         execution_time = time() - start_time
         if dep_ctx:
-            await dep_ctx.close()
+            args = (None, None, None)
+            if found_exception and self.propagate_exceptions:
+                args = (  # type: ignore
+                    type(found_exception),
+                    found_exception,
+                    found_exception.__traceback__,
+                )
+            await dep_ctx.close(*args)
 
         # Assemble result.
         result: "TaskiqResult[Any]" = TaskiqResult(
@@ -229,6 +240,7 @@ class Receiver:
             log=None,
             return_value=returned,
             execution_time=round(execution_time, 2),
+            error=found_exception,
         )
         # If exception is found we execute middlewares.
         if found_exception is not None:

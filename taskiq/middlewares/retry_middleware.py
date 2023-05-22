@@ -22,7 +22,7 @@ class SimpleRetryMiddleware(TaskiqMiddleware):
         self,
         message: "TaskiqMessage",
         result: "TaskiqResult[Any]",
-        exception: Exception,
+        exception: BaseException,
     ) -> None:
         """
         Retry on error.

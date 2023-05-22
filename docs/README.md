@@ -1,5 +1,5 @@
 ---
-title: Home
+title: Task manager for asyncio
 home: true
 heroImage: logo.svg
 heroAlt: logo
@@ -27,6 +27,15 @@ features:
       details: Taskiq provides correct autocompletion for most of its functionality.
 footer: MIT Licensed | Copyright© 2022-2023
 ---
+
+## What is taskiq in a nutshell
+
+Consider taskiq as an asyncio celery implementation. It uses almost the same patterns, but it's more modern
+and flexible.
+
+It's not a drop-in replacement for any other task manager. It has a different ecosystem of libraries and a different set of features.
+Also, it doesn't work for synchronous projects. You won't be able to send tasks synchronously.
+
 
 ## Installation
 

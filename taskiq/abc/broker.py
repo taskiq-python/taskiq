@@ -113,7 +113,7 @@ class AsyncBroker(ABC):
         Provided dict will be used to inject new dependencies
         in all dependency graph contexts.
 
-        :param new_ctx: Additional context values for dependnecy injection.
+        :param new_ctx: Additional context values for dependency injection.
         """
         self.custom_dependency_context.update(new_ctx)
 
@@ -152,7 +152,7 @@ class AsyncBroker(ABC):
         Close the broker.
 
         This method is called,
-        when broker is closig.
+        when broker is closing.
         """
         event = TaskiqEvents.CLIENT_SHUTDOWN
         if self.is_worker_process:

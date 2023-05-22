@@ -32,7 +32,7 @@ def parse_params(  # noqa: C901
     >>> def my_task(a: int) -> str
     >>>     ...
 
-    If you will kall my_task.kiq("11")
+    If you will call my_task.kiq("11")
 
     You'll receive parsed 11 (int).
     But, if you call it with mytask.kiq("str"),

@@ -22,7 +22,7 @@ Of course we can implement loop like this:
         await asyncio.sleep(timedelta(minutes=5).total_seconds)
 ```
 
-But if you have many schedules it may be a little painful to implement. So let me introuce you the `TaskiqScheduler`.
+But if you have many schedules it may be a little painful to implement. So let me introduce you the `TaskiqScheduler`.
 Let's add scheduler to our module.
 
 @[code python](../examples/schedule/intro.py)

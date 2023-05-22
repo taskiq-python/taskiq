@@ -9,7 +9,7 @@ logger = getLogger("taskiq.worker")
 
 
 class FileWatcher:  # pragma: no cover
-    """Filewatcher that watchs for filesystem changes."""
+    """Filewatcher that watches for filesystem changes."""
 
     def __init__(
         self,

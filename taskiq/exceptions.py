@@ -28,3 +28,11 @@ class ResultSetError(ResultBackendError):
 
 class ResultIsReadyError(ResultBackendError):
     """Error if ResultBackend was unable to find out if the task is ready."""
+
+
+class SecurityError(TaskiqError):
+    """Security related exception."""
+
+
+class NoResultError(TaskiqError):
+    """Error if user does not want to set result."""

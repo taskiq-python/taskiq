@@ -11,7 +11,7 @@ from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.brokers.inmemory_broker import InMemoryBroker
 from taskiq.brokers.inmemory_queue_broker import InMemoryQueueBroker
-from taskiq.exceptions import TaskiqResultTimeoutError
+from taskiq.exceptions import NoResultError, TaskiqResultTimeoutError
 from taskiq.message import TaskiqMessage
 from taskiq.receiver import Receiver
 from taskiq.result import TaskiqResult
@@ -79,7 +79,7 @@ async def test_run_task_successfull_async() -> None:
 
 
 @pytest.mark.anyio
-async def test_run_task_successfull_sync() -> None:
+async def test_run_task_successful_sync() -> None:
     """Tests that run_task can run sync tasks."""
 
     def test_func(param: int) -> int:
@@ -134,7 +134,7 @@ async def test_run_task_exception_middlewares() -> None:
             self,
             message: "TaskiqMessage",
             result: "TaskiqResult[Any]",
-            exception: Exception,
+            exception: BaseException,
         ) -> None:
             self.found_exceptions.append(exception)
 
@@ -162,7 +162,7 @@ async def test_run_task_exception_middlewares() -> None:
 
 @pytest.mark.anyio
 async def test_callback_success() -> None:
-    """Test that callback funcion works well."""
+    """Test that callback function works well."""
     broker = InMemoryBroker()
     called_times = 0
 
@@ -259,7 +259,7 @@ async def test_custom_ctx() -> None:
 
 @pytest.mark.anyio
 async def test_callback_semaphore() -> None:
-    """Test that callback funcion semaphore works well."""
+    """Test that callback function semaphore works well."""
     max_async_tasks = 3
     broker = BrokerForTests()
     sem_num = 0
@@ -425,3 +425,51 @@ async def test_tasks_sleep() -> None:
 
     assert receiver.sem_idle._value == 20  # type: ignore
     assert receiver.sem._value == 1  # type: ignore
+
+
+async def test_no_result_error() -> None:
+    broker = InMemoryBroker()
+    executed = asyncio.Event()
+
+    @broker.task
+    async def task_no_result() -> int:
+        executed.set()
+        raise NoResultError()
+
+    task = await task_no_result.kiq()
+    with pytest.raises(TaskiqResultTimeoutError):
+        await task.wait_result(timeout=1)
+
+    assert executed.is_set()
+    assert not broker._running_tasks
+
+
+@pytest.mark.anyio
+async def test_result() -> None:
+    broker = InMemoryBroker()
+
+    @broker.task
+    async def task_no_result() -> str:
+        return "some value"
+
+    task = await task_no_result.kiq()
+    resp = await task.wait_result(timeout=1)
+
+    assert resp.return_value == "some value"
+    assert not broker._running_tasks
+
+
+@pytest.mark.anyio
+async def test_error_result() -> None:
+    broker = InMemoryBroker()
+
+    @broker.task
+    async def task_no_result() -> str:
+        raise ValueError("some error")
+
+    task = await task_no_result.kiq()
+    resp = await task.wait_result(timeout=1)
+
+    assert resp.return_value is None
+    assert not broker._running_tasks
+    assert isinstance(resp.error, ValueError)

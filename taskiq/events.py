@@ -7,7 +7,7 @@ class TaskiqEvents(enum.Enum):
 
     # Worker events.
 
-    # Called on woker startup.
+    # Called on worker startup.
     WORKER_STARTUP = "WORKER_STARTUP"
     # Called o worker shutdown.
     WORKER_SHUTDOWN = "WORKER_SHUTDOWN"

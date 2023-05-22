@@ -5,7 +5,7 @@ import { hopeTheme } from "vuepress-theme-hope";
 export default defineUserConfig({
   lang: "en-US",
   title: "Taskiq",
-  description: "Distributed task queue with full async support",
+  description: "Async Distributed Task Manager",
   head: [
     [
       "meta",
@@ -31,6 +31,7 @@ export default defineUserConfig({
     backToTop: false,
 
     plugins: {
+      readingTime: false,
       copyCode: {
         showInMobile: true,
       },

@@ -102,7 +102,7 @@ For example:
 
 @[code python](../examples/state/dependencies_tree.py)
 
-In this code, the dependency `common_dep` is going to be evaluated only once and the `dep1` and the `dep2` are going to recevie the same value. You can control this behavior by using the `use_cache=False` parameter to you dependency. This parameter will force the
+In this code, the dependency `common_dep` is going to be evaluated only once and the `dep1` and the `dep2` are going to receive the same value. You can control this behavior by using the `use_cache=False` parameter to you dependency. This parameter will force the
 dependency to reevaluate all it's subdependencies.
 
 In this example we cannot predict the result. Since the `dep2` doesn't use cache for the `common_dep` function.
@@ -167,7 +167,7 @@ If you want to do something asynchronously, convert this function to an asynchro
 
 ### Default dependencies
 
-By default taskiq has only two deendencies:
+By default taskiq has only two dependencies:
 
 - Context from `taskiq.context.Context`
 - TaskiqState from `taskiq.state.TaskiqState`
@@ -181,3 +181,33 @@ Taskiq have an ability to add new first-level dependencies using brokers.
 The AsyncBroker interface has a function called `add_dependency_context` and you can add
 more default dependencies to the taskiq. This may be useful for libraries if you want to
 add new dependencies to users.
+
+
+### Exception handling
+
+Dependencies can handle exceptions that happen in tasks. This feature is handy if you want your system to be more atomic.
+
+For example, if you open a database transaction in your dependency and want to commit it only if the function is completed successfully.
+
+```python
+async def get_transaction(db_driver: DBDriver = TaskiqDepends(get_driver)) -> AsyncGenerator[Transaction, None]:
+    trans = db_driver.begin_transaction():
+    try:
+        # Here we give transaction to our dependant function.
+        yield trans
+    # If exception was found in dependant function,
+    # we rollback our transaction.
+    except Exception:
+        await trans.rollback()
+        return
+    # Here we commit if everything is fine.
+    await trans.commit()
+```
+
+If you don't want to propagate exceptions in dependencies, you can add `--no-propagate-errors` option to `worker` command.
+
+```bash
+taskiq worker my_file:broker --no-propagate-errors
+```
+
+In this case, no exception will ever going to be propagated to any dependency.

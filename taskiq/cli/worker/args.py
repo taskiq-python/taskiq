@@ -42,6 +42,7 @@ class WorkerArgs:
     receiver_arg: List[Tuple[str, str]] = field(default_factory=list)
     max_prefetch: int = 0
     max_idle_tasks: Optional[int] = None
+    no_propagate_errors: bool = False
 
     @classmethod
     def from_cli(  # noqa: WPS213
@@ -101,7 +102,7 @@ class WorkerArgs:
             help=(
                 "If this option is on, "
                 "taskiq will try to find tasks modules "
-                "in current directory recursievly. Name of file to search for "
+                "in current directory recursively. Name of file to search for "
                 "can be configured using `--tasks-pattern` option."
             ),
         )
@@ -128,7 +129,7 @@ class WorkerArgs:
                 "[%(module)s:%(funcName)s:%(lineno)d] "
                 "%(message)s"
             ),
-            help="Format wich is used when collecting logs from function execution",
+            help="Format which is used when collecting logs from function execution",
         )
         parser.add_argument(
             "--no-parse",
@@ -137,6 +138,16 @@ class WorkerArgs:
                 "If this parameter is on,"
                 " taskiq doesn't parse incoming parameters "
                 " with pydantic."
+            ),
+        )
+        parser.add_argument(
+            "--no-propagate-errors",
+            action="store_true",
+            dest="no_propagate_errors",
+            help=(
+                "If this parameter is on,"
+                " all errors that happen in tasks "
+                " won't be propagated to generator dependencies."
             ),
         )
         parser.add_argument(
