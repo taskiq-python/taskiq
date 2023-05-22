@@ -41,7 +41,7 @@ class WorkerArgs:
     receiver: str = "taskiq.receiver:Receiver"
     receiver_arg: List[Tuple[str, str]] = field(default_factory=list)
     max_prefetch: int = 0
-    max_idle_tasks: Optional[int] = None
+    max_sleeping_tasks: Optional[int] = None
     no_propagate_errors: bool = False
 
     @classmethod
@@ -189,11 +189,11 @@ class WorkerArgs:
             help="Maximum prefetched tasks per worker process. ",
         )
         parser.add_argument(
-            "--max-idle-tasks",
+            "--max-sleeping-tasks",
             type=int,
-            dest="max_idle_tasks",
+            dest="max_sleeping_tasks",
             default=None,
-            help="Maximum idle tasks per worker process. ",
+            help="Maximum sleeping tasks per worker process. ",
         )
 
         namespace = parser.parse_args(args)

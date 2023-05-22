@@ -3,18 +3,18 @@ import asyncio
 import anyio
 import pytest
 
-from taskiq.semaphore import DequeSemaphore
+from taskiq.semaphore import PrioritySemaphore
 
 
 @pytest.mark.anyio
 async def test_semaphore_exception() -> None:
     with pytest.raises(ValueError):
-        DequeSemaphore(-1)
+        PrioritySemaphore(-1)
 
 
 @pytest.mark.anyio
 async def test_semaphore() -> None:
-    sem = DequeSemaphore(1)
+    sem = PrioritySemaphore(1)
 
     async def c1() -> None:
         await sem.acquire()

@@ -14,10 +14,10 @@ class Context:
         self,
         message: TaskiqMessage,
         broker: AsyncBroker,
-        task_idler: Callable[[float], Awaitable[None]],
+        sleep: Callable[[float], Awaitable[None]],
     ) -> None:
         self.message = message
         self.broker = broker
         self.state: "TaskiqState" = None  # type: ignore
         self.state = broker.state
-        self.task_idler = task_idler
+        self.sleep = sleep

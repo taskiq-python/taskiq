@@ -5,9 +5,9 @@ from typing import Any, Deque
 from typing_extensions import Literal
 
 
-class DequeSemaphore:
+class PrioritySemaphore:
     """
-    Custom deque based semaphore.
+    Custom semaphore with prioerities.
 
     https://neopythonic.blogspot.com/2022/10/reasoning-about-asynciosemaphore.html
     """

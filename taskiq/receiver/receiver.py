@@ -15,7 +15,7 @@ from taskiq.exceptions import NoResultError
 from taskiq.message import TaskiqMessage
 from taskiq.receiver.params_parser import parse_params
 from taskiq.result import TaskiqResult
-from taskiq.semaphore import DequeSemaphore
+from taskiq.semaphore import PrioritySemaphore
 from taskiq.state import TaskiqState
 from taskiq.utils import DequeQueue, maybe_awaitable
 
@@ -48,7 +48,7 @@ class Receiver:
         validate_params: bool = True,
         max_async_tasks: "Optional[int]" = None,
         max_prefetch: int = 0,
-        max_idle_tasks: Optional[int] = None,
+        max_sleeping_tasks: Optional[int] = None,
         propagate_exceptions: bool = True,
     ) -> None:
         self.broker = broker
@@ -62,22 +62,22 @@ class Receiver:
             self.task_signatures[task.task_name] = inspect.signature(task.original_func)
             self.task_hints[task.task_name] = get_type_hints(task.original_func)
             self.dependency_graphs[task.task_name] = DependencyGraph(task.original_func)
-        self.sem: "Optional[DequeSemaphore]" = None
+        self.sem: "Optional[PrioritySemaphore]" = None
         if max_async_tasks is not None and max_async_tasks > 0:
-            self.sem = DequeSemaphore(max_async_tasks)
+            self.sem = PrioritySemaphore(max_async_tasks)
         else:
             logger.warning(
                 "Setting unlimited number of async tasks "
                 + "can result in undefined behavior",
             )
-        self.sem_prefetch = DequeSemaphore(max_prefetch)
+        self.sem_prefetch = PrioritySemaphore(max_prefetch)
         self.queue: DequeQueue[bytes] = DequeQueue()
 
-        self.sem_idle: Optional[asyncio.Semaphore] = None
-        if max_idle_tasks is not None and max_idle_tasks <= 0:
+        self.sem_sleeping: Optional[asyncio.Semaphore] = None
+        if max_sleeping_tasks is not None and max_sleeping_tasks <= 0:
             raise ValueError("`max_idle_tasks` should be greater then zero or None.")
-        if max_idle_tasks is not None and max_idle_tasks > 0:
-            self.sem_idle = asyncio.Semaphore(max_idle_tasks)
+        if max_sleeping_tasks is not None and max_sleeping_tasks > 0:
+            self.sem_sleeping = asyncio.Semaphore(max_sleeping_tasks)
 
     async def callback(  # noqa: C901, WPS213
         self,
@@ -190,7 +190,7 @@ class Receiver:
             broker_ctx = self.broker.custom_dependency_context
             broker_ctx.update(
                 {
-                    Context: Context(message, self.broker, self.task_idler),
+                    Context: Context(message, self.broker, self.task_sleeper),
                     TaskiqState: self.broker.state,
                 },
             )
@@ -344,9 +344,11 @@ class Receiver:
             # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
             task.add_done_callback(task_cb)
 
-    async def task_idler(self, wait: float) -> None:  # noqa: WPS213, WPS217
+    async def task_sleeper(self, wait: float) -> None:  # noqa: WPS213, WPS217
         """
-        Temporary increasing `max_async_tasks` for at least `wait` amount of time.
+        Non-blocking sleep for running tasks.
+
+        Temporary increasing `max_async_tasks` for at least `wait` amount of time
 
         :param wait: time
         """
@@ -354,14 +356,14 @@ class Receiver:
             await asyncio.sleep(wait)
             return
 
-        if not self.sem_idle:
-            logger.warning("`max_idle_tasks` is undefined. Idle is unavailable.")
+        if not self.sem_sleeping:
+            logger.warning("`max_sleeping_tasks` is undefined. Sleep is unavailable.")
             await asyncio.sleep(wait)
             return
 
         start_time = time()
         with anyio.move_on_after(wait) as scope:
-            await self.sem_idle.acquire()
+            await self.sem_sleeping.acquire()
 
         if scope.cancel_called:  # noqa: WPS441
             return
@@ -381,4 +383,4 @@ class Receiver:
             await task
 
         finally:
-            self.sem_idle.release()
+            self.sem_sleeping.release()

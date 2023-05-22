@@ -34,7 +34,7 @@ def get_receiver(
     broker: Optional[AsyncBroker] = None,
     no_parse: bool = False,
     max_async_tasks: Optional[int] = None,
-    max_idle_tasks: Optional[int] = None,
+    max_sleeping_tasks: Optional[int] = None,
 ) -> Receiver:
     """
     Returns receiver with custom broker and args.
@@ -51,7 +51,7 @@ def get_receiver(
         executor=ThreadPoolExecutor(max_workers=10),
         validate_params=not no_parse,
         max_async_tasks=max_async_tasks,
-        max_idle_tasks=max_idle_tasks,
+        max_sleeping_tasks=max_sleeping_tasks,
     )
 
 
@@ -333,13 +333,13 @@ async def test_tasks_chain_with_idler() -> None:
     @broker.task
     async def task_map(vals: List[int], ctx: Context = Depends()) -> List[int]:
         tasks = [await task_add_one.kiq(val) for val in vals]
-        await ctx.task_idler(0.5)
+        await ctx.sleep(0.5)
         resps_tasks = [asyncio.create_task(t.wait_result(timeout=1)) for t in tasks]
         resps = await asyncio.gather(*resps_tasks)
         res = [r.return_value for r in resps]
         return res
 
-    receiver = get_receiver(broker, max_async_tasks=1, max_idle_tasks=1)
+    receiver = get_receiver(broker, max_async_tasks=1, max_sleeping_tasks=1)
     listen_task = asyncio.create_task(receiver.listen())
 
     task = await task_map.kiq(list(range(0, 10)))
@@ -349,7 +349,7 @@ async def test_tasks_chain_with_idler() -> None:
     await broker.shutdown()
     await listen_task
 
-    assert receiver.sem_idle._value == 1  # type: ignore
+    assert receiver.sem_sleeping._value == 1  # type: ignore
     assert receiver.sem._value == 1  # type: ignore
 
 
@@ -376,14 +376,14 @@ async def test_tasks_chain_deep() -> None:
             resp_task = asyncio.create_task(
                 task.wait_result(interval * 0.4, timeout=interval),
             )
-            await ctx.task_idler(interval)
+            await ctx.sleep(interval)
 
             try:
                 return await resp_task
             except TaskiqResultTimeoutError:
                 continue
 
-    receiver = get_receiver(broker, max_async_tasks=1, max_idle_tasks=10)
+    receiver = get_receiver(broker, max_async_tasks=1, max_sleeping_tasks=10)
     listen_task = asyncio.create_task(receiver.listen())
 
     task = await task_run.kiq(10, "hello world!")
@@ -393,7 +393,7 @@ async def test_tasks_chain_deep() -> None:
     await broker.shutdown()
     await listen_task
 
-    assert receiver.sem_idle._value == 10  # type: ignore
+    assert receiver.sem_sleeping._value == 10  # type: ignore
     assert receiver.sem._value == 1  # type: ignore
 
 
@@ -404,10 +404,10 @@ async def test_tasks_sleep() -> None:
 
     @broker.task
     async def task_run(ind: int, ctx: Context = Depends()) -> int:
-        await ctx.task_idler(0.1)
+        await ctx.sleep(0.1)
         return ind
 
-    receiver = get_receiver(broker, max_async_tasks=1, max_idle_tasks=20)
+    receiver = get_receiver(broker, max_async_tasks=1, max_sleeping_tasks=20)
     listen_task = asyncio.create_task(receiver.listen())
 
     with anyio.fail_after(1):
@@ -423,10 +423,11 @@ async def test_tasks_sleep() -> None:
     await broker.shutdown()
     await listen_task
 
-    assert receiver.sem_idle._value == 20  # type: ignore
+    assert receiver.sem_sleeping._value == 20  # type: ignore
     assert receiver.sem._value == 1  # type: ignore
 
 
+@pytest.mark.anyio
 async def test_no_result_error() -> None:
     broker = InMemoryBroker()
     executed = asyncio.Event()
