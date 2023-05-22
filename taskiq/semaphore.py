@@ -52,7 +52,7 @@ class PrioritySemaphore:
         Acquire a semaphore.
 
         :param first: acquire ASAP
-        :raises asyncio.exceptions.CancelledError: task cancelled
+        :raises asyncio.CancelledError: task cancelled
         :returns: true
         """
         if not self.locked():
@@ -78,7 +78,7 @@ class PrioritySemaphore:
                 else:
                     self._waiters.remove(fut)
 
-        except asyncio.exceptions.CancelledError:
+        except asyncio.CancelledError:
             if not fut.cancelled():
                 self._value += 1
                 self._wakeup_next()
