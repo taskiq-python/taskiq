@@ -3,7 +3,6 @@ import sys
 import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from dataclasses import dataclass
 from functools import wraps
 from logging import getLogger
 from typing import (  # noqa: WPS235
@@ -25,6 +24,7 @@ from uuid import uuid4
 from typing_extensions import ParamSpec, Self, TypeAlias
 
 from taskiq.abc.middleware import TaskiqMiddleware
+from taskiq.acks import AckableMessage
 from taskiq.decor import AsyncTaskiqDecoratedTask
 from taskiq.events import TaskiqEvents
 from taskiq.formatters.json_formatter import JSONFormatter
@@ -57,24 +57,6 @@ def default_id_generator() -> str:
     :return: new task_id.
     """
     return uuid4().hex
-
-
-@dataclass
-class AckableMessage:
-    """
-    Message that can be acknowledged.
-
-    If your broker support message acknowledgement,
-    please return this type of message, so we'll be
-    able to mark this message as acknowledged after
-    the function will be executed.
-
-    It adds more reliability to brokers and system
-    as a whole.
-    """
-
-    data: bytes
-    ack: Callable[[], Union[None, Awaitable[None]]]
 
 
 class AsyncBroker(ABC):

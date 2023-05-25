@@ -11,7 +11,7 @@ from taskiq_dependencies import DependencyGraph
 from taskiq.abc.broker import AckableMessage, AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.context import Context
-from taskiq.exceptions import NoResultError
+from taskiq.exceptions import NoResultError, RejectError
 from taskiq.message import TaskiqMessage
 from taskiq.receiver.params_parser import parse_params
 from taskiq.result import TaskiqResult
@@ -128,11 +128,20 @@ class Receiver:
             target=self.broker.available_tasks[taskiq_msg.task_name].original_func,
             message=taskiq_msg,
         )
+
+        # If broker has an ability to ack or reject messages.
         if isinstance(message, AckableMessage):
-            await maybe_awaitable(message.ack())
+            # If we received an error for negative acknowledgement.
+            if message.reject is not None and isinstance(result.error, RejectError):
+                await maybe_awaitable(message.reject())
+            # Otherwise we positively acknowledge the message.
+            else:
+                await maybe_awaitable(message.ack())
+
         for middleware in self.broker.middlewares:
             if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
                 await maybe_awaitable(middleware.post_execute(taskiq_msg, result))
+
         try:
             if not isinstance(result.error, NoResultError):
                 await self.broker.result_backend.set_result(taskiq_msg.task_id, result)
