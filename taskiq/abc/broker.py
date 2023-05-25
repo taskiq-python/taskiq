@@ -68,7 +68,10 @@ class AsyncBroker(ABC):
     """
 
     available_tasks: Dict[str, AsyncTaskiqDecoratedTask[Any, Any]] = {}
+    # True only if broker runs in worker process.
     is_worker_process: bool = False
+    # True only if broker runs in scheduler process.
+    is_scheduler_process: bool = False
 
     def __init__(
         self,

@@ -5,6 +5,7 @@ from typing import List
 
 from pycron import is_now
 
+from taskiq.abc.broker import AsyncBroker
 from taskiq.cli.scheduler.args import SchedulerArgs
 from taskiq.cli.utils import import_object, import_tasks
 from taskiq.kicker import AsyncKicker
@@ -70,6 +71,7 @@ async def run_scheduler(args: SchedulerArgs) -> None:  # noqa: C901, WPS210, WPS
 
     :param args: parsed CLI args.
     """
+    AsyncBroker.is_scheduler_process = True
     scheduler = import_object(args.scheduler)
     if not isinstance(scheduler, TaskiqScheduler):
         print(  # noqa: WPS421
