@@ -3,6 +3,7 @@ import sys
 import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from dataclasses import dataclass
 from functools import wraps
 from logging import getLogger
 from typing import (  # noqa: WPS235
@@ -56,6 +57,24 @@ def default_id_generator() -> str:
     :return: new task_id.
     """
     return uuid4().hex
+
+
+@dataclass
+class AckableMessage:
+    """
+    Message that can be acknowledged.
+
+    If your broker support message acknowledgement,
+    please return this type of message, so we'll be
+    able to mark this message as acknowledged after
+    the function will be executed.
+
+    It adds more reliability to brokers and system
+    as a whole.
+    """
+
+    data: bytes
+    ack: Callable[[], Union[None, Awaitable[None]]]
 
 
 class AsyncBroker(ABC):
@@ -185,12 +204,18 @@ class AsyncBroker(ABC):
         """
 
     @abstractmethod
-    def listen(self) -> AsyncGenerator[bytes, None]:
+    def listen(self) -> AsyncGenerator[Union[bytes, AckableMessage], None]:
         """
         This function listens to new messages and yields them.
 
         This it the main point for workers.
         This function is used to get new tasks from the network.
+
+        If your broker support acknowledgement, then you
+        should wrap your message in AckableMessage dataclass.
+
+        If your messages was wrapped in AckableMessage dataclass,
+        taskiq will call ack when finish processing message.
 
         :yield: incoming messages.
         :return: nothing.
