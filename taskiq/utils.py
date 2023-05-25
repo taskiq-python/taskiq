@@ -1,5 +1,6 @@
+import asyncio
 import inspect
-from typing import Any, Coroutine, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Coroutine, Generic, Tuple, TypeVar, Union
 
 _T = TypeVar("_T")  # noqa: WPS111
 
@@ -35,3 +36,54 @@ def remove_suffix(text: str, suffix: str) -> str:
     if text.endswith(suffix):
         return text[: -len(suffix)]
     return text
+
+
+class PriorityQueue(asyncio.PriorityQueue, Generic[_T]):  # type: ignore
+    """PriorityQueue based Queue."""
+
+    async def put_first(self, item: _T) -> None:
+        """
+        Put item in Queue with highest priority.
+
+        :param item: value to prepend
+        """
+        self.counter += 1
+        await self.put((0, self.counter, item))
+
+    async def put_last(self, item: _T) -> None:
+        """
+        Put item in Queue with lowest priority.
+
+        :param item: value to append
+        """
+        self.counter += 1
+        await self.put((1, self.counter, item))
+
+    def _init(self, maxsize: int) -> None:
+        super()._init(maxsize)
+        self.counter = 0
+
+
+if TYPE_CHECKING:  # pragma: no cover
+
+    class PriorityQueue(  # type: ignore  # noqa: F811
+        asyncio.PriorityQueue[Tuple[int, int, _T]],
+        Generic[_T],
+    ):
+        """PriorityQueue based Queue."""
+
+        async def put_first(self, item: _T) -> None:
+            """
+            Put item in Queue with highest priority.
+
+            :param item: value to prepend
+            """
+            ...
+
+        async def put_last(self, item: _T) -> None:
+            """
+            Put item in Queue with lowest priority.
+
+            :param item: value to append
+            """
+            ...

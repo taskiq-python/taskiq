@@ -15,11 +15,13 @@ from taskiq.exceptions import NoResultError
 from taskiq.message import TaskiqMessage
 from taskiq.receiver.params_parser import parse_params
 from taskiq.result import TaskiqResult
+from taskiq.semaphore import PrioritySemaphore
 from taskiq.state import TaskiqState
-from taskiq.utils import maybe_awaitable
+from taskiq.utils import PriorityQueue, maybe_awaitable
 
 logger = getLogger(__name__)
 QUEUE_DONE = b"-1"
+QUEUE_SKIP = b"-2"
 
 
 def _run_sync(target: Callable[..., Any], message: TaskiqMessage) -> Any:
@@ -46,6 +48,7 @@ class Receiver:
         validate_params: bool = True,
         max_async_tasks: "Optional[int]" = None,
         max_prefetch: int = 0,
+        max_sleeping_tasks: Optional[int] = None,
         propagate_exceptions: bool = True,
     ) -> None:
         self.broker = broker
@@ -59,15 +62,24 @@ class Receiver:
             self.task_signatures[task.task_name] = inspect.signature(task.original_func)
             self.task_hints[task.task_name] = get_type_hints(task.original_func)
             self.dependency_graphs[task.task_name] = DependencyGraph(task.original_func)
-        self.sem: "Optional[asyncio.Semaphore]" = None
+        self.sem: "Optional[PrioritySemaphore]" = None
         if max_async_tasks is not None and max_async_tasks > 0:
-            self.sem = asyncio.Semaphore(max_async_tasks)
+            self.sem = PrioritySemaphore(max_async_tasks)
         else:
             logger.warning(
                 "Setting unlimited number of async tasks "
                 + "can result in undefined behavior",
             )
-        self.sem_prefetch = asyncio.Semaphore(max_prefetch)
+        self.sem_prefetch = PrioritySemaphore(max_prefetch)
+        self.queue: PriorityQueue[bytes] = PriorityQueue()
+
+        self.sem_sleeping: Optional[asyncio.Semaphore] = None
+        if max_sleeping_tasks is not None and max_sleeping_tasks < 0:
+            raise ValueError(
+                "`max_sleeping_tasks` should be greater than zero or None.",
+            )
+        if max_sleeping_tasks is not None and max_sleeping_tasks > 0:
+            self.sem_sleeping = asyncio.Semaphore(max_sleeping_tasks)
 
     async def callback(  # noqa: C901, WPS213
         self,
@@ -180,7 +192,7 @@ class Receiver:
             broker_ctx = self.broker.custom_dependency_context
             broker_ctx.update(
                 {
-                    Context: Context(message, self.broker),
+                    Context: Context(message, self.broker, self.task_sleeper),
                     TaskiqState: self.broker.state,
                 },
             )
@@ -255,13 +267,12 @@ class Receiver:
         """
         await self.broker.startup()
         logger.info("Listening started.")
-        queue: asyncio.Queue[bytes] = asyncio.Queue()
 
         async with anyio.create_task_group() as gr:
-            gr.start_soon(self.prefetcher, queue)
-            gr.start_soon(self.runner, queue)
+            gr.start_soon(self.prefetcher, self.queue)
+            gr.start_soon(self.runner, self.queue)
 
-    async def prefetcher(self, queue: "asyncio.Queue[Any]") -> None:
+    async def prefetcher(self, queue: "PriorityQueue[Any]") -> None:
         """
         Prefetch tasks data.
 
@@ -273,14 +284,14 @@ class Receiver:
             try:
                 await self.sem_prefetch.acquire()
                 message = await iterator.__anext__()  # noqa: WPS609
-                await queue.put(message)
+                await queue.put_last(message)
 
             except StopAsyncIteration:
                 break
 
-        await queue.put(QUEUE_DONE)
+        await queue.put_last(QUEUE_DONE)
 
-    async def runner(self, queue: "asyncio.Queue[bytes]") -> None:
+    async def runner(self, queue: "PriorityQueue[bytes]") -> None:  # noqa: C901, WPS213
         """
         Run tasks.
 
@@ -308,9 +319,20 @@ class Receiver:
                 await self.sem.acquire()
 
             self.sem_prefetch.release()
-            message = await queue.get()
+            _, _, message = await queue.get()
             if message is QUEUE_DONE:
+                if self.sem is not None:
+                    self.sem.release()
                 break
+            if message is QUEUE_SKIP:
+                # Decrease max_prefetch
+                prefetch_dec = asyncio.create_task(self.sem_prefetch.acquire_first())
+                prefetch_dec.add_done_callback(tasks.discard)
+                tasks.add(prefetch_dec)
+
+                if self.sem is not None:
+                    self.sem.release()
+                continue
 
             task = asyncio.create_task(
                 self.callback(message=message, raise_err=False),
@@ -323,3 +345,44 @@ class Receiver:
             # and it considered to be Hisenbug.
             # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
             task.add_done_callback(task_cb)
+
+    async def task_sleeper(self, wait: float) -> None:  # noqa: WPS213, WPS217
+        """
+        Non-blocking sleep for running tasks.
+
+        Temporary increasing `max_async_tasks` for at least `wait` amount of time
+
+        :param wait: time
+        """
+        if not self.sem:
+            await asyncio.sleep(wait)
+            return
+
+        if not self.sem_sleeping:
+            logger.warning("`max_sleeping_tasks` is undefined. Sleep is unavailable.")
+            await asyncio.sleep(wait)
+            return
+
+        start_time = time()
+        with anyio.move_on_after(wait) as scope:
+            await self.sem_sleeping.acquire()
+
+        if scope.cancel_called:  # noqa: WPS441
+            return
+
+        try:  # noqa: WPS501
+            # Increase max_tasks
+            # Increase max_prefetch in runner
+            self.sem.release()
+
+            # Wait
+            await asyncio.sleep(max(wait - (time() - start_time), 0))
+
+            # Decrease max_prefetch in runner
+            task = asyncio.create_task(self.queue.put_first(QUEUE_SKIP))
+            # Decrease max_tasks
+            await self.sem.acquire_first()
+            await task
+
+        finally:
+            self.sem_sleeping.release()
