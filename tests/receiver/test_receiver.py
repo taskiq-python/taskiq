@@ -162,7 +162,7 @@ async def test_callback_success() -> None:
 
     @broker.task
     async def my_task() -> int:
-        nonlocal called_times  # noqa: WPS420
+        nonlocal called_times
         called_times += 1
         return 1
 
@@ -415,7 +415,7 @@ async def test_callback_semaphore() -> None:
 
     @broker.task
     async def task_sem() -> int:
-        nonlocal sem_num  # noqa: WPS420
+        nonlocal sem_num
         sem_num += 1
         await asyncio.sleep(1)
         return 1
