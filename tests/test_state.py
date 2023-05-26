@@ -24,7 +24,7 @@ def test_state_del() -> None:
 
     state["a"] = 1
 
-    del state["a"]  # noqa: WPS420
+    del state["a"]
 
     assert state.get("a") is None
 
@@ -53,6 +53,6 @@ def test_state_del_attr() -> None:
 
     state["a"] = 1
 
-    del state.a  # noqa: WPS420
+    del state.a
 
     assert state.get("a") is None
