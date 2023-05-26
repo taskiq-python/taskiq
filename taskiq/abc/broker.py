@@ -24,6 +24,7 @@ from uuid import uuid4
 from typing_extensions import ParamSpec, Self, TypeAlias
 
 from taskiq.abc.middleware import TaskiqMiddleware
+from taskiq.acks import AckableMessage
 from taskiq.decor import AsyncTaskiqDecoratedTask
 from taskiq.events import TaskiqEvents
 from taskiq.formatters.json_formatter import JSONFormatter
@@ -68,7 +69,10 @@ class AsyncBroker(ABC):
     """
 
     available_tasks: Dict[str, AsyncTaskiqDecoratedTask[Any, Any]] = {}
+    # True only if broker runs in worker process.
     is_worker_process: bool = False
+    # True only if broker runs in scheduler process.
+    is_scheduler_process: bool = False
 
     def __init__(
         self,
@@ -182,12 +186,18 @@ class AsyncBroker(ABC):
         """
 
     @abstractmethod
-    def listen(self) -> AsyncGenerator[bytes, None]:
+    def listen(self) -> AsyncGenerator[Union[bytes, AckableMessage], None]:
         """
         This function listens to new messages and yields them.
 
         This it the main point for workers.
         This function is used to get new tasks from the network.
+
+        If your broker support acknowledgement, then you
+        should wrap your message in AckableMessage dataclass.
+
+        If your messages was wrapped in AckableMessage dataclass,
+        taskiq will call ack when finish processing message.
 
         :yield: incoming messages.
         :return: nothing.

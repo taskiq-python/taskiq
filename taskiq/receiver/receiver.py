@@ -3,15 +3,15 @@ import inspect
 from concurrent.futures import Executor
 from logging import getLogger
 from time import time
-from typing import Any, Callable, Dict, Optional, Set, get_type_hints
+from typing import Any, Callable, Dict, Optional, Set, Union, get_type_hints
 
 import anyio
 from taskiq_dependencies import DependencyGraph
 
-from taskiq.abc.broker import AsyncBroker
+from taskiq.abc.broker import AckableMessage, AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.context import Context
-from taskiq.exceptions import NoResultError
+from taskiq.exceptions import NoResultError, RejectError
 from taskiq.message import TaskiqMessage
 from taskiq.receiver.params_parser import parse_params
 from taskiq.result import TaskiqResult
@@ -69,9 +69,9 @@ class Receiver:
             )
         self.sem_prefetch = asyncio.Semaphore(max_prefetch)
 
-    async def callback(  # noqa: C901, WPS213
+    async def callback(  # noqa: C901, WPS213, WPS217
         self,
-        message: bytes,
+        message: Union[bytes, AckableMessage],
         raise_err: bool = False,
     ) -> None:
         """
@@ -86,12 +86,16 @@ class Receiver:
         :param raise_err: raise an error if cannot save result in
             result_backend.
         """
+        if isinstance(message, AckableMessage):
+            message_data = message.data
+        else:
+            message_data = message
         try:
-            taskiq_msg = self.broker.formatter.loads(message=message)
+            taskiq_msg = self.broker.formatter.loads(message=message_data)
         except Exception as exc:
             logger.warning(
                 "Cannot parse message: %s. Skipping execution.\n %s",
-                message,
+                message_data,
                 exc,
                 exc_info=True,
             )
@@ -124,9 +128,20 @@ class Receiver:
             target=self.broker.available_tasks[taskiq_msg.task_name].original_func,
             message=taskiq_msg,
         )
+
+        # If broker has an ability to ack or reject messages.
+        if isinstance(message, AckableMessage):
+            # If we received an error for negative acknowledgement.
+            if message.reject is not None and isinstance(result.error, RejectError):
+                await maybe_awaitable(message.reject())
+            # Otherwise we positively acknowledge the message.
+            else:
+                await maybe_awaitable(message.ack())
+
         for middleware in self.broker.middlewares:
             if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
                 await maybe_awaitable(middleware.post_execute(taskiq_msg, result))
+
         try:
             if not isinstance(result.error, NoResultError):
                 await self.broker.result_backend.set_result(taskiq_msg.task_id, result)
@@ -255,13 +270,16 @@ class Receiver:
         """
         await self.broker.startup()
         logger.info("Listening started.")
-        queue: asyncio.Queue[bytes] = asyncio.Queue()
+        queue: "asyncio.Queue[Union[bytes, AckableMessage]]" = asyncio.Queue()
 
         async with anyio.create_task_group() as gr:
             gr.start_soon(self.prefetcher, queue)
             gr.start_soon(self.runner, queue)
 
-    async def prefetcher(self, queue: "asyncio.Queue[Any]") -> None:
+    async def prefetcher(
+        self,
+        queue: "asyncio.Queue[Union[bytes, AckableMessage]]",
+    ) -> None:
         """
         Prefetch tasks data.
 
@@ -280,7 +298,10 @@ class Receiver:
 
         await queue.put(QUEUE_DONE)
 
-    async def runner(self, queue: "asyncio.Queue[bytes]") -> None:
+    async def runner(
+        self,
+        queue: "asyncio.Queue[Union[bytes, AckableMessage]]",
+    ) -> None:
         """
         Run tasks.
 

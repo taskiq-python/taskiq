@@ -1,11 +1,11 @@
 import inspect
-from typing import Any, Coroutine, TypeVar, Union
+from typing import Any, Awaitable, Coroutine, TypeVar, Union
 
 _T = TypeVar("_T")  # noqa: WPS111
 
 
 async def maybe_awaitable(
-    possible_coroutine: "Union[_T, Coroutine[Any, Any, _T]]",
+    possible_coroutine: "Union[_T, Coroutine[Any, Any, _T], Awaitable[_T]]",
 ) -> _T:
     """
     Awaits coroutine if needed.
