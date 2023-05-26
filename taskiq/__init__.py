@@ -21,7 +21,16 @@ from taskiq.scheduler import ScheduledTask, TaskiqScheduler
 from taskiq.state import TaskiqState
 from taskiq.task import AsyncTaskiqTask
 
+try:
+    # Python 3.8+
+    from importlib.metadata import version  # noqa: WPS433
+except ImportError:
+    # Python 3.7
+    from importlib_metadata import version  # noqa: WPS433
+
+__version__ = version("taskiq")
 __all__ = [
+    "__version__",
     "gather",
     "Context",
     "AsyncBroker",
