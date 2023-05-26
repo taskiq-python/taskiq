@@ -36,3 +36,7 @@ class SecurityError(TaskiqError):
 
 class NoResultError(TaskiqError):
     """Error if user does not want to set result."""
+
+
+class RejectError(TaskiqError):
+    """Error is thrown if message should be rejected."""
