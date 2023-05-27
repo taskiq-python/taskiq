@@ -2,8 +2,9 @@ import argparse
 import sys
 from typing import Dict
 
-from importlib_metadata import entry_points, version
+from importlib_metadata import entry_points
 
+from taskiq import __version__
 from taskiq.abc.cmd import TaskiqCMD
 
 
@@ -60,7 +61,7 @@ def main() -> None:  # noqa: WPS210  # pragma: no cover
     args, _ = parser.parse_known_args()
 
     if args.version:
-        print(version("taskiq"))  # noqa: WPS421
+        print(__version__)  # noqa: WPS421
         return
 
     if args.subcommand is None:

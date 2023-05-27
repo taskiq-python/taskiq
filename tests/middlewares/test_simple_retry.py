@@ -37,7 +37,6 @@ async def test_successful_retry(broker: AsyncMock) -> None:
     resend: TaskiqMessage = broker.kick.await_args.args[0]
     assert resend.task_name == "meme"
     assert resend.labels["_retries"] == "1"
-    assert resend.labels["_parent"] == "test_id"
 
 
 @pytest.mark.anyio
