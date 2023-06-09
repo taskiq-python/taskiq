@@ -133,7 +133,12 @@ class Receiver:
         if isinstance(message, AckableMessage):
             # If we received an error for negative acknowledgement.
             if message.reject is not None and isinstance(result.error, RejectError):
-                await maybe_awaitable(message.reject())
+                await maybe_awaitable(
+                    message.reject(
+                        *result.error.args,
+                        **result.error.kwargs,
+                    ),
+                )
             # Otherwise we positively acknowledge the message.
             else:
                 await maybe_awaitable(message.ack())

@@ -1,3 +1,6 @@
+from typing import Any
+
+
 class TaskiqError(Exception):
     """Base exception for all errors."""
 
@@ -40,3 +43,7 @@ class NoResultError(TaskiqError):
 
 class RejectError(TaskiqError):
     """Error is thrown if message should be rejected."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        self.args = args
+        self.kwargs = kwargs

@@ -18,4 +18,4 @@ class AckableMessage:
 
     data: bytes
     ack: Callable[[], Union[None, Awaitable[None]]]
-    reject: Optional[Callable[[], Union[None, Awaitable[None]]]] = None
+    reject: Optional[Callable[..., Union[None, Awaitable[None]]]] = None
