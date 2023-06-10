@@ -42,4 +42,3 @@ async def test_requeue_from_dependency() -> None:
     await kicked.wait_result()
 
     assert runs_count == 2
-    assert False
