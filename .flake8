@@ -95,17 +95,6 @@ ignore =
   ; Found too many public instance attributes
   WPS230,
 
-  ; all init files
-  __init__.py:
-  ; ignore not used imports
-  F401,
-  ; ignore import with wildcard
-  F403,
-  ; Found wrong metadata variable
-  WPS410,
-  ; Found commented out cod
-  E800,
-
 per-file-ignores =
   ; all tests
   test_*.py,tests.py,tests_*.py,*/tests/*:
@@ -119,6 +108,21 @@ per-file-ignores =
   WPS111,
   ; Found complex default value
   WPS404,
+
+  ; all init files
+  __init__.py:
+  ; ignore not used imports
+  F401,
+  ; ignore import with wildcard
+  F403,
+  ; Found wrong metadata variable
+  WPS410,
+  ; Found commented out cod
+  E800,
+
+  taskiq/serialization.py:
+  ; Found commented out code
+  E800,
 
 exclude =
   ./.git,
