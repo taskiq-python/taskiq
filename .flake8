@@ -117,7 +117,7 @@ per-file-ignores =
   F403,
   ; Found wrong metadata variable
   WPS410,
-  ; Found commented out cod
+  ; Found commented out code
   E800,
 
   taskiq/serialization.py:
