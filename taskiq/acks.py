@@ -1,9 +1,9 @@
-import dataclasses
-from typing import Awaitable, Callable, Optional, Union
+from typing import Awaitable, Callable, Union
+
+from pydantic import BaseModel
 
 
-@dataclasses.dataclass
-class AckableMessage:
+class AckableMessage(BaseModel):
     """
     Message that can be acknowledged.
 
@@ -18,4 +18,3 @@ class AckableMessage:
 
     data: bytes
     ack: Callable[[], Union[None, Awaitable[None]]]
-    reject: Optional[Callable[[], Union[None, Awaitable[None]]]] = None

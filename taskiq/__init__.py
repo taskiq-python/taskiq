@@ -14,7 +14,6 @@ from taskiq.context import Context
 from taskiq.events import TaskiqEvents
 from taskiq.exceptions import (
     NoResultError,
-    RejectError,
     ResultGetError,
     ResultIsReadyError,
     SecurityError,
@@ -45,7 +44,6 @@ __all__ = [
     "Context",
     "AsyncBroker",
     "TaskiqError",
-    "RejectError",
     "TaskiqState",
     "TaskiqResult",
     "ZeroMQBroker",
