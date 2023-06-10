@@ -206,14 +206,19 @@ class Receiver:
             )
             dep_ctx = dependency_graph.async_ctx(broker_ctx)
             # Resolve all function's dependencies.
-            kwargs = await dep_ctx.resolve_kwargs()
-
-        # We udpate kwargs with kwargs from network.
-        kwargs.update(message.kwargs)
 
         # Start a timer.
         start_time = time()
+
         try:
+            # We put kwargs resolving here,
+            # to be able to catch any exception (for example ),
+            # that happen while resolving dependencies.
+            if dep_ctx:
+                kwargs = await dep_ctx.resolve_kwargs()
+            # We udpate kwargs with kwargs from network.
+            kwargs.update(message.kwargs)
+
             # If the function is a coroutine, we await it.
             if asyncio.iscoroutinefunction(target):
                 returned = await target(*message.args, **kwargs)
