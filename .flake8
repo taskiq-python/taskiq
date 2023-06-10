@@ -93,7 +93,7 @@ ignore =
   ; Do not perform function calls in argument defaults.
   B008,
   ; Found too many public instance attributes
-  WPS230
+  WPS230,
 
 per-file-ignores =
   ; all tests
@@ -118,11 +118,11 @@ per-file-ignores =
   ; Found wrong metadata variable
   WPS410,
   ; Found commented out code
-  E800
+  E800,
 
   taskiq/serialization.py:
   ; Found commented out code
-  E800
+  E800,
 
 exclude =
   ./.git,

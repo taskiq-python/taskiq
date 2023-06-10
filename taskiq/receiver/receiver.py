@@ -3,7 +3,7 @@ import inspect
 from concurrent.futures import Executor
 from logging import getLogger
 from time import time
-from typing import Any, Callable, Dict, Optional, Set, Union, get_type_hints
+from typing import Any, Callable, Dict, List, Optional, Set, Union, get_type_hints
 
 import anyio
 from taskiq_dependencies import DependencyGraph
@@ -11,7 +11,7 @@ from taskiq_dependencies import DependencyGraph
 from taskiq.abc.broker import AckableMessage, AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.context import Context
-from taskiq.exceptions import NoResultError, RejectError
+from taskiq.exceptions import NoResultError
 from taskiq.message import TaskiqMessage
 from taskiq.receiver.params_parser import parse_params
 from taskiq.result import TaskiqResult
@@ -22,7 +22,11 @@ logger = getLogger(__name__)
 QUEUE_DONE = b"-1"
 
 
-def _run_sync(target: Callable[..., Any], message: TaskiqMessage) -> Any:
+def _run_sync(
+    target: Callable[..., Any],
+    args: List[Any],
+    kwargs: Dict[str, Any],
+) -> Any:
     """
     Runs function synchronously.
 
@@ -30,10 +34,11 @@ def _run_sync(target: Callable[..., Any], message: TaskiqMessage) -> Any:
     we cannot pass kwargs in loop.run_with_executor().
 
     :param target: function to execute.
-    :param message: received message from broker.
+    :param args: list of function's args.
+    :param kwargs: dict of function's kwargs.
     :return: result of function's execution.
     """
-    return target(*message.args, **message.kwargs)
+    return target(*args, **kwargs)
 
 
 class Receiver:
@@ -124,19 +129,15 @@ class Receiver:
             taskiq_msg.task_name,
             taskiq_msg.task_id,
         )
+
+        # If broker has an ability to ack messages.
+        if isinstance(message, AckableMessage):
+            await maybe_awaitable(message.ack())
+
         result = await self.run_task(
             target=self.broker.available_tasks[taskiq_msg.task_name].original_func,
             message=taskiq_msg,
         )
-
-        # If broker has an ability to ack or reject messages.
-        if isinstance(message, AckableMessage):
-            # If we received an error for negative acknowledgement.
-            if message.reject is not None and isinstance(result.error, RejectError):
-                await maybe_awaitable(message.reject())
-            # Otherwise we positively acknowledge the message.
-            else:
-                await maybe_awaitable(message.ack())
 
         for middleware in self.broker.middlewares:
             if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
@@ -182,7 +183,7 @@ class Receiver:
         """
         loop = asyncio.get_running_loop()
         returned = None
-        found_exception = None
+        found_exception: "Optional[BaseException]" = None
         signature = None
         if self.validate_params:
             signature = self.task_signatures.get(message.task_name)
@@ -190,6 +191,10 @@ class Receiver:
         parse_params(signature, self.task_hints.get(message.task_name) or {}, message)
 
         dep_ctx = None
+        # Kwargs are defined in another variable,
+        # because we want to update them with
+        # kwargs resolved by dependency injector.
+        kwargs = {}
         if dependency_graph:
             # Create a context for dependency resolving.
             broker_ctx = self.broker.custom_dependency_context
@@ -201,25 +206,39 @@ class Receiver:
             )
             dep_ctx = dependency_graph.async_ctx(broker_ctx)
             # Resolve all function's dependencies.
-            dep_kwargs = await dep_ctx.resolve_kwargs()
-            for key, val in dep_kwargs.items():
-                if key not in message.kwargs:
-                    message.kwargs[key] = val
+
         # Start a timer.
         start_time = time()
+
         try:
-            # If the function is a coroutine we await it.
+            # We put kwargs resolving here,
+            # to be able to catch any exception (for example ),
+            # that happen while resolving dependencies.
+            if dep_ctx:
+                kwargs = await dep_ctx.resolve_kwargs()
+            # We udpate kwargs with kwargs from network.
+            kwargs.update(message.kwargs)
+
+            # If the function is a coroutine, we await it.
             if asyncio.iscoroutinefunction(target):
-                returned = await target(*message.args, **message.kwargs)
+                returned = await target(*message.args, **kwargs)
             else:
-                # If this is a synchronous function we
+                # If this is a synchronous function, we
                 # run it in executor.
                 returned = await loop.run_in_executor(
                     self.executor,
                     _run_sync,
                     target,
-                    message,
+                    message.args,
+                    kwargs,
                 )
+        except NoResultError as no_res_exc:
+            found_exception = no_res_exc
+            logger.warning(
+                "Task %s with id %s skipped setting result.",
+                message.task_name,
+                message.task_id,
+            )
         except BaseException as exc:  # noqa: WPS424
             found_exception = exc
             logger.error(
