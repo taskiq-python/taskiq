@@ -191,7 +191,7 @@ async def test_callback_success_ackable() -> None:
 
     @broker.task
     async def my_task() -> int:
-        nonlocal called_times  # noqa: WPS420
+        nonlocal called_times
         called_times += 1
         return 1
 
@@ -230,7 +230,7 @@ async def test_callback_success_ackable_async() -> None:
 
     @broker.task
     async def my_task() -> int:
-        nonlocal called_times  # noqa: WPS420
+        nonlocal called_times
         called_times += 1
         return 1
 
