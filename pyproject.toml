@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "taskiq"
-version = "0.6.0"
+version = "0.7.0"
 description = "Distributed task queue with full async support"
 authors = ["Pavel Kirilin <win10@list.ru>"]
 maintainers = ["Pavel Kirilin <win10@list.ru>"]
@@ -14,10 +14,10 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "Operating System :: OS Independent",
     "Intended Audience :: Developers",
     "Topic :: System :: Networking",
@@ -26,7 +26,7 @@ classifiers = [
 keywords = ["taskiq", "tasks", "distributed", "async"]
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.8.1"
 typing-extensions = ">=3.10.0.0"
 pydantic = "^1.6.2"
 importlib-metadata = "*"
@@ -42,17 +42,17 @@ uvloop = { version = ">=0.16.0,<1", optional = true }
 # For hot-reload.
 watchdog = { version = "^2.1.9", optional = true }
 gitignore-parser = { version = "^0", optional = true }
+wemake-python-styleguide = "^0.18.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"
 black = { version = "^22.6.0", allow-prereleases = true }
-flake8 = "^4.0.1"
+flake8 = "^6"
 isort = "^5.10.1"
 mypy = "^1"
 pre-commit = "^2.20.0"
 yesqa = "^1.3.0"
 autoflake = "^1.4"
-wemake-python-styleguide = "^0.16.1"
 coverage = "^6.4.2"
 pytest-cov = "^3.0.0"
 mock = "^4.0.3"

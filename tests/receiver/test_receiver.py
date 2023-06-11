@@ -8,7 +8,7 @@ from taskiq_dependencies import Depends
 from taskiq.abc.broker import AckableMessage, AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.brokers.inmemory_broker import InMemoryBroker
-from taskiq.exceptions import NoResultError, RejectError, TaskiqResultTimeoutError
+from taskiq.exceptions import NoResultError, TaskiqResultTimeoutError
 from taskiq.message import TaskiqMessage
 from taskiq.receiver import Receiver
 from taskiq.result import TaskiqResult
@@ -191,7 +191,7 @@ async def test_callback_success_ackable() -> None:
 
     @broker.task
     async def my_task() -> int:
-        nonlocal called_times  # noqa: WPS420
+        nonlocal called_times
         called_times += 1
         return 1
 
@@ -230,7 +230,7 @@ async def test_callback_success_ackable_async() -> None:
 
     @broker.task
     async def my_task() -> int:
-        nonlocal called_times  # noqa: WPS420
+        nonlocal called_times
         called_times += 1
         return 1
 
@@ -257,83 +257,6 @@ async def test_callback_success_ackable_async() -> None:
         ),
     )
     assert called_times == 1
-    assert acked
-
-
-@pytest.mark.anyio
-async def test_callback_success_reject() -> None:
-    """
-    Test that if reject error is thrown,
-    broker would reject a message.
-    """
-    broker = InMemoryBroker()
-    rejected = False
-
-    @broker.task
-    async def my_task() -> None:
-        raise RejectError()
-
-    def reject_callback() -> None:
-        nonlocal rejected
-        rejected = True
-
-    receiver = get_receiver(broker)
-
-    broker_message = broker.formatter.dumps(
-        TaskiqMessage(
-            task_id="task_id",
-            task_name=my_task.task_name,
-            labels={},
-            args=[],
-            kwargs={},
-        ),
-    )
-
-    await receiver.callback(
-        AckableMessage(
-            data=broker_message.message,
-            ack=lambda: None,
-            reject=reject_callback,
-        ),
-    )
-    assert rejected
-
-
-@pytest.mark.anyio
-async def test_callback_no_reject_func() -> None:
-    """
-    Test that if broker doesn't support rejects,
-    it acks message instead.
-    """
-    broker = InMemoryBroker()
-    acked = False
-
-    @broker.task
-    async def my_task() -> None:
-        raise RejectError()
-
-    def ack_callback() -> None:
-        nonlocal acked
-        acked = True
-
-    receiver = get_receiver(broker)
-
-    broker_message = broker.formatter.dumps(
-        TaskiqMessage(
-            task_id="task_id",
-            task_name=my_task.task_name,
-            labels={},
-            args=[],
-            kwargs={},
-        ),
-    )
-
-    await receiver.callback(
-        AckableMessage(
-            data=broker_message.message,
-            ack=ack_callback,
-        ),
-    )
     assert acked
 
 

@@ -18,7 +18,7 @@ async def test_wait_result() -> None:
 
     @broker.task(retry_on_error=True)
     def run_task() -> str:
-        nonlocal runs  # noqa: WPS420
+        nonlocal runs
 
         if runs == 0:
             runs += 1
@@ -44,7 +44,7 @@ async def test_wait_result_error() -> None:
 
     @broker.task(retry_on_error=True)
     def run_task() -> str:
-        nonlocal runs  # noqa: WPS420
+        nonlocal runs
 
         if runs == 0:
             runs += 1
@@ -75,7 +75,7 @@ async def test_wait_result_no_result() -> None:
 
     @broker.task(retry_on_error=True)
     def run_task() -> str:
-        nonlocal runs, done  # noqa: WPS420
+        nonlocal runs, done
 
         if runs == 0:
             runs += 1
@@ -112,7 +112,7 @@ async def test_max_retries() -> None:
 
     @broker.task(max_retries=10)
     def run_task() -> str:
-        nonlocal runs  # noqa: WPS420
+        nonlocal runs
 
         runs += 1
         raise ValueError(runs)
@@ -138,7 +138,7 @@ async def test_no_retry() -> None:
 
     @broker.task(retry_on_error=False, max_retries=10)
     def run_task() -> str:
-        nonlocal runs  # noqa: WPS420
+        nonlocal runs
 
         runs += 1
         raise ValueError(runs)

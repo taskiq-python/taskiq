@@ -86,6 +86,7 @@ class AsyncBroker(ABC):
                 "Setting result backend with constructor is deprecated. "
                 "Please use `with_result_backend` instead.",
                 TaskiqDeprecationWarning,
+                stacklevel=2,
             )
         if task_id_generator is None:
             task_id_generator = default_id_generator
@@ -94,6 +95,7 @@ class AsyncBroker(ABC):
                 "Setting id generator with constructor is deprecated. "
                 "Please use `with_id_generator` instead.",
                 TaskiqDeprecationWarning,
+                stacklevel=2,
             )
         self.middlewares: "List[TaskiqMiddleware]" = []
         self.result_backend = result_backend
