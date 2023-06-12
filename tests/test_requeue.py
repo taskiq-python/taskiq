@@ -18,6 +18,10 @@ async def test_requeue() -> None:
 
     kicked = await task.kiq()
     await kicked.wait_result()
+    assert (
+        broker.custom_dependency_context[Context].message.labels["X-Taskiq-requeue"]
+        == "1"
+    )
 
     assert runs_count == 2
 
@@ -40,5 +44,9 @@ async def test_requeue_from_dependency() -> None:
 
     kicked = await task.kiq()
     await kicked.wait_result()
+    assert (
+        broker.custom_dependency_context[Context].message.labels["X-Taskiq-requeue"]
+        == "1"
+    )
 
     assert runs_count == 2
