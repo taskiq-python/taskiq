@@ -1,4 +1,3 @@
-from copy import copy
 from typing import TYPE_CHECKING
 
 from taskiq.abc.broker import AsyncBroker
@@ -28,10 +27,9 @@ class Context:
 
         :raises NoResultError: to not store result for current task.
         """
-        message = copy(self.message)
-        requeue_count = int(message.labels.get("X-Taskiq-requeue", 0))
+        requeue_count = int(self.message.labels.get("X-Taskiq-requeue", 0))
         requeue_count += 1
-        message.labels["X-Taskiq-requeue"] = str(requeue_count)
+        self.message.labels["X-Taskiq-requeue"] = str(requeue_count)
         await self.broker.kick(self.broker.formatter.dumps(self.message))
         raise NoResultError()
 
