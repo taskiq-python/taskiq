@@ -265,6 +265,7 @@ class Receiver:
             return_value=returned,
             execution_time=round(execution_time, 2),
             error=found_exception,
+            labels=message.labels,
         )
         # If exception is found we execute middlewares.
         if found_exception is not None:
