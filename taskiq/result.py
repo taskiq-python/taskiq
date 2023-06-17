@@ -33,6 +33,7 @@ class TaskiqResult(GenericModel, Generic[_ReturnType]):
     log: Optional[str] = None
     return_value: _ReturnType
     execution_time: float
+    labels: Dict[str, str]
 
     error: Optional[BaseException] = None
 
