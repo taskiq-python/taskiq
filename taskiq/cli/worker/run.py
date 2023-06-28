@@ -153,10 +153,13 @@ def run_worker(args: WorkerArgs) -> None:  # noqa: WPS213
 
     :raises ValueError: if reload flag is used, but dependencies are not installed.
     """
-    logging.basicConfig(
-        level=logging.getLevelName(args.log_level),
-        format="[%(asctime)s][%(name)s][%(levelname)-7s][%(processName)s] %(message)s",
-    )
+    if args.configure_logging:
+        logging.basicConfig(
+            level=logging.getLevelName(args.log_level),
+            format="[%(asctime)s][%(name)s][%(levelname)-7s]"
+            + "[%(processName)s] %(message)s",
+        )
+    logging.getLogger("taskiq").setLevel(level=logging.getLevelName(args.log_level))
     logging.getLogger("watchdog.observers.inotify_buffer").setLevel(level=logging.INFO)
     logger.info("Starting %s worker processes.", args.workers)
 
