@@ -255,8 +255,7 @@ class ExceptionRepr(pydantic.BaseModel):
     exc_context: Optional[Union[BaseException, "ExceptionRepr"]] = None
     exc_suppress_context: bool = False
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = pydantic.ConfigDict(arbitrary_types_allowed=True)
 
 
 def _prepare_exception(

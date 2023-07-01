@@ -15,7 +15,7 @@ class JSONFormatter(TaskiqFormatter):
         return BrokerMessage(
             task_id=message.task_id,
             task_name=message.task_name,
-            message=message.json().encode(),
+            message=message.model_dump_json().encode(),
             labels=message.labels,
         )
 
@@ -26,4 +26,4 @@ class JSONFormatter(TaskiqFormatter):
         :param message: broker's message.
         :return: parsed taskiq message.
         """
-        return TaskiqMessage.parse_raw(message)
+        return TaskiqMessage.model_validate_json(message)

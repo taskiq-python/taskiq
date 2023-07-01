@@ -1,29 +1,16 @@
 import json
 import pickle  # noqa: S403
-from functools import partial
-from typing import Any, Callable, Dict, Generic, Optional, TypeVar
+from typing import Any, Dict, Generic, Optional, TypeVar, Union
 
-from pydantic import Field, validator
-from pydantic.generics import GenericModel
+from pydantic import Field, field_validator, BaseModel, ConfigDict, field_serializer
 from typing_extensions import Self
 
-from taskiq.serialization import exception_to_python, prepare_exception
+from taskiq.serialization import exception_to_python, prepare_exception, ExceptionRepr
 
 _ReturnType = TypeVar("_ReturnType")
 
 
-def _json_encoder(value: Any, default: Callable[[Any], Any]) -> Any:
-    if isinstance(value, BaseException):
-        return prepare_exception(value, json)
-
-    return default(value)
-
-
-def _json_dumps(value: Any, *, default: Callable[[Any], Any], **kwargs: Any) -> str:
-    return json.dumps(value, default=partial(_json_encoder, default=default), **kwargs)
-
-
-class TaskiqResult(GenericModel, Generic[_ReturnType]):
+class TaskiqResult(BaseModel, Generic[_ReturnType]):
     """Result of a remote task invocation."""
 
     is_err: bool
@@ -37,10 +24,14 @@ class TaskiqResult(GenericModel, Generic[_ReturnType]):
 
     error: Optional[BaseException] = None
 
-    class Config:
-        arbitrary_types_allowed = True
-        json_dumps = _json_dumps  # type: ignore
-        json_loads = json.loads
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @field_serializer("error")
+    def serialize_error(self, value: BaseException):
+        if value:
+            return prepare_exception(value, json)
+
+        return None
 
     def raise_for_error(self) -> "Self":
         """Raise exception if `error`.
@@ -64,7 +55,7 @@ class TaskiqResult(GenericModel, Generic[_ReturnType]):
 
         return dict
 
-    @validator("error", pre=True)
+    @field_validator("error", mode="before")
     @classmethod
     def _validate_error(cls, value: Any) -> Optional[BaseException]:
         return exception_to_python(value)

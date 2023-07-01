@@ -27,7 +27,7 @@ def test_parse_params_no_signature() -> None:
         args=[1, 2],
         kwargs={"a": 1},
     )
-    modify_msg = src_msg.copy(deep=True)
+    modify_msg = src_msg.model_copy(deep=True)
     parse_params(
         signature=None,
         type_hints={},

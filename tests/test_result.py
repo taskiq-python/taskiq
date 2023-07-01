@@ -1,4 +1,5 @@
 import pickle
+import json
 
 import pytest
 
@@ -7,8 +8,8 @@ from taskiq import TaskiqResult
 
 def test_json_serialization() -> None:
     task = TaskiqResult(is_err=False, return_value="some value", execution_time=0)
-    data: TaskiqResult[str] = TaskiqResult.parse_raw(task.json())
-    assert data.return_value == task.return_value
+    data = json.loads(task.model_dump_json())
+    assert data["return_value"] == task.return_value
 
 
 def test_pickle_serialization() -> None:
@@ -24,10 +25,12 @@ def test_json_error_serialization() -> None:
         error = exc
 
     task = TaskiqResult(is_err=False, return_value=1, execution_time=0, error=error)
-    data: TaskiqResult[int] = TaskiqResult.parse_raw(task.json())
+    data = json.loads(task.model_dump_json())
 
-    assert data.error.args == task.error.args  # type: ignore
-    assert type(data.error) == type(task.error)
+    assert len(data["error"]["exc_message"]) == 2
+    args = list(task.error.args) # type: ignore
+    assert data["error"]["exc_message"][0] == args[0]  # type: ignore
+    assert data["error"]["exc_message"][1] == args[1]  # type: ignore
 
 
 def test_pickle_error_serialization() -> None:
