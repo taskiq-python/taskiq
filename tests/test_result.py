@@ -1,5 +1,5 @@
-import pickle
 import json
+import pickle
 
 import pytest
 
@@ -28,7 +28,7 @@ def test_json_error_serialization() -> None:
     data = json.loads(task.model_dump_json())
 
     assert len(data["error"]["exc_message"]) == 2
-    args = list(task.error.args) # type: ignore
+    args = list(task.error.args)  # type: ignore
     assert data["error"]["exc_message"][0] == args[0]  # type: ignore
     assert data["error"]["exc_message"][1] == args[1]  # type: ignore
 

@@ -1,11 +1,11 @@
 import json
 import pickle  # noqa: S403
-from typing import Any, Dict, Generic, Optional, TypeVar, Union
+from typing import Any, Dict, Generic, Optional, TypeVar
 
-from pydantic import Field, field_validator, BaseModel, ConfigDict, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 from typing_extensions import Self
 
-from taskiq.serialization import exception_to_python, prepare_exception, ExceptionRepr
+from taskiq.serialization import exception_to_python, prepare_exception
 
 _ReturnType = TypeVar("_ReturnType")
 
@@ -27,7 +27,8 @@ class TaskiqResult(BaseModel, Generic[_ReturnType]):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_serializer("error")
-    def serialize_error(self, value: BaseException):
+    def serialize_error(self, value: BaseException) -> Any:
+        """Serialize error field"""
         if value:
             return prepare_exception(value, json)
 
