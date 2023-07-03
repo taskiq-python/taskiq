@@ -2,8 +2,7 @@ import inspect
 from logging import getLogger
 from typing import Any, Dict, Optional
 
-from pydantic import TypeAdapter
-
+from taskiq.compat import parse_obj_as
 from taskiq.message import TaskiqMessage
 
 logger = getLogger(__name__)
@@ -75,7 +74,7 @@ def parse_params(  # noqa: C901
                 continue
             try:
                 # trying to parse found value as in type annotation.
-                message.args[argnum] = TypeAdapter(annot).validate_python(value)
+                message.args[argnum] = parse_obj_as(annot, value)
             except (ValueError, RuntimeError) as exc:
                 logger.debug(exc, exc_info=True)
         else:
@@ -85,6 +84,6 @@ def parse_params(  # noqa: C901
                 continue
             try:
                 # trying to parse found value as in type annotation.
-                message.kwargs[param_name] = TypeAdapter(annot).validate_python(value)
+                message.kwargs[param_name] = parse_obj_as(annot, value)
             except (ValueError, RuntimeError) as exc:
                 logger.debug(exc, exc_info=True)
