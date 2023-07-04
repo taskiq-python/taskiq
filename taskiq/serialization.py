@@ -297,7 +297,7 @@ def _prepare_exception(
         SEEN_EXCEPTIONS_CACHE.discard(id(exc))
 
 
-@pydantic.validate_arguments(config={"arbitrary_types_allowed": True})
+@pydantic.validate_arguments(config={"arbitrary_types_allowed": True})  # type: ignore
 def prepare_exception(
     exc: BaseException,
     coder: Coder[Any, Any],
@@ -312,7 +312,7 @@ def prepare_exception(
     return _prepare_exception(exc, coder)  # type: ignore
 
 
-@pydantic.validate_arguments(config={"arbitrary_types_allowed": True})
+@pydantic.validate_arguments(config={"arbitrary_types_allowed": True})  # type: ignore
 def exception_to_python(  # noqa: C901, WPS210
     exc: Optional[Union[BaseException, ExceptionRepr]],
 ) -> Optional[BaseException]:
