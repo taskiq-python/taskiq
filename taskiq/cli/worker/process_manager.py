@@ -1,7 +1,7 @@
 import logging
 import signal
 from dataclasses import dataclass
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, current_process
 from time import sleep
 from typing import Any, Callable, List, Optional
 
@@ -82,6 +82,7 @@ class ReloadOneAction(ProcessActionBase):
         new_process.start()
         logger.info(f"Process {new_process.name} restarted with pid {new_process.pid}")
         workers[self.worker_num] = new_process
+        sleep(0.1)
 
 
 @dataclass
@@ -118,6 +119,9 @@ def get_signal_handler(
     """
 
     def _signal_handler(signum: int, _frame: Any) -> None:
+        if current_process().name.startswith("worker"):
+            raise KeyboardInterrupt
+
         logger.debug(f"Got signal {signum}.")
         action_queue.put(ShutdownAction())
         logger.warn("Workers are scheduled for shutdown.")
