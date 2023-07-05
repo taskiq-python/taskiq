@@ -1,5 +1,5 @@
 # flake8: noqa
-from typing import Any, Dict, Optional, TypeVar, Union
+from typing import Any, Dict, Optional, Type, TypeVar, Union
 
 import pydantic
 from importlib_metadata import version
@@ -17,7 +17,7 @@ if PYDANTIC_VER >= Version("2.0"):
         return pydantic.TypeAdapter(annot).validate_python(obj)
 
     def model_validate_json(
-        model_class: type[Model],
+        model_class: Type[Model],
         message: Union[str, bytes, bytearray],
     ) -> Model:
         return model_class.model_validate_json(message)
@@ -36,7 +36,7 @@ else:
     parse_obj_as = pydantic.parse_obj_as  # type: ignore
 
     def model_validate_json(
-        model_class: type[Model],
+        model_class: Type[Model],
         message: Union[str, bytes, bytearray],
     ) -> Model:
         return model_class.parse_raw(message)
