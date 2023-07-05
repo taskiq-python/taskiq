@@ -97,6 +97,7 @@ def _wait_for_worker_startup(process: Process, event: EventType) -> None:
     while process.is_alive():
         with suppress(TimeoutError):
             event.wait(0.1)
+            return
 
 
 def schedule_workers_reload(
@@ -151,7 +152,7 @@ class ProcessManager:
         self,
         args: WorkerArgs,
         worker_function: Callable[[WorkerArgs, EventType], None],
-        observer: Optional[Observer] = None,
+        observer: Optional[Observer] = None,  # type: ignore[valid-type]
     ) -> None:
         self.worker_function = worker_function
         self.action_queue: "Queue[ProcessActionBase]" = Queue(-1)
