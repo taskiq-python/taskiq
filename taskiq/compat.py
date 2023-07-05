@@ -1,5 +1,5 @@
 # flake8: noqa
-from typing import Any, TypeVar
+from typing import Any, Dict, Optional, TypeVar, Union
 
 import pydantic
 from importlib_metadata import version
@@ -18,7 +18,7 @@ if PYDANTIC_VER >= Version("2.0"):
 
     def model_validate_json(
         model_class: type[Model],
-        message: str | bytes | bytearray,
+        message: Union[str, bytes, bytearray],
     ) -> Model:
         return model_class.model_validate_json(message)
 
@@ -27,7 +27,7 @@ if PYDANTIC_VER >= Version("2.0"):
 
     def model_copy(
         instance: Model,
-        update: dict[str, Any] | None = None,
+        update: Optional[Dict[str, Any]] = None,
         deep: bool = False,
     ) -> Model:
         return instance.model_copy(update=update, deep=deep)
@@ -37,7 +37,7 @@ else:
 
     def model_validate_json(
         model_class: type[Model],
-        message: str | bytes | bytearray,
+        message: Union[str, bytes, bytearray],
     ) -> Model:
         return model_class.parse_raw(message)
 
@@ -46,7 +46,7 @@ else:
 
     def model_copy(
         instance: Model,
-        update: dict[str, Any] | None = None,
+        update: Optional[Dict[str, Any]] = None,
         deep: bool = False,
     ) -> Model:
         return instance.copy(update=update, deep=deep)
