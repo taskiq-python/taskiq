@@ -79,22 +79,6 @@ def start_listen(args: WorkerArgs) -> None:  # noqa: WPS210, WPS213
     :raises ValueError: if broker is not an AsyncBroker instance.
     :raises ValueError: if receiver is not a Receiver type.
     """
-    if uvloop is not None:
-        logger.debug("UVLOOP found. Installing policy.")
-        uvloop.install()
-    # This option signals that current
-    # broker is running as a worker.
-    # We must set this field before importing tasks,
-    # so broker will remember all tasks it's related to.
-    AsyncBroker.is_worker_process = True
-    broker = import_object(args.broker)
-    import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
-    if not isinstance(broker, AsyncBroker):
-        raise ValueError("Unknown broker type. Please use AsyncBroker instance.")
-
-    receiver_type = get_receiver_type(args)
-    receiver_args = dict(args.receiver_arg)
-
     # Here how we manage interruptions.
     # We have to remember shutting_down state,
     # because KeyboardInterrupt can be send multiple
@@ -121,6 +105,22 @@ def start_listen(args: WorkerArgs) -> None:  # noqa: WPS210, WPS213
 
     signal.signal(signal.SIGINT, interrupt_handler)
     signal.signal(signal.SIGTERM, interrupt_handler)
+
+    if uvloop is not None:
+        logger.debug("UVLOOP found. Installing policy.")
+        uvloop.install()
+    # This option signals that current
+    # broker is running as a worker.
+    # We must set this field before importing tasks,
+    # so broker will remember all tasks it's related to.
+    AsyncBroker.is_worker_process = True
+    broker = import_object(args.broker)
+    import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
+    if not isinstance(broker, AsyncBroker):
+        raise ValueError("Unknown broker type. Please use AsyncBroker instance.")
+
+    receiver_type = get_receiver_type(args)
+    receiver_args = dict(args.receiver_arg)
 
     loop = asyncio.get_event_loop()
 
