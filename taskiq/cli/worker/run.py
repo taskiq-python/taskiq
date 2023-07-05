@@ -2,6 +2,7 @@ import asyncio
 import logging
 import signal
 from concurrent.futures import ThreadPoolExecutor
+from multiprocessing.synchronize import Event
 from typing import Any, Type
 
 from taskiq.abc.broker import AsyncBroker
@@ -65,7 +66,7 @@ def get_receiver_type(args: WorkerArgs) -> Type[Receiver]:
     return receiver_type
 
 
-def start_listen(args: WorkerArgs) -> None:  # noqa: WPS210, WPS213
+def start_listen(args: WorkerArgs, event: Event) -> None:  # noqa: WPS210, WPS213
     """
     This function starts actual listening process.
 
@@ -76,6 +77,7 @@ def start_listen(args: WorkerArgs) -> None:  # noqa: WPS210, WPS213
     field.
 
     :param args: CLI arguments.
+    :param event: Event for notification.
     :raises ValueError: if broker is not an AsyncBroker instance.
     :raises ValueError: if receiver is not a Receiver type.
     """
@@ -105,6 +107,9 @@ def start_listen(args: WorkerArgs) -> None:  # noqa: WPS210, WPS213
 
     signal.signal(signal.SIGINT, interrupt_handler)
     signal.signal(signal.SIGTERM, interrupt_handler)
+
+    # Notify parent process, worker is ready
+    event.set()
 
     if uvloop is not None:
         logger.debug("UVLOOP found. Installing policy.")

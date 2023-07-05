@@ -1,7 +1,9 @@
 import logging
 import signal
+from contextlib import suppress
 from dataclasses import dataclass
-from multiprocessing import Process, Queue, current_process
+from multiprocessing import Event, Process, Queue, current_process
+from multiprocessing.synchronize import Event as EventType
 from time import sleep
 from typing import Any, Callable, List, Optional
 
@@ -54,7 +56,7 @@ class ReloadOneAction(ProcessActionBase):
         self,
         workers: List[Process],
         args: WorkerArgs,
-        worker_func: Callable[[WorkerArgs], None],
+        worker_func: Callable[[WorkerArgs, EventType], None],
     ) -> None:
         """
         This action reloads a single process.
@@ -73,21 +75,28 @@ class ReloadOneAction(ProcessActionBase):
             logger.debug(f"Process {worker.name} is already terminated.")
         # Waiting worker shutdown.
         worker.join()
+        event: EventType = Event()
         new_process = Process(
             target=worker_func,
-            kwargs={"args": args},
+            kwargs={"args": args, "event": event},
             name=f"worker-{self.worker_num}",
             daemon=True,
         )
         new_process.start()
         logger.info(f"Process {new_process.name} restarted with pid {new_process.pid}")
         workers[self.worker_num] = new_process
-        sleep(0.1)
+        _wait_for_worker_startup(new_process, event)
 
 
 @dataclass
 class ShutdownAction(ProcessActionBase):
     """This action shuts down process manager loop."""
+
+
+def _wait_for_worker_startup(process: Process, event: EventType) -> None:
+    while process.is_alive():
+        with suppress(TimeoutError):
+            event.wait(0.1)
 
 
 def schedule_workers_reload(
@@ -141,7 +150,7 @@ class ProcessManager:
     def __init__(
         self,
         args: WorkerArgs,
-        worker_function: Callable[[WorkerArgs], None],
+        worker_function: Callable[[WorkerArgs, EventType], None],
         observer: Optional[Observer] = None,
     ) -> None:
         self.worker_function = worker_function
@@ -166,10 +175,12 @@ class ProcessManager:
 
     def prepare_workers(self) -> None:
         """Spawn multiple processes."""
+        events: List[EventType] = []
         for process in range(self.args.workers):
+            event = Event()
             work_proc = Process(
                 target=self.worker_function,
-                kwargs={"args": self.args},
+                kwargs={"args": self.args, "event": event},
                 name=f"worker-{process}",
                 daemon=True,
             )
@@ -180,6 +191,11 @@ class ProcessManager:
                 work_proc.pid,
             )
             self.workers.append(work_proc)
+            events.append(event)
+
+        # Wait for workers startup
+        for worker, event in zip(self.workers, events):
+            _wait_for_worker_startup(worker, event)
 
     def start(self) -> None:  # noqa: C901, WPS213
         """
