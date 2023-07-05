@@ -28,7 +28,7 @@ keywords = ["taskiq", "tasks", "distributed", "async"]
 [tool.poetry.dependencies]
 python = "^3.8.1"
 typing-extensions = ">=3.10.0.0"
-pydantic = "^1.6.2"
+pydantic = ">=1.0,<=3.0"
 importlib-metadata = "*"
 pycron = "^3.0.0"
 taskiq_dependencies = "^1"
