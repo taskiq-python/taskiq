@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 from taskiq.abc.broker import AsyncBroker
 from taskiq.kicker import AsyncKicker
 from taskiq.scheduler.merge_functions import preserve_all
+from taskiq.utils import maybe_awaitable
 
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.schedule_source import ScheduleSource
@@ -18,8 +19,7 @@ class ScheduledTask:
     labels: Dict[str, Any]
     args: List[Any]
     kwargs: Dict[str, Any]
-    source: "ScheduleSource"
-    "Backward point to source which this task is belongs to."
+    source: "ScheduleSource"  # Backward point to source which this task belongs to
     cron: Optional[str] = field(default=None)
     time: Optional[datetime] = field(default=None)
 
@@ -62,14 +62,14 @@ class TaskiqScheduler:
 
     async def on_ready(self, task: ScheduledTask) -> None:
         """
-        This method is called on task is ready to be enqueued.
+        This method is called when task is ready to be enqueued.
 
         It's triggered on proper time depending on `task.cron` or `task.time` attribute.
         :param task: task to send
         """
-        await task.source.pre_send(task)
+        await maybe_awaitable(task.source.pre_send(task))
         await AsyncKicker(task.task_name, self.broker, task.labels).kiq(
             *task.args,
             **task.kwargs,
         )
-        await task.source.post_send(task)
+        await maybe_awaitable(task.source.post_send(task))
