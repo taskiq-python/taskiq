@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, timedelta
+from typing import Any
 
 import pytest
 from freezegun import freeze_time
@@ -19,7 +20,7 @@ from taskiq.scheduler.scheduler import ScheduledTask, TaskiqScheduler
         pytest.param([{"time": datetime.utcnow()}], id="time"),
     ],
 )
-async def test_label_discovery(schedule_label: list[dict[str, str | datetime]]) -> None:
+async def test_label_discovery(schedule_label: list[dict[str, Any]]) -> None:
     broker = InMemoryBroker()
 
     @broker.task(
@@ -33,8 +34,8 @@ async def test_label_discovery(schedule_label: list[dict[str, str | datetime]]) 
     schedules = await source.get_schedules()
     assert schedules == [
         ScheduledTask(
-            cron=schedule_label[0].get("cron"),  # type: ignore
-            time=schedule_label[0].get("time"),  # type: ignore
+            cron=schedule_label[0].get("cron"),
+            time=schedule_label[0].get("time"),
             task_name="test_task",
             labels={"schedule": schedule_label},
             args=[],
