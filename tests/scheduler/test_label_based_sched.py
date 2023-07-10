@@ -19,7 +19,7 @@ from taskiq.scheduler.scheduler import ScheduledTask, TaskiqScheduler
         pytest.param([{"time": datetime.utcnow()}], id="time"),
     ],
 )
-async def test_label_discovery(schedule_label: list[dict[str, str]]) -> None:
+async def test_label_discovery(schedule_label: list[dict[str, str | datetime]]) -> None:
     broker = InMemoryBroker()
 
     @broker.task(
@@ -33,7 +33,8 @@ async def test_label_discovery(schedule_label: list[dict[str, str]]) -> None:
     schedules = await source.get_schedules()
     assert schedules == [
         ScheduledTask(
-            cron="* * * * *",
+            cron=schedule_label[0].get("cron"),  # type: ignore
+            time=schedule_label[0].get("time"),  # type: ignore
             task_name="test_task",
             labels={"schedule": schedule_label},
             args=[],
