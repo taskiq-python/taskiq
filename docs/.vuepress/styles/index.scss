@@ -1,18 +1,14 @@
-.toggle-navbar-button {
+.vp-site-name {
     visibility: hidden;
 }
 
-.hero-info-wrapper {
+.vp-hero-info {
     img {
         max-width: 60% !important;
         padding: 1rem;
     }
 }
 
-.actions {
+.vp-actions {
     align-items: flex-end;
-}
-
-span.site-name {
-    visibility: hidden;
 }
