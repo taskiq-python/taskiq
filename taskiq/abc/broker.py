@@ -69,10 +69,6 @@ class AsyncBroker(ABC):
     """
 
     available_tasks: Dict[str, AsyncTaskiqDecoratedTask[Any, Any]] = {}
-    # True only if broker runs in worker process.
-    is_worker_process: bool = False
-    # True only if broker runs in scheduler process.
-    is_scheduler_process: bool = False
 
     def __init__(
         self,
@@ -111,6 +107,10 @@ class AsyncBroker(ABC):
         ] = defaultdict(list)
         self.state = TaskiqState()
         self.custom_dependency_context: Dict[Any, Any] = {}
+        # True only if broker runs in worker process.
+        self.is_worker_process: bool = False
+        # True only if broker runs in scheduler process.
+        self.is_scheduler_process: bool = False
 
     def add_dependency_context(self, new_ctx: Dict[Any, Any]) -> None:
         """
@@ -151,6 +151,10 @@ class AsyncBroker(ABC):
         for handler in self.event_handlers[event]:
             await maybe_awaitable(handler(self.state))
 
+        for middleware in self.middlewares:
+            if middleware.__class__.startup != TaskiqMiddleware.startup:
+                await maybe_awaitable(middleware.startup)
+
         await self.result_backend.startup()
 
     async def shutdown(self) -> None:
@@ -167,6 +171,10 @@ class AsyncBroker(ABC):
         # Call all shutdown events.
         for handler in self.event_handlers[event]:
             await maybe_awaitable(handler(self.state))
+
+        for middleware in self.middlewares:
+            if middleware.__class__.shutdown != TaskiqMiddleware.shutdown:
+                await maybe_awaitable(middleware.shutdown)
 
         await self.result_backend.shutdown()
 

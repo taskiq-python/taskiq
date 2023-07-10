@@ -5,6 +5,14 @@ from taskiq import TaskiqMessage, TaskiqMiddleware, TaskiqResult
 
 
 class MyMiddleware(TaskiqMiddleware):
+    def startup(self) -> None:
+        print("RUN STARTUP")
+        sleep(1)
+
+    def shutdown(self) -> None:
+        print("RUN SHUTDOWN")
+        sleep(1)
+
     def pre_execute(self, message: "TaskiqMessage") -> TaskiqMessage:
         sleep(1)
         return message

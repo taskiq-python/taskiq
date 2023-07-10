@@ -20,6 +20,26 @@ class TaskiqMiddleware:  # pragma: no cover
         """
         self.broker = broker
 
+    def startup(self) -> "Union[None, Coroutine[Any, Any, None]]":
+        """
+        Startup method to perform various action during startup.
+
+        This function can be either sync or async.
+        Executed during broker's startup.
+
+        :returns nothing.
+        """
+
+    def shutdown(self) -> "Union[None, Coroutine[Any, Any, None]]":
+        """
+        Shutdown method to perform various action during shutdown.
+
+        This function can be either sync or async.
+        Executed during broker's shutdown.
+
+        :returns nothing.
+        """
+
     def pre_send(
         self,
         message: "TaskiqMessage",

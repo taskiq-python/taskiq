@@ -26,5 +26,3 @@ def reset_broker() -> Generator[None, None, None]:
     """
     yield
     AsyncBroker.available_tasks = {}
-    AsyncBroker.is_worker_process = False
-    AsyncBroker.is_scheduler_process = False

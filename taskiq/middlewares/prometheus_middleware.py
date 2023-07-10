@@ -4,7 +4,6 @@ from pathlib import Path
 from tempfile import gettempdir
 from typing import Any, Optional
 
-from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.message import TaskiqMessage
 from taskiq.result import TaskiqResult
@@ -36,9 +35,6 @@ class PrometheusMiddleware(TaskiqMiddleware):
         self.saved_results = None
         self.execution_time = None
 
-        if not AsyncBroker.is_worker_process:
-            return
-
         metrics_path = metrics_path or Path(gettempdir()) / "taskiq_worker"
 
         if not metrics_path.exists():
@@ -52,11 +48,7 @@ class PrometheusMiddleware(TaskiqMiddleware):
         logger.debug("Initializing metrics")
 
         try:
-            from prometheus_client import (  # noqa: WPS433
-                Counter,
-                Histogram,
-                start_http_server,
-            )
+            from prometheus_client import Counter, Histogram  # noqa: WPS433
         except ImportError as exc:
             raise ImportError(
                 "Cannot initialize metrics. Please install 'taskiq[metrics]'.",
@@ -87,10 +79,23 @@ class PrometheusMiddleware(TaskiqMiddleware):
             "Tome of function execution",
             ["task_name"],
         )
-        try:
-            start_http_server(port=server_port, addr=server_addr)
-        except OSError as exc:
-            logger.debug("Cannot start prometheus server: %s", exc)
+        self.server_port = server_port
+        self.server_addr = server_addr
+
+    def startup(self) -> None:
+        """
+        Prometheus startup.
+
+        This function starts prometheus server.
+        It starts it only in case if it's a worker process.
+        """
+        from prometheus_client import start_http_server  # noqa: WPS433
+
+        if self.broker.is_worker_process:
+            try:
+                start_http_server(port=self.server_port, addr=self.server_addr)
+            except OSError as exc:
+                logger.debug("Cannot start prometheus server: %s", exc)
 
     def pre_execute(
         self,
