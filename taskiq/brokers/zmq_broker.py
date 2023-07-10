@@ -8,7 +8,7 @@ from taskiq.message import BrokerMessage
 
 try:
     import zmq  # noqa: WPS433
-    from zmq.asyncio import Context  # noqa: WPS433
+    from zmq.asyncio import Context, Socket  # noqa: WPS433
 except ImportError:
     zmq = None  # type: ignore
 
@@ -43,12 +43,23 @@ class ZeroMQBroker(AsyncBroker):
         self.context = Context()
         self.pub_host = zmq_pub_host
         self.sub_host = zmq_sub_host
+        self.socket: Socket
+
+    async def startup(self) -> None:
+        """
+        Startup for zmq broker.
+
+        This function creates actual connections to
+        sockets. if current process is worker,
+        it subscribes, otherwise it becomes publisher.
+        """
         if self.is_worker_process:
             self.socket = self.context.socket(zmq.SUB)
             self.socket.setsockopt(zmq.SUBSCRIBE, b"")
         else:
             self.socket = self.context.socket(zmq.PUB)
             self.socket.bind(self.pub_host)
+        await super().startup()
 
     async def kick(self, message: BrokerMessage) -> None:
         """

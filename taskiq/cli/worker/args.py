@@ -27,11 +27,9 @@ class WorkerArgs:
     modules: List[str]
     tasks_pattern: str = "tasks.py"
     fs_discover: bool = False
+    configure_logging: bool = True
     log_level: LogLevel = LogLevel.INFO
     workers: int = 2
-    log_collector_format: str = (
-        "[%(asctime)s][%(levelname)-7s][%(module)s:%(funcName)s:%(lineno)d] %(message)s"
-    )
     max_threadpool_threads: int = 10
     no_parse: bool = False
     shutdown_timeout: float = 5
@@ -119,18 +117,6 @@ class WorkerArgs:
             help="Number of worker child processes",
         )
         parser.add_argument(
-            "--log-collector-format",
-            "-lcf",
-            type=str,
-            default=(
-                "[%(asctime)s]"
-                "[%(levelname)-7s]"
-                "[%(module)s:%(funcName)s:%(lineno)d] "
-                "%(message)s"
-            ),
-            help="Format which is used when collecting logs from function execution",
-        )
-        parser.add_argument(
             "--no-parse",
             action="store_true",
             help=(
@@ -186,6 +172,12 @@ class WorkerArgs:
             dest="max_prefetch",
             default=0,
             help="Maximum prefetched tasks per worker process. ",
+        )
+        parser.add_argument(
+            "--no-configure-logging",
+            action="store_false",
+            dest="configure_logging",
+            help="Use this parameter if your application configures custom logging.",
         )
 
         namespace = parser.parse_args(args)

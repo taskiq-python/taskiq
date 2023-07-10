@@ -2,8 +2,7 @@ import inspect
 from logging import getLogger
 from typing import Any, Dict, Optional
 
-from pydantic import parse_obj_as
-
+from taskiq.compat import parse_obj_as
 from taskiq.message import TaskiqMessage
 
 logger = getLogger(__name__)
