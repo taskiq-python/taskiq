@@ -118,11 +118,11 @@ def start_listen(args: WorkerArgs, event: Event) -> None:  # noqa: WPS210, WPS21
     # broker is running as a worker.
     # We must set this field before importing tasks,
     # so broker will remember all tasks it's related to.
-    AsyncBroker.is_worker_process = True
     broker = import_object(args.broker)
-    import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
     if not isinstance(broker, AsyncBroker):
         raise ValueError("Unknown broker type. Please use AsyncBroker instance.")
+    broker.is_worker_process = True
+    import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
 
     receiver_type = get_receiver_type(args)
     receiver_args = dict(args.receiver_arg)
