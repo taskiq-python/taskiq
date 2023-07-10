@@ -48,7 +48,7 @@ class LabelScheduleSource(ScheduleSource):
                 )
         return schedules
 
-    async def post_send(self, scheduled_task: ScheduledTask) -> None:
+    def post_send(self, scheduled_task: ScheduledTask) -> None:
         """
         Remove `time` schedule from task's scheduler list.
 
@@ -57,6 +57,9 @@ class LabelScheduleSource(ScheduleSource):
 
         :param scheduled_task: task that just have sent
         """
+        if scheduled_task.cron or not scheduled_task.time:
+            return  # it's scheduled task with cron label, do not remove this trigger.
+
         for task_name, task in self.broker.available_tasks.items():
             if task.broker != self.broker or scheduled_task.task_name != task_name:
                 continue

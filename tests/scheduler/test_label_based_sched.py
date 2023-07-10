@@ -70,14 +70,16 @@ async def test_task_scheduled_at_time_runs_only_once(mock_sleep: None) -> None:
         sources=[LabelScheduleSource(broker)],
     )
 
-    with freeze_time(tick=True):
+    # NOTE:
+    # freeze time to 00:00, so task won't be scheduled by `cron`, only by `time`
+    with freeze_time("00:00:00", tick=True):
 
         @broker.task(
             task_name="test_task",
             schedule=[
                 {"time": datetime.utcnow(), "args": [1]},
                 {"time": datetime.utcnow() + timedelta(days=1), "args": [2]},
-                {"cron": "1 2 3 4 5", "args": [3]},
+                {"cron": "1 * * * *", "args": [3]},
             ],
         )
         def task(number: int) -> None:
