@@ -8,9 +8,9 @@ from packaging.version import Version, parse
 PYDANTIC_VER = parse(version("pydantic"))
 
 Model = TypeVar("Model", bound="pydantic.BaseModel")
+IS_PYDANTIC2 = PYDANTIC_VER >= Version("2.0")
 
-
-if PYDANTIC_VER >= Version("2.0"):
+if IS_PYDANTIC2:
     T = TypeVar("T")
 
     def parse_obj_as(annot: T, obj: Any) -> T:
@@ -32,6 +32,8 @@ if PYDANTIC_VER >= Version("2.0"):
     ) -> Model:
         return instance.model_copy(update=update, deep=deep)
 
+    validate_call = pydantic.validate_call
+
 else:
     parse_obj_as = pydantic.parse_obj_as  # type: ignore
 
@@ -50,3 +52,5 @@ else:
         deep: bool = False,
     ) -> Model:
         return instance.copy(update=update, deep=deep)
+
+    validate_call = pydantic.validate_arguments  # type: ignore
