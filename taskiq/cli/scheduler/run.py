@@ -8,7 +8,6 @@ from pycron import is_now
 from taskiq.abc.broker import AsyncBroker
 from taskiq.cli.scheduler.args import SchedulerArgs
 from taskiq.cli.utils import import_object, import_tasks
-from taskiq.kicker import AsyncKicker
 from taskiq.scheduler.scheduler import ScheduledTask, TaskiqScheduler
 
 logger = getLogger(__name__)
@@ -41,8 +40,10 @@ async def schedules_updater(
                 )
                 logger.debug(exc, exc_info=True)
                 continue
+
             for schedule in scheduler.merge_func(new_schedules, schedules):
                 new_schedules.append(schedule)
+
         current_schedules.clear()
         current_schedules.extend(new_schedules)
         await asyncio.sleep(scheduler.refresh_delay)
@@ -56,7 +57,7 @@ def should_run(task: ScheduledTask) -> bool:
     :return: True if task must be sent.
     """
     if task.cron is not None:
-        return is_now(task.cron)
+        return is_now(task.cron, datetime.utcnow())
     if task.time is not None:
         return task.time <= datetime.utcnow()
     return False
@@ -72,8 +73,11 @@ async def run_scheduler(args: SchedulerArgs) -> None:  # noqa: C901, WPS210, WPS
     :param args: parsed CLI args.
     """
     AsyncBroker.is_scheduler_process = True
-    scheduler = import_object(args.scheduler)
-    if not isinstance(scheduler, TaskiqScheduler):
+    if isinstance(args.scheduler, str):
+        scheduler = import_object(args.scheduler)
+    else:
+        scheduler = args.scheduler
+    if not isinstance(args.scheduler, TaskiqScheduler):
         print(  # noqa: WPS421
             "Imported scheduler is not a subclass of TaskiqScheduler.",
         )
@@ -96,7 +100,6 @@ async def run_scheduler(args: SchedulerArgs) -> None:  # noqa: C901, WPS210, WPS
     await scheduler.startup()
     logger.info("Startup completed.")
     while True:  # noqa: WPS457
-        not_fired_tasks = []
         for task in tasks:
             try:
                 ready = should_run(task)
@@ -109,14 +112,8 @@ async def run_scheduler(args: SchedulerArgs) -> None:  # noqa: C901, WPS210, WPS
                 continue
             if ready:
                 logger.info("Sending task %s.", task.task_name)
-                loop.create_task(
-                    AsyncKicker(task.task_name, scheduler.broker, task.labels).kiq(
-                        *task.args,
-                        **task.kwargs,
-                    ),
-                )
-            else:
-                not_fired_tasks.append(task)
+                loop.create_task(scheduler.on_ready(task))
+
         delay = (
             datetime.now().replace(second=1, microsecond=0)
             + timedelta(minutes=1)

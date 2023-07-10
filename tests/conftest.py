@@ -1,6 +1,8 @@
+import asyncio
 from typing import Generator
 
 import pytest
+from pytest_mock import MockerFixture
 
 from taskiq.abc.broker import AsyncBroker
 
@@ -28,3 +30,12 @@ def reset_broker() -> Generator[None, None, None]:
     AsyncBroker.available_tasks = {}
     AsyncBroker.is_worker_process = False
     AsyncBroker.is_scheduler_process = False
+
+
+@pytest.fixture
+def mock_sleep(mocker: MockerFixture) -> None:
+    async def _fast_sleep(delay: float) -> None:
+        await asyncio_sleep(delay / 10000)
+
+    asyncio_sleep = asyncio.sleep
+    mocker.patch("asyncio.sleep", _fast_sleep)

@@ -3,13 +3,14 @@ from dataclasses import dataclass
 from typing import List, Optional, Sequence
 
 from taskiq.cli.common_args import LogLevel
+from taskiq.scheduler.scheduler import TaskiqScheduler
 
 
 @dataclass
 class SchedulerArgs:
     """Arguments for scheduler."""
 
-    scheduler: str
+    scheduler: str | TaskiqScheduler
     modules: List[str]
     log_level: str = LogLevel.INFO.name
     fs_discover: bool = False

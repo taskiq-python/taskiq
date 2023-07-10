@@ -33,3 +33,17 @@ class ScheduleSource(ABC):
 
         :param schedule: schedule to add.
         """
+
+    async def pre_send(self, task: "ScheduledTask") -> None:  # noqa: B027
+        """
+        Actions to execute before task will be sent to broker.
+
+        :param task: task that will be sent
+        """
+
+    async def post_send(self, task: "ScheduledTask") -> None:  # noqa: B027
+        """
+        Actions to execute after task was sent to broker.
+
+        :param task: task that just have sent
+        """

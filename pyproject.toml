@@ -58,6 +58,8 @@ mock = "^4.0.3"
 pytest-xdist = { version = "^2.5.0", extras = ["psutil"] }
 types-mock = "^4.0.15"
 wemake-python-styleguide = "^0.18.0"
+freezegun = "^1.2.2"
+pytest-mock = "^3.11.1"
 
 [tool.poetry.extras]
 zmq = ["pyzmq"]
@@ -87,6 +89,9 @@ warn_unused_ignores = false
 [tool.isort]
 profile = "black"
 multi_line_output = 3
+
+[tool.pytest.ini_options]
+log_level='INFO'
 
 [tool.coverage.run]
 omit = [
