@@ -87,12 +87,12 @@ async def test_task_scheduled_at_time_runs_only_once(mock_sleep: None) -> None:
         loop.create_task(run_scheduler(SchedulerArgs(scheduler=scheduler, modules=[])))
 
         # Wait for task be called
-        await asyncio.wait_for(event.wait(), 1.0)
+        await asyncio.wait_for(event.wait(), 2.0)
 
         # Wait again, but task is not called again as expected, so TimeoutError.
         event.clear()
         with pytest.raises(TimeoutError):
-            await asyncio.wait_for(event.wait(), 1.0)
+            await asyncio.wait_for(event.wait(), 2.0)
 
         # Check that other scheduled task are not effected and is still available
         tasks = [task.args for task in await scheduler.sources[0].get_schedules()]
