@@ -18,6 +18,7 @@ import pydantic
 from typing_extensions import Protocol, TypeVar, runtime_checkable
 
 import taskiq.exceptions  # noqa: WPS301
+from taskiq.compat import IS_PYDANTIC2, validate_call
 
 DecodedType = TypeVar("DecodedType")
 EncodedType = TypeVar("EncodedType")
@@ -245,18 +246,34 @@ def get_pickled_exception(exc: BaseException) -> BaseException:
     return exc
 
 
-class ExceptionRepr(pydantic.BaseModel):
-    """Serialiable exception representation."""
+if IS_PYDANTIC2:
 
-    exc_type: str
-    exc_message: Tuple[Any, ...]
-    exc_module: Optional[str]
-    exc_cause: Optional[Union[BaseException, "ExceptionRepr"]] = None
-    exc_context: Optional[Union[BaseException, "ExceptionRepr"]] = None
-    exc_suppress_context: bool = False
+    class ExceptionRepr(pydantic.BaseModel):
+        """Serializable exception model for pydantic v2."""
 
-    class Config:
-        arbitrary_types_allowed = True
+        exc_type: str
+        exc_message: Tuple[Any, ...]
+        exc_module: Optional[str]
+        exc_cause: Optional[Union[BaseException, "ExceptionRepr"]] = None
+        exc_context: Optional[Union[BaseException, "ExceptionRepr"]] = None
+        exc_suppress_context: bool = False
+
+        model_config = pydantic.ConfigDict(arbitrary_types_allowed=True)
+
+else:
+
+    class ExceptionRepr(pydantic.BaseModel):  # type: ignore
+        """Serializable exception model for pydantic v1."""
+
+        exc_type: str
+        exc_message: Tuple[Any, ...]
+        exc_module: Optional[str]
+        exc_cause: Optional[Union[BaseException, "ExceptionRepr"]] = None
+        exc_context: Optional[Union[BaseException, "ExceptionRepr"]] = None
+        exc_suppress_context: bool = False
+
+        class Config:
+            arbitrary_types_allowed = True
 
 
 def _prepare_exception(
@@ -297,7 +314,7 @@ def _prepare_exception(
         SEEN_EXCEPTIONS_CACHE.discard(id(exc))
 
 
-@pydantic.validate_arguments(config={"arbitrary_types_allowed": True})  # type: ignore
+@validate_call(config=pydantic.ConfigDict(arbitrary_types_allowed=True))
 def prepare_exception(
     exc: BaseException,
     coder: Coder[Any, Any],
@@ -312,7 +329,7 @@ def prepare_exception(
     return _prepare_exception(exc, coder)  # type: ignore
 
 
-@pydantic.validate_arguments(config={"arbitrary_types_allowed": True})  # type: ignore
+@validate_call(config=pydantic.ConfigDict(arbitrary_types_allowed=True))
 def exception_to_python(  # noqa: C901, WPS210
     exc: Optional[Union[BaseException, ExceptionRepr]],
 ) -> Optional[BaseException]:
