@@ -77,7 +77,7 @@ async def run_scheduler(args: SchedulerArgs) -> None:  # noqa: C901, WPS210, WPS
         scheduler = import_object(args.scheduler)
     else:
         scheduler = args.scheduler
-    if not isinstance(args.scheduler, TaskiqScheduler):
+    if not isinstance(scheduler, TaskiqScheduler):
         print(  # noqa: WPS421
             "Imported scheduler is not a subclass of TaskiqScheduler.",
         )
