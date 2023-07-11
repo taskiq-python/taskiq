@@ -82,9 +82,60 @@ asyncio.run(main())
 
 ```
 
+## Messages
+
+Every message has labels. You can define labels
+using `task` decorator, or you can add them using kicker.
+
+For example:
+
+```python
+
+@broker.task(my_label=1, label2="something")
+async def my_async_task() -> None:
+    """My lovely task."""
+    await asyncio.sleep(1)
+    print("Hello")
+
+async def main():
+    await my_async_task.kiq()
+```
+
+It's equivalent to this
+
+```python
+
+@broker.task
+async def my_async_task() -> None:
+    """My lovely task."""
+    await asyncio.sleep(1)
+    print("Hello")
+
+async def main():
+    await my_async_task.kicker().with_labels(
+        my_label=1,
+        label2="something",
+    ).kiq()
+```
+
+Also you can assign custom task names using decorator.
+This is useful to be sure that task names are unique and resolved correctly.
+Also it may be useful to balance message routing in some brokers.
+
+for example:
+
+```python
+@broker.task(task_name="my_tasks.add_one", label1=1)
+async def my_async_task() -> None:
+    """My lovely task."""
+    await asyncio.sleep(1)
+    print("Hello")
+
+```
+
 ## Result backend
 
-This part is used to store and get results of the execution.
+Result backend is used to store and get results of the execution.
 Results have type `TaskiqResult` from [taskiq.result](https://github.com/taskiq-python/taskiq/blob/master/taskiq/result.py).
 
 Every ResultBackend must implement `AsyncResultBackend` from [taskiq.abc.result_backend](https://github.com/taskiq-python/taskiq/blob/master/taskiq/abc/result_backend.py). By default, brokers use `DummyResultBackend`. It doesn't do anything and cannot be used
@@ -130,6 +181,12 @@ taskiq worker test_project.broker:broker -fsd
 
 If you have uvloop installed, taskiq will automatically install new policies to event loop.
 You can get more info about the CLI in the [CLI](./cli.md) section.
+
+::: info Cool info
+
+By default we start two processes, if you want to change this value, please take a look at `--help`.
+
+:::
 
 ## Middlewares
 
@@ -182,88 +239,35 @@ Middlewares can store information in `message.labels` for
 later use. For example `SimpleRetryMiddleware` uses labels
 to remember number of failed attempts.
 
-## Messages
-
-Every message has labels. You can define labels
-using `task` decorator, or you can add them using kicker.
-
-For example:
-
-```python
-
-@broker.task(my_label=1, label2="something")
-async def my_async_task() -> None:
-    """My lovely task."""
-    await asyncio.sleep(1)
-    print("Hello")
-
-async def main():
-    await my_async_task.kiq()
-```
-
-It's equivalent to this
-
-```python
-
-@broker.task
-async def my_async_task() -> None:
-    """My lovely task."""
-    await asyncio.sleep(1)
-    print("Hello")
-
-async def main():
-    await my_async_task.kicker().with_labels(
-        my_label=1,
-        label2="something",
-    ).kiq()
-```
-
-Also you can assign custom task names using decorator.
-This is useful to be sure that task names are unique and resolved correctly.
-Also it may be useful to balance message routing in some brokers.
-
-for example:
-
-```python
-@broker.task(task_name="my_tasks.add_one", label1=1)
-async def my_async_task() -> None:
-    """My lovely task."""
-    await asyncio.sleep(1)
-    print("Hello")
-
-```
-
 ## Context
 
-This section is useful for library developers. Who want to get current broker during shared task execution.
+Context is a useful class with some additional functions.
+You can use context to get broker that runs this task, from inside of the task.
 
-For example, you've created shared_task and you want to send message in that task.
-This can be done with context.
-
-Context holds information about the current broker and current incoming message.
-To get it, simply add the context parameter with `type-hint`.
-
-::: danger Cool warning!
-Context injected only if you have a type hint.
-:::
-
-Example:
+Or it has ability to control the flow of execution. Here's example of how to get
+the context.
 
 ```python
-from taskiq import async_shared_broker, BrokerMessage, Context
+from taskiq import Context, TaskiqDepends, ZeroMQBroker
+
+broker = ZeroMQBroker()
 
 
-@async_shared_broker.task
-async def my_shr_task(context: Context):
-    message = BrokerMessage(
-        task_id="123",
-        task_name="dummy_name",
-        message='{"one": "two"}',
-        labels={},
-    )
-    await context.broker.kick(message)
-
+@broker.task
+async def my_task(context: Context = TaskiqDepends()):
+    ...
 ```
 
-This is useless example, but it's good as a demonstration.
-Pipelines are built using this magic.
+Also through contexts you can reject or requeue a task. It's easy as this:
+
+```python
+@broker.task
+async def my_task(context: Context = TaskiqDepends()):
+   await context.requeue()
+```
+
+Calling `requeue` or `reject` stops task execution and either drops the message,
+or puts it back to the queue.
+
+Also, with context you'll be able to get current message that was received by the broker
+or even instance of a broker who received a message. This may be useful for lib developers.

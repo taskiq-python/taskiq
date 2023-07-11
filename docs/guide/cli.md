@@ -71,6 +71,16 @@ To enable this option simply pass the `--reload` or `-r` option to worker taskiq
 Also this option supports `.gitignore` files. If you have such file in your directory, it won't reload worker
 when you modify ignored files. To disable this functionality pass `--do-not-use-gitignore` option.
 
+### Other parameters
+
+* `--no-configure-logging` - disables default logging configuration for workers.
+* `--max-async-tasks` - maximum number of simultaneously running async tasks.
+* `--max-prefetch` - number of tasks to be prefetched before execution. (Useful for systems with high message rates, but brokers should support acknowledgements).
+* `--max-threadpool-threads` - number of threads for sync function exection.
+* `--no-propagate-errors` - if this parameter is enabled, exceptions won't be thrown in generator dependencies.
+* `--receiver` - python path to custom receiver class.
+* `--receiver_arg` - custom args for receiver.
+
 ## Scheduler
 
 Scheduler is used to schedule tasks as described in [Scheduling tasks](./scheduling-tasks.md) section.

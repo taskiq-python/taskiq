@@ -82,6 +82,7 @@ async def run_scheduler(args: SchedulerArgs) -> None:  # noqa: C901, WPS210, WPS
             "Imported scheduler is not a subclass of TaskiqScheduler.",
         )
         exit(1)  # noqa: WPS421
+    scheduler.broker.is_scheduler_process = True
     import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
     basicConfig(
         level=getLevelName(args.log_level),

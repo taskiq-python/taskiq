@@ -165,29 +165,12 @@ If you want to do something asynchronously, convert this function to an asynchro
 
 @[code python](../examples/state/async_generator_deps.py)
 
-### Default dependencies
 
-By default taskiq has only two dependencies:
+#### Exception handling
 
-- Context from `taskiq.context.Context`
-- TaskiqState from `taskiq.state.TaskiqState`
+Generator dependencies can handle exceptions that happen in tasks. This feature is handy if you want your system to be more atomic.
 
-
-### Adding first-level dependencies
-
-You can expand default list of available dependencies for you application.
-Taskiq have an ability to add new first-level dependencies using brokers.
-
-The AsyncBroker interface has a function called `add_dependency_context` and you can add
-more default dependencies to the taskiq. This may be useful for libraries if you want to
-add new dependencies to users.
-
-
-### Exception handling
-
-Dependencies can handle exceptions that happen in tasks. This feature is handy if you want your system to be more atomic.
-
-For example, if you open a database transaction in your dependency and want to commit it only if the function is completed successfully.
+For example, if you open a database transaction in your dependency and want to commit it only if the function you execute is completed successfully.
 
 ```python
 async def get_transaction(db_driver: DBDriver = TaskiqDepends(get_driver)) -> AsyncGenerator[Transaction, None]:
@@ -211,3 +194,20 @@ taskiq worker my_file:broker --no-propagate-errors
 ```
 
 In this case, no exception will ever going to be propagated to any dependency.
+
+### Default dependencies
+
+By default taskiq has only two dependencies:
+
+- Context from `taskiq.context.Context`
+- TaskiqState from `taskiq.state.TaskiqState`
+
+
+### Adding first-level dependencies
+
+You can expand default list of available dependencies for you application.
+Taskiq have an ability to add new first-level dependencies using brokers.
+
+The AsyncBroker interface has a function called `add_dependency_context` and you can add
+more default dependencies to the taskiq. This may be useful for libraries if you want to
+add new dependencies to users.
