@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Dict, List
 
 import pytest
 from freezegun import freeze_time
@@ -20,7 +20,7 @@ from taskiq.scheduler.scheduler import ScheduledTask, TaskiqScheduler
         pytest.param([{"time": datetime.utcnow()}], id="time"),
     ],
 )
-async def test_label_discovery(schedule_label: list[dict[str, Any]]) -> None:
+async def test_label_discovery(schedule_label: List[Dict[str, Any]]) -> None:
     broker = InMemoryBroker()
 
     @broker.task(
@@ -94,9 +94,9 @@ async def test_task_scheduled_at_time_runs_only_once(mock_sleep: None) -> None:
 
         # Wait again, but task is not called again as expected, so TimeoutError.
         event.clear()
-        with pytest.raises(TimeoutError):
+        with pytest.raises(asyncio.TimeoutError):
             await asyncio.wait_for(event.wait(), 2.0)
 
-        # Check that other scheduled task are not effected and is still available
+        # Check that other scheduled task are not effected and still available
         tasks = [task.args for task in await scheduler.sources[0].get_schedules()]
         assert tasks == [[2], [3]]  # [1] not in a list as it was enqueued above
