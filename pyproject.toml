@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "taskiq"
-version = "0.8.0"
+version = "0.8.1"
 description = "Distributed task queue with full async support"
 authors = ["Pavel Kirilin <win10@list.ru>"]
 maintainers = ["Pavel Kirilin <win10@list.ru>"]
@@ -59,6 +59,8 @@ pytest-xdist = { version = "^2.5.0", extras = ["psutil"] }
 types-mock = "^4.0.15"
 wemake-python-styleguide = "^0.18.0"
 tox = "^4.6.4"
+freezegun = "^1.2.2"
+pytest-mock = "^3.11.1"
 
 [tool.poetry.extras]
 zmq = ["pyzmq"]
@@ -88,6 +90,9 @@ warn_unused_ignores = false
 [tool.isort]
 profile = "black"
 multi_line_output = 3
+
+[tool.pytest.ini_options]
+log_level='INFO'
 
 [tool.coverage.run]
 omit = [
