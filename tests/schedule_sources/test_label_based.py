@@ -1,3 +1,6 @@
+from datetime import datetime
+from typing import Any, Dict, List
+
 import pytest
 
 from taskiq.brokers.inmemory_broker import InMemoryBroker
@@ -6,12 +9,19 @@ from taskiq.scheduler.scheduler import ScheduledTask
 
 
 @pytest.mark.anyio
-async def test_label_discovery() -> None:
+@pytest.mark.parametrize(
+    "schedule_label",
+    [
+        pytest.param([{"cron": "* * * * *"}], id="cron"),
+        pytest.param([{"time": datetime.utcnow()}], id="time"),
+    ],
+)
+async def test_label_discovery(schedule_label: List[Dict[str, Any]]) -> None:
     broker = InMemoryBroker()
 
     @broker.task(
         task_name="test_task",
-        schedule=[{"cron": "* * * * *"}],
+        schedule=schedule_label,
     )
     def task() -> None:
         pass
@@ -20,11 +30,13 @@ async def test_label_discovery() -> None:
     schedules = await source.get_schedules()
     assert schedules == [
         ScheduledTask(
-            cron="* * * * *",
+            cron=schedule_label[0].get("cron"),
+            time=schedule_label[0].get("time"),
             task_name="test_task",
-            labels={"schedule": [{"cron": "* * * * *"}]},
+            labels={"schedule": schedule_label},
             args=[],
             kwargs={},
+            source=source,
         ),
     ]
 

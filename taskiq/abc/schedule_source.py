@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, Any, Coroutine, List, Union
 
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.scheduler.scheduler import ScheduledTask
@@ -32,4 +32,24 @@ class ScheduleSource(ABC):
         Note that this function may do nothing.
 
         :param schedule: schedule to add.
+        """
+
+    def pre_send(  # noqa: B027
+        self,
+        task: "ScheduledTask",
+    ) -> Union[None, Coroutine[Any, Any, None]]:
+        """
+        Actions to execute before task will be sent to broker.
+
+        :param task: task that will be sent
+        """
+
+    def post_send(  # noqa: B027
+        self,
+        task: "ScheduledTask",
+    ) -> Union[None, Coroutine[Any, Any, None]]:
+        """
+        Actions to execute after task was sent to broker.
+
+        :param task: task that just have sent
         """
