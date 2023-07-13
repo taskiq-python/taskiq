@@ -1,4 +1,6 @@
 """Distributed task manager."""
+from importlib.metadata import version
+
 from taskiq_dependencies import Depends as TaskiqDepends
 
 from taskiq.abc.broker import AsyncBroker, AsyncTaskiqDecoratedTask
@@ -29,13 +31,6 @@ from taskiq.result import TaskiqResult
 from taskiq.scheduler import ScheduledTask, TaskiqScheduler
 from taskiq.state import TaskiqState
 from taskiq.task import AsyncTaskiqTask
-
-try:
-    # Python 3.8+
-    from importlib.metadata import version  # noqa: WPS433
-except ImportError:
-    # Python 3.7
-    from importlib_metadata import version  # noqa: WPS433
 
 __version__ = version("taskiq")
 __all__ = [
