@@ -153,7 +153,7 @@ class AsyncBroker(ABC):
 
         for middleware in self.middlewares:
             if middleware.__class__.startup != TaskiqMiddleware.startup:
-                await maybe_awaitable(middleware.startup)
+                await maybe_awaitable(middleware.startup())
 
         await self.result_backend.startup()
 
