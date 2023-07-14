@@ -83,7 +83,7 @@ class PrometheusMiddleware(TaskiqMiddleware):
         )
         self.execution_time = Histogram(
             "execution_time",
-            "Tome of function execution",
+            "Time of function execution",
             ["task_name"],
             registry=registry,
         )
