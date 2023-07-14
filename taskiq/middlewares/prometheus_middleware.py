@@ -42,36 +42,50 @@ class PrometheusMiddleware(TaskiqMiddleware):
         logger.debug("Initializing metrics")
 
         try:
-            from prometheus_client import Counter, Histogram  # noqa: WPS433
+            from prometheus_client import (  # noqa: WPS433
+                CollectorRegistry,
+                Counter,
+                Histogram,
+                multiprocess,
+            )
         except ImportError as exc:
             raise ImportError(
                 "Cannot initialize metrics. Please install 'taskiq[metrics]'.",
             ) from exc
 
+        registry = CollectorRegistry()
+        multiprocess.MultiProcessCollector(registry)
+        self.registry = registry
+
         self.found_errors = Counter(
             "found_errors",
             "Number of found errors",
             ["task_name"],
+            registry=registry,
         )
         self.received_tasks = Counter(
             "received_tasks",
             "Number of received tasks",
             ["task_name"],
+            registry=registry,
         )
         self.success_tasks = Counter(
             "success_tasks",
             "Number of successfully executed tasks",
             ["task_name"],
+            registry=registry,
         )
         self.saved_results = Counter(
             "saved_results",
             "Number of saved results in result backend",
             ["task_name"],
+            registry=registry,
         )
         self.execution_time = Histogram(
             "execution_time",
             "Tome of function execution",
             ["task_name"],
+            registry=registry,
         )
         self.server_port = server_port
         self.server_addr = server_addr
@@ -87,7 +101,11 @@ class PrometheusMiddleware(TaskiqMiddleware):
 
         if self.broker.is_worker_process:
             try:
-                start_http_server(port=self.server_port, addr=self.server_addr)
+                start_http_server(
+                    port=self.server_port,
+                    addr=self.server_addr,
+                    registry=self.registry,
+                )
             except OSError as exc:
                 logger.debug("Cannot start prometheus server: %s", exc)
 
