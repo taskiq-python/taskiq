@@ -29,12 +29,6 @@ class PrometheusMiddleware(TaskiqMiddleware):
     ) -> None:
         super().__init__()
 
-        self.found_errors = None
-        self.received_tasks = None
-        self.success_tasks = None
-        self.saved_results = None
-        self.execution_time = None
-
         metrics_path = metrics_path or Path(gettempdir()) / "taskiq_worker"
 
         if not metrics_path.exists():
@@ -76,7 +70,7 @@ class PrometheusMiddleware(TaskiqMiddleware):
         )
         self.execution_time = Histogram(
             "execution_time",
-            "Tome of function execution",
+            "Time of function execution",
             ["task_name"],
         )
         self.server_port = server_port
@@ -110,8 +104,6 @@ class PrometheusMiddleware(TaskiqMiddleware):
         :param message: current message.
         :return: message
         """
-        if self.received_tasks is None:
-            return message
         self.received_tasks.labels(message.task_name).inc()
         return message
 
@@ -126,12 +118,6 @@ class PrometheusMiddleware(TaskiqMiddleware):
         :param message: received message.
         :param result: result of the execution.
         """
-        if (  # noqa: WPS337
-            self.success_tasks is None
-            or self.execution_time is None
-            or self.found_errors is None
-        ):
-            return
         if result.is_err:
             self.found_errors.labels(message.task_name).inc()
         else:
@@ -149,6 +135,4 @@ class PrometheusMiddleware(TaskiqMiddleware):
         :param message: received message.
         :param result: result of execution.
         """
-        if self.saved_results is None:
-            return
         self.saved_results.labels(message.task_name).inc()
