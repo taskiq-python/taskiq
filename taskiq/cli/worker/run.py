@@ -2,7 +2,9 @@ import asyncio
 import logging
 import signal
 from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import set_start_method
 from multiprocessing.synchronize import Event
+from sys import platform
 from typing import Any, Type
 
 from taskiq.abc.broker import AsyncBroker
@@ -158,6 +160,8 @@ def run_worker(args: WorkerArgs) -> None:  # noqa: WPS213
 
     :raises ValueError: if reload flag is used, but dependencies are not installed.
     """
+    if platform == "darwin":
+        set_start_method("fork")
     if args.configure_logging:
         logging.basicConfig(
             level=logging.getLevelName(args.log_level),
