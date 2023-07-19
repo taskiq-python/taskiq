@@ -82,14 +82,15 @@ async def run_scheduler(args: SchedulerArgs) -> None:  # noqa: C901, WPS210, WPS
         exit(1)  # noqa: WPS421
     scheduler.broker.is_scheduler_process = True
     import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
-    basicConfig(
-        level=getLevelName(args.log_level),
-        format=(
-            "[%(asctime)s][%(levelname)-7s]"
-            "[%(module)s:%(funcName)s:%(lineno)d]"
-            " %(message)s"
-        ),
-    )
+    if args.configure_logging:
+        basicConfig(
+            level=getLevelName(args.log_level),
+            format=(
+                "[%(asctime)s][%(levelname)-7s]"
+                "[%(module)s:%(funcName)s:%(lineno)d]"
+                " %(message)s"
+            ),
+        )
     for source in scheduler.sources:
         await source.startup()
     loop = asyncio.get_event_loop()
@@ -114,8 +115,6 @@ async def run_scheduler(args: SchedulerArgs) -> None:  # noqa: C901, WPS210, WPS
                 loop.create_task(scheduler.on_ready(task))
 
         delay = (
-            datetime.now().replace(second=1, microsecond=0)
-            + timedelta(minutes=1)
-            - datetime.now()
+            datetime.now().replace(second=1, microsecond=0) + timedelta(minutes=1) - datetime.now()
         )
         await asyncio.sleep(delay.total_seconds())
