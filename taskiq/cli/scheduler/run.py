@@ -91,6 +91,7 @@ async def run_scheduler(args: SchedulerArgs) -> None:  # noqa: C901, WPS210, WPS
                 " %(message)s"
             ),
         )
+    getLogger("taskiq").setLevel(level=getLevelName(args.log_level))
     for source in scheduler.sources:
         await source.startup()
     loop = asyncio.get_event_loop()
@@ -115,8 +116,6 @@ async def run_scheduler(args: SchedulerArgs) -> None:  # noqa: C901, WPS210, WPS
                 loop.create_task(scheduler.on_ready(task))
 
         delay = (
-            datetime.now().replace(second=1, microsecond=0)
-            + timedelta(minutes=1)
-            - datetime.now()
+            datetime.now().replace(second=1, microsecond=0) + timedelta(minutes=1) - datetime.now()
         )
         await asyncio.sleep(delay.total_seconds())
