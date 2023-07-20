@@ -115,6 +115,8 @@ async def run_scheduler(args: SchedulerArgs) -> None:  # noqa: C901, WPS210, WPS
                 loop.create_task(scheduler.on_ready(task))
 
         delay = (
-            datetime.now().replace(second=1, microsecond=0) + timedelta(minutes=1) - datetime.now()
+            datetime.now().replace(second=1, microsecond=0)
+            + timedelta(minutes=1)
+            - datetime.now()
         )
         await asyncio.sleep(delay.total_seconds())
