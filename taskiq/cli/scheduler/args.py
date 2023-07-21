@@ -13,6 +13,7 @@ class SchedulerArgs:
     scheduler: Union[str, TaskiqScheduler]
     modules: List[str]
     log_level: str = LogLevel.INFO.name
+    configure_logging: bool = True
     fs_discover: bool = False
     tasks_pattern: str = "tasks.py"
 
@@ -58,5 +59,11 @@ class SchedulerArgs:
             default=LogLevel.INFO.name,
             choices=[level.name for level in LogLevel],
             help="scheduler log level",
+        )
+        parser.add_argument(
+            "--no-configure-logging",
+            action="store_false",
+            dest="configure_logging",
+            help="Use this parameter if your application configures custom logging.",
         )
         return cls(**parser.parse_args(args).__dict__)
