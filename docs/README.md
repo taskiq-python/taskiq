@@ -15,6 +15,12 @@ head:
   - - meta
     - name: "google-site-verification"
       content: "hQCR5w2tmeuOvYIYXsOYU3u4kLNwT86lnqltANYlRQ0"
+  - - meta
+    - name: "msvalidate.01"
+      content: "97DC185FE0A2F5B123861F0790FDFB26"
+  - - meta
+    - name: "yandex-verification"
+      content: "9b105f7c58cbc920"
 features:
     - title: Production ready
       details: Taskiq has proven that it can run in heavy production systems with high load.
