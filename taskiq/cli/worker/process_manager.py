@@ -43,7 +43,7 @@ class ReloadAllAction(ProcessActionBase):
         :param action_queue: queue to send events to.
         """
         for worker_id in range(workers_num):
-            action_queue.put(ReloadOneAction(worker_num=worker_id))
+            action_queue.put(ReloadOneAction(worker_num=worker_id, is_reload_all=True))
 
 
 @dataclass
@@ -51,6 +51,7 @@ class ReloadOneAction(ProcessActionBase):
     """This action reloads single worker with particular id."""
 
     worker_num: int
+    is_reload_all: bool
 
     def handle(
         self,
@@ -153,6 +154,7 @@ class ProcessManager:
         args: WorkerArgs,
         worker_function: Callable[[WorkerArgs, EventType], None],
         observer: Optional[Observer] = None,  # type: ignore[valid-type]
+        max_restarts: Optional[int] = None,
     ) -> None:
         self.worker_function = worker_function
         self.action_queue: "Queue[ProcessActionBase]" = Queue(-1)
@@ -198,7 +200,7 @@ class ProcessManager:
         for worker, event in zip(self.workers, events):
             _wait_for_worker_startup(worker, event)
 
-    def start(self) -> None:  # noqa: C901, WPS213
+    def start(self) -> Optional[int]:  # noqa: C901, WPS213
         """
         Start managing child processes.
 
@@ -223,7 +225,10 @@ class ProcessManager:
         After all events are handled, it iterates over all child processes and
         checks that all processes are healthy. If process was terminated for
         some reason, it schedules a restart for dead process.
+
+        :returns: status code or None.
         """
+        restarts = 0
         self.prepare_workers()
         while True:
             sleep(1)
@@ -238,6 +243,15 @@ class ProcessManager:
                         action_queue=self.action_queue,
                     )
                 elif isinstance(action, ReloadOneAction):
+                    # We check if max_fails is set.
+                    # If it's true, we check how many times
+                    # worker was reloaded.
+                    if not action.is_reload_all and self.args.max_fails >= 1:
+                        restarts += 1
+                        if restarts >= self.args.max_fails:
+                            logger.warning("Max restarts reached. Exiting.")
+                            # Returning error status.
+                            return -1
                     # If we just reloaded this worker, skip handling.
                     if action.worker_num in reloaded_workers:
                         continue
@@ -245,9 +259,14 @@ class ProcessManager:
                     reloaded_workers.add(action.worker_num)
                 elif isinstance(action, ShutdownAction):
                     logger.debug("Process manager closed.")
-                    return
+                    return None
 
             for worker_num, worker in enumerate(self.workers):
                 if not worker.is_alive():
                     logger.info(f"{worker.name} is dead. Scheduling reload.")
-                    self.action_queue.put(ReloadOneAction(worker_num=worker_num))
+                    self.action_queue.put(
+                        ReloadOneAction(
+                            worker_num=worker_num,
+                            is_reload_all=False,
+                        ),
+                    )

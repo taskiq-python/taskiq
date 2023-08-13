@@ -40,6 +40,7 @@ class WorkerArgs:
     receiver_arg: List[Tuple[str, str]] = field(default_factory=list)
     max_prefetch: int = 0
     no_propagate_errors: bool = False
+    max_fails: int = -1
 
     @classmethod
     def from_cli(  # noqa: WPS213
@@ -178,6 +179,13 @@ class WorkerArgs:
             action="store_false",
             dest="configure_logging",
             help="Use this parameter if your application configures custom logging.",
+        )
+        parser.add_argument(
+            "--max-fails",
+            type=int,
+            dest="max_fails",
+            default=-1,
+            help="Maximum number of child process exits.",
         )
 
         namespace = parser.parse_args(args)
