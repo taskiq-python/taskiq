@@ -1,5 +1,5 @@
 import logging
-from typing import Sequence
+from typing import Optional, Sequence
 
 from taskiq.abc.cmd import TaskiqCMD
 from taskiq.cli.worker.args import WorkerArgs
@@ -13,7 +13,7 @@ class WorkerCMD(TaskiqCMD):
 
     short_help = "Helper to run workers"
 
-    def exec(self, args: Sequence[str]) -> None:
+    def exec(self, args: Sequence[str]) -> Optional[int]:
         """
         Start worker process.
 
@@ -21,6 +21,7 @@ class WorkerCMD(TaskiqCMD):
         processes in which tasks are actually processed.
 
         :param args: CLI arguments.
+        :returns: status code.
         """
         wargs = WorkerArgs.from_cli(args)
-        run_worker(wargs)
+        return run_worker(wargs)
