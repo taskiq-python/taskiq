@@ -8,7 +8,7 @@ from taskiq import __version__
 from taskiq.abc.cmd import TaskiqCMD
 
 
-def main() -> None:  # noqa: WPS210  # pragma: no cover
+def main() -> None:  # noqa: C901, WPS210  # pragma: no cover
     """
     Main entrypoint of the taskiq.
 
@@ -70,7 +70,9 @@ def main() -> None:  # noqa: WPS210  # pragma: no cover
 
     command = subcommands[args.subcommand]
     sys.argv.pop(0)
-    command.exec(sys.argv[1:])
+    status = command.exec(sys.argv[1:])
+    if status is not None:
+        exit(status)  # noqa: WPS421
 
 
 if __name__ == "__main__":  # pragma: no cover

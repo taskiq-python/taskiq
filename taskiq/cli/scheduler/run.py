@@ -26,7 +26,7 @@ async def schedules_updater(
     :param scheduler: current scheduler.
     :param current_schedules: list of schedules.
     """
-    while True:
+    while True:  # noqa: WPS457
         logger.debug("Started schedule update.")
         new_schedules: "List[ScheduledTask]" = []
         for source in scheduler.sources:
@@ -40,8 +40,7 @@ async def schedules_updater(
                 logger.debug(exc, exc_info=True)
                 continue
 
-            for schedule in scheduler.merge_func(new_schedules, schedules):
-                new_schedules.append(schedule)
+            new_schedules = scheduler.merge_func(new_schedules, schedules)
 
         current_schedules.clear()
         current_schedules.extend(new_schedules)
@@ -62,38 +61,15 @@ def should_run(task: ScheduledTask) -> bool:
     return False
 
 
-async def run_scheduler(args: SchedulerArgs) -> None:  # noqa: C901, WPS210, WPS213
+async def _run_loop(scheduler: TaskiqScheduler) -> None:
     """
     Runs scheduler loop.
 
     This function imports taskiq scheduler
     and runs tasks when needed.
 
-    :param args: parsed CLI args.
+    :param scheduler: current scheduler.
     """
-    if isinstance(args.scheduler, str):
-        scheduler = import_object(args.scheduler)
-    else:
-        scheduler = args.scheduler
-    if not isinstance(scheduler, TaskiqScheduler):
-        print(  # noqa: WPS421
-            "Imported scheduler is not a subclass of TaskiqScheduler.",
-        )
-        exit(1)  # noqa: WPS421
-    scheduler.broker.is_scheduler_process = True
-    import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
-    if args.configure_logging:
-        basicConfig(
-            level=getLevelName(args.log_level),
-            format=(
-                "[%(asctime)s][%(levelname)-7s]"
-                "[%(module)s:%(funcName)s:%(lineno)d]"
-                " %(message)s"
-            ),
-        )
-    getLogger("taskiq").setLevel(level=getLevelName(args.log_level))
-    for source in scheduler.sources:
-        await source.startup()
     loop = asyncio.get_event_loop()
     tasks: "List[ScheduledTask]" = []
     loop.create_task(schedules_updater(scheduler, tasks))
@@ -121,3 +97,44 @@ async def run_scheduler(args: SchedulerArgs) -> None:  # noqa: C901, WPS210, WPS
             - datetime.now()
         )
         await asyncio.sleep(delay.total_seconds())
+
+
+async def run_scheduler(args: SchedulerArgs) -> None:  # noqa: WPS213
+    """
+    Run scheduler.
+
+    This function takes all CLI arguments
+    and starts the scheduler process.
+
+    :param args: parsed CLI arguments.
+    """
+    if isinstance(args.scheduler, str):
+        scheduler = import_object(args.scheduler)
+    else:
+        scheduler = args.scheduler
+    if not isinstance(scheduler, TaskiqScheduler):
+        print(  # noqa: WPS421
+            "Imported scheduler is not a subclass of TaskiqScheduler.",
+        )
+        exit(1)  # noqa: WPS421
+    scheduler.broker.is_scheduler_process = True
+    import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
+    if args.configure_logging:
+        basicConfig(
+            level=getLevelName(args.log_level),
+            format=(
+                "[%(asctime)s][%(levelname)-7s]"
+                "[%(module)s:%(funcName)s:%(lineno)d]"
+                " %(message)s"
+            ),
+        )
+    getLogger("taskiq").setLevel(level=getLevelName(args.log_level))
+    for source in scheduler.sources:
+        await source.startup()
+
+    try:
+        await _run_loop(scheduler)
+    except asyncio.CancelledError:
+        logger.warning("Shutting down scheduler.")
+        await scheduler.shutdown()
+        logger.info("Scheduler shut down. Good bye!")

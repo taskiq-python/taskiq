@@ -73,3 +73,7 @@ class TaskiqScheduler:
             **task.kwargs,
         )
         await maybe_awaitable(task.source.post_send(task))
+
+    async def shutdown(self) -> None:
+        """Shutdown the scheduler process."""
+        await self.broker.shutdown()

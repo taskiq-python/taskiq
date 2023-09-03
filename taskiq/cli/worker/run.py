@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import set_start_method
 from multiprocessing.synchronize import Event
 from sys import platform
-from typing import Any, Type
+from typing import Any, Optional, Type
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.cli.utils import import_object, import_tasks
@@ -149,7 +149,7 @@ def start_listen(args: WorkerArgs, event: Event) -> None:  # noqa: WPS210, WPS21
         loop.run_until_complete(shutdown_broker(broker, args.shutdown_timeout))
 
 
-def run_worker(args: WorkerArgs) -> None:  # noqa: WPS213
+def run_worker(args: WorkerArgs) -> Optional[int]:  # noqa: WPS213
     """
     This function starts worker processes.
 
@@ -159,6 +159,7 @@ def run_worker(args: WorkerArgs) -> None:  # noqa: WPS213
     :param args: CLI arguments.
 
     :raises ValueError: if reload flag is used, but dependencies are not installed.
+    :returns: Optional status code.
     """
     if platform == "darwin":
         set_start_method("fork")
@@ -187,10 +188,11 @@ def run_worker(args: WorkerArgs) -> None:  # noqa: WPS213
 
     manager = ProcessManager(args=args, observer=observer, worker_function=start_listen)
 
-    manager.start()
+    status = manager.start()
 
     if observer is not None and observer.is_alive():
         if args.reload:
             logger.info("Stopping watching files.")
         observer.stop()
-    logger.info("Stopping logging thread.")
+
+    return status
