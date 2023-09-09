@@ -1,4 +1,5 @@
 import asyncio
+import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, AsyncGenerator, List, Optional, TypeVar
 
@@ -114,6 +115,50 @@ async def test_run_task_exception() -> None:
         ),
     )
     assert result.return_value is None
+    assert result.is_err
+
+
+@pytest.mark.anyio
+async def test_run_timeouts() -> None:
+    async def test_func() -> None:
+        await asyncio.sleep(2)
+
+    receiver = get_receiver()
+
+    result = await receiver.run_task(
+        test_func,
+        TaskiqMessage(
+            task_id="",
+            task_name="",
+            labels={"timeout": "0.3"},
+            args=[],
+            kwargs={},
+        ),
+    )
+    assert result.return_value is None
+    assert result.execution_time < 2
+    assert result.is_err
+
+
+@pytest.mark.anyio
+async def test_run_timeouts_sync() -> None:
+    def test_func() -> None:
+        time.sleep(2)
+
+    receiver = get_receiver()
+
+    result = await receiver.run_task(
+        test_func,
+        TaskiqMessage(
+            task_id="",
+            task_name="",
+            labels={"timeout": "0.3"},
+            args=[],
+            kwargs={},
+        ),
+    )
+    assert result.return_value is None
+    assert result.execution_time < 2
     assert result.is_err
 
 

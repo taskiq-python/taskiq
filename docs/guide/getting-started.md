@@ -217,3 +217,36 @@ Returned value: 2
 ```
 
 Continue reading to get more information about taskiq internals.
+
+
+## Timeouts
+
+If you want to restrict amount of time you want to run task,
+just add timeout label to the task.
+
+You can do it either with decorator or when calling the task.
+
+::: tabs
+
+@tab decorator
+
+```python
+@broker.task(timeout=0.1)
+async def mytask():
+    await asyncio.sleep(2)
+```
+
+@tab when calling
+
+```python
+await my_task.kicker().with_labels(timeout=0.3).kiq()
+```
+
+:::
+
+::: danger Cool alert
+
+We use [run_in_executor](https://docs.python.org/3/library/asyncio-eventloop.html#asyncio.loop.run_in_executor) method to run sync functions. Timeouts will raise a TimeoutException, but
+synchronous function may not stop from execution. This is a constraint of python.
+
+:::

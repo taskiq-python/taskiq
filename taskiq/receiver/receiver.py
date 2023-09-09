@@ -218,20 +218,27 @@ class Receiver:
                 kwargs = await dep_ctx.resolve_kwargs()
             # We udpate kwargs with kwargs from network.
             kwargs.update(message.kwargs)
-
+            is_coroutine = True
             # If the function is a coroutine, we await it.
             if asyncio.iscoroutinefunction(target):
-                returned = await target(*message.args, **kwargs)
+                target_future = target(*message.args, **kwargs)
             else:
+                is_coroutine = False
                 # If this is a synchronous function, we
                 # run it in executor.
-                returned = await loop.run_in_executor(
+                target_future = loop.run_in_executor(
                     self.executor,
                     _run_sync,
                     target,
                     message.args,
                     kwargs,
                 )
+            timeout = message.labels.get("timeout")
+            if timeout is not None:
+                if not is_coroutine:
+                    logger.warning("Timeouts for sync tasks don't work in python well.")
+                target_future = asyncio.wait_for(target_future, float(timeout))
+            returned = await target_future
         except NoResultError as no_res_exc:
             found_exception = no_res_exc
             logger.warning(
