@@ -1,5 +1,5 @@
 import asyncio
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from logging import basicConfig, getLevelName, getLogger
 from typing import List
 
@@ -25,7 +25,7 @@ def to_tz_aware(time: datetime) -> datetime:
     :return: timezone aware time.
     """
     if time.tzinfo is None:
-        return time.replace(tzinfo=UTC)
+        return time.replace(tzinfo=pytz.UTC)
     return time
 
 
@@ -72,7 +72,7 @@ def should_run(task: ScheduledTask) -> bool:
     :return: True if task must be sent.
     """
     if task.cron is not None:
-        now = datetime.now(tz=UTC)
+        now = datetime.now(tz=pytz.UTC)
         # If user specified cron offset we apply it.
         # If it's timedelta, we simply add the delta to current time.
         if task.cron_offset and isinstance(task.cron_offset, timedelta):
@@ -83,7 +83,7 @@ def should_run(task: ScheduledTask) -> bool:
             now = now.astimezone(pytz.timezone(task.cron_offset))
         return is_now(task.cron, now)
     if task.time is not None:
-        return to_tz_aware(task.time) <= datetime.now(tz=UTC)
+        return to_tz_aware(task.time) <= datetime.now(tz=pytz.UTC)
     return False
 
 

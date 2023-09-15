@@ -71,7 +71,7 @@ def test_time_utc_without_zone() -> None:
 
 
 def test_time_utc_with_zone() -> None:
-    time = datetime.datetime.now(tz=datetime.UTC)
+    time = datetime.datetime.now(tz=pytz.UTC)
     assert should_run(
         ScheduledTask(
             task_name="",

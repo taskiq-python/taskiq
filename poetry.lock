@@ -1976,4 +1976,4 @@ zmq = ["pyzmq"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8.1"
-content-hash = "86f104c4546808388993d24a0bc9a2e8f80b638afa362f8e13fc378e06b74743"
+content-hash = "431ad22a8584008ae45b89610b742bef245e281223f9b09f18dbe7b098f826a4"
