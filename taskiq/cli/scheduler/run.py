@@ -116,6 +116,7 @@ async def delayed_send(
     """
     if delay > 0:
         await asyncio.sleep(delay)
+    logger.info("Sending task %s.", task.task_name)
     await scheduler.on_ready(task)
 
 
@@ -146,7 +147,6 @@ async def _run_loop(scheduler: TaskiqScheduler) -> None:
                 )
                 continue
             if task_delay is not None:
-                logger.info("Sending task %s.", task.task_name)
                 loop.create_task(delayed_send(scheduler, task, task_delay))
 
         delay = (
