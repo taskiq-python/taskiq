@@ -60,6 +60,24 @@ taskiq_aiohttp.init(broker, "my_project.main:app")
 From this point, you'll be able to reuse the same dependencies as with `aiohttp-deps`.
 Let's take a look at this function:
 
+::: tabs
+
+@tab Annotated 3.10+
+
+```python
+from aiohttp import web
+from typing import Annotated
+from taskiq import TaskiqDepends
+from my_project.tkq import broker
+
+@broker.task
+async def my_task(app: Annotated[web.Application, TaskiqDepends()]):
+    ...
+
+```
+
+@tab default values
+
 ```python
 from aiohttp import web
 from taskiq import TaskiqDepends
@@ -70,6 +88,8 @@ async def my_task(app: web.Application = TaskiqDepends()):
     ...
 
 ```
+
+:::
 
 In this example, we depend on the current application. We can use its state in a current task or any other dependency. We can take db_pool from your application's state, which is the same pool, as the one you've created on AiohTTP's startup.
 But this application is only a mock of your application. It has correct types and all your variables that you filled on startup, but it doesn't handle any request.
