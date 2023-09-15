@@ -23,7 +23,17 @@ Client events are called when you call the `startup` method of your broker from 
 
 This is an example of code using event handlers:
 
+::: tabs
+
+@tab Annotated 3.10+
+
+@[code python](../examples/state/events_example_annot.py)
+
+@tab default values
+
 @[code python](../examples/state/events_example.py)
+
+:::
 
 ::: tip Cool tip!
 
@@ -43,12 +53,6 @@ That's why we suggest you try TaskiqDependencies. The implementation is very sim
 We use the [taskiq-dependencies](https://pypi.org/project/taskiq-dependencies/) package to provide autocompetion.
 You can easily integrate it in your own project.
 
-::: danger Cool alarm!
-
-FastAPI's `Depends` is not compatible with `TaskiqDepends`.
-
-:::
-
 ### How dependencies are useful
 
 You can use dependencies for better autocompletion and reduce the amount of code you write.
@@ -67,6 +71,21 @@ async def startup(state: TaskiqState) -> None:
 
 You can access this variable by using the current execution context directly, like this:
 
+::: tabs
+
+@tab Annotated 3.10+
+
+```python
+from typing import Annotated
+
+@broker.task
+async def my_task(context: Annotated[Context, TaskiqDepends()]) -> None:
+    async with Redis(connection_pool=context.state.redis, decode_responses=True) as redis:
+        await redis.set('key', 'value')
+```
+
+@tab default values
+
 ```python
 @broker.task
 async def my_task(context: Context = TaskiqDepends()) -> None:
@@ -74,8 +93,28 @@ async def my_task(context: Context = TaskiqDepends()) -> None:
         await redis.set('key', 'value')
 ```
 
+:::
+
 If you hit the `TAB` button after the `context.state.` expression, your IDE won't give you any auto-completion.
 But we can create a dependency function to add auto-completion.
+
+::: tabs
+
+@tab Annotated 3.10+
+
+```python
+from typing import Annotated
+
+def redis_dep(context: Annotated[Context, TaskiqDepends()]) -> Redis:
+    return Redis(connection_pool=context.state.redis, decode_responses=True)
+
+@broker.task
+async def my_task(redis: Annotated[Redis, TaskiqDepends(redis_dep)]) -> None:
+    await redis.set('key', 'value')
+
+```
+
+@tab default values
 
 ```python
 
@@ -87,6 +126,8 @@ async def my_task(redis: Redis = TaskiqDepends(redis_dep)) -> None:
     await redis.set('key', 'value')
 
 ```
+
+:::
 
 Now, this dependency injection will be autocompleted. But, of course, state fields cannot be autocompleted,
 even in dependencies. But this way, you won't make any typos while writing tasks.
@@ -100,13 +141,34 @@ Dependencies can also depend on something. Also dependencies are optimized to **
 
 For example:
 
+::: tabs
+
+@tab Annotated 3.10+
+
+@[code python](../examples/state/dependencies_tree_annot.py)
+
+@tab default values
+
 @[code python](../examples/state/dependencies_tree.py)
+
+:::
 
 In this code, the dependency `common_dep` is going to be evaluated only once and the `dep1` and the `dep2` are going to receive the same value. You can control this behavior by using the `use_cache=False` parameter to you dependency. This parameter will force the
 dependency to reevaluate all it's subdependencies.
 
 In this example we cannot predict the result. Since the `dep2` doesn't use cache for the `common_dep` function.
+::: tabs
+
+@tab Annotated 3.10+
+
+@[code python](../examples/state/no_cache_annot.py)
+
+@tab default values
+
 @[code python](../examples/state/no_cache.py)
+
+:::
+
 
 The graph for cached dependencies looks like this:
 
@@ -145,7 +207,17 @@ You can use classes as dependencies, and they can also use other dependencies to
 
 Let's see an example:
 
+::: tabs
+
+@tab Annotated 3.10+
+
+@[code python](../examples/state/class_dependency_annot.py)
+
+@tab default values
+
 @[code python](../examples/state/class_dependency.py)
+
+:::
 
 As you can see, the dependency for `my_task` function is declared with `TaskiqDependency()`.
 It's because you can omit the class if it's declared in type-hint for the parameter. This feature doesn't
@@ -157,13 +229,34 @@ You can pass dependencies for classes in the constructor.
 
 Generator dependencies are used to perform startup before task execution and teardown after the task execution.
 
+::: tabs
+
+@tab Annotated 3.10+
+
+@[code python](../examples/state/generator_deps_annot.py)
+
+@tab default values
+
 @[code python](../examples/state/generator_deps.py)
+
+:::
+
 
 In this example, we can do something at startup before the execution and at shutdown after the task is completed.
 
 If you want to do something asynchronously, convert this function to an asynchronous generator. Like this:
 
+::: tabs
+
+@tab Annotated 3.10+
+
+@[code python](../examples/state/async_generator_deps_annot.py)
+
+@tab default values
+
 @[code python](../examples/state/async_generator_deps.py)
+
+:::
 
 
 #### Exception handling
@@ -172,8 +265,17 @@ Generator dependencies can handle exceptions that happen in tasks. This feature 
 
 For example, if you open a database transaction in your dependency and want to commit it only if the function you execute is completed successfully.
 
+::: tabs
+
+@tab Annotated 3.10+
+
+
 ```python
-async def get_transaction(db_driver: DBDriver = TaskiqDepends(get_driver)) -> AsyncGenerator[Transaction, None]:
+from typing import Annotated
+
+async def get_transaction(
+    db_driver: Annotated[DBDriver, TaskiqDepends(get_driver)],
+) -> AsyncGenerator[Transaction, None]:
     trans = db_driver.begin_transaction():
     try:
         # Here we give transaction to our dependant function.
@@ -187,6 +289,28 @@ async def get_transaction(db_driver: DBDriver = TaskiqDepends(get_driver)) -> As
     await trans.commit()
 ```
 
+@tab default values
+
+```python
+async def get_transaction(
+    db_driver: DBDriver = TaskiqDepends(get_driver),
+) -> AsyncGenerator[Transaction, None]:
+    trans = db_driver.begin_transaction():
+    try:
+        # Here we give transaction to our dependant function.
+        yield trans
+    # If exception was found in dependant function,
+    # we rollback our transaction.
+    except Exception:
+        await trans.rollback()
+        return
+    # Here we commit if everything is fine.
+    await trans.commit()
+```
+
+:::
+
+
 If you don't want to propagate exceptions in dependencies, you can add `--no-propagate-errors` option to `worker` command.
 
 ```bash
@@ -194,6 +318,12 @@ taskiq worker my_file:broker --no-propagate-errors
 ```
 
 In this case, no exception will ever going to be propagated to any dependency.
+
+
+## Generics
+
+Taskiq supports generic dependencies. You can create a generic class that is generic over
+another class and takskiq will be able to resolve generics based on type annotations.
 
 ### Default dependencies
 

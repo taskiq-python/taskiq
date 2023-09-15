@@ -23,7 +23,7 @@ taskiq_fastapi.init(broker, "my_package.application:app")
 ```
 
 There are two rules to make everything work as you expect:
-1. Add `TaskiqDepends` as a default value for every parameter with `Request` or `HTTPConnection` types in base dependencies.
+1. Add `TaskiqDepends` as a default value for every parameter with `Request` or `HTTPConnection` types in base dependencies. Or if you use `Annotated`, please annotate these types with `TaskiqDepends`.
 2. Use only `TaskiqDepends` in tasks.
 
 
@@ -46,7 +46,26 @@ def get_redis_pool(request: Request) -> Any:
 
 ```
 
-To make it resolvable in taskiq, people should add `TaskiqDepends` as a default value for each parameter. Like this:
+To make it resolvable in taskiq, people should mark default fastapi dependencies (such as `Request` and `HTTPConnection`) with `TaskiqDepends`. Like this:
+
+
+::: tabs
+
+@tab Annotated 3.10+
+
+```python
+from typing import Annotated
+from fastapi import Request
+from taskiq import TaskiqDepends
+
+
+async def get_redis_pool(request: Annotated[Request, TaskiqDepends()]):
+    return request.app.state.redis_pool
+
+```
+
+@tab default values
+
 ```python
 from fastapi import Request
 from taskiq import TaskiqDepends
@@ -56,6 +75,8 @@ async def get_redis_pool(request: Request = TaskiqDepends()):
     return request.app.state.redis_pool
 
 ```
+
+:::
 
 
 Also you want to call startup of your brokers somewhere.

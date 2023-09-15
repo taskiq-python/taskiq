@@ -67,3 +67,16 @@ Currently we have only two default functions to merge tasks. You can find them i
 - `only_unique` - adds schedule only if it was not added by previous sources.
 
 Every time we update schedule it gets task from the source and executes this function to merge them together.
+
+
+## Working with timezones
+
+Sometimes, you want to be specific in terms of time zones. We have you covered.
+Our `ScheduledTask` model has fields for that. Use these fields or not, it's up to the specific schedule source.
+
+Taskiq scheduler assumes that if time has no specific timezone, it's in [UTC](https://www.wikiwand.com/en/Coordinated_Universal_Time). Sometimes, this behavior might not be convinient for developers.
+
+For the `time` field of `ScheduledTask` we use timezone information from datetime to check if a task should run.
+
+For `cron` tasks, we have an additional field called `cron_offset` that can be used to specify
+an offset of the cron task. An offset can be a string like `Europe/Berlin` or an instance of the `timedelta` class.

@@ -247,6 +247,24 @@ You can use context to get broker that runs this task, from inside of the task.
 Or it has ability to control the flow of execution. Here's example of how to get
 the context.
 
+::: tabs
+
+@tab Annotated 3.10+
+
+
+```python
+from taskiq import Context, TaskiqDepends, ZeroMQBroker
+
+broker = ZeroMQBroker()
+
+
+@broker.task
+async def my_task(context: Annotated[Context, TaskiqDepends()]):
+    ...
+```
+
+@tab default values
+
 ```python
 from taskiq import Context, TaskiqDepends, ZeroMQBroker
 
@@ -258,13 +276,32 @@ async def my_task(context: Context = TaskiqDepends()):
     ...
 ```
 
+:::
+
 Also through contexts you can reject or requeue a task. It's easy as this:
+
+
+::: tabs
+
+@tab Annotated 3.10+
+
+```python
+from typing import Annotated
+
+@broker.task
+async def my_task(context: Annotated[Context, TaskiqDepends()]):
+   await context.requeue()
+```
+
+@tab default values
 
 ```python
 @broker.task
 async def my_task(context: Context = TaskiqDepends()):
    await context.requeue()
 ```
+
+:::
 
 Calling `requeue` or `reject` stops task execution and either drops the message,
 or puts it back to the queue.
