@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from taskiq.abc.broker import AsyncBroker
@@ -21,6 +21,7 @@ class ScheduledTask:
     kwargs: Dict[str, Any]
     source: "ScheduleSource"  # Backward point to source which this task belongs to
     cron: Optional[str] = field(default=None)
+    cron_offset: Optional[str | timedelta] = field(default=None)
     time: Optional[datetime] = field(default=None)
 
     def __post_init__(self) -> None:
