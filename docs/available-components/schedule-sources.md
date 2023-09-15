@@ -17,7 +17,9 @@ The format of the schedule label is the following:
 @broker.task(
     schedule=[
         {
-            "cron": "* * * * *", # type: str, required argument.
+            "cron": "* * * * *", # type: str, either cron or time shoule be specified.
+            "cron_offset": None # type: str | timedelta | None, can be ommited.
+            "time": None  # type: datetime | None, either cron or time shoule be specified.
             "args": [], # type List[Any] | None, can be omitted.
             "kwargs": {}, # type: Dict[str, Any] | None, can be omitted.
             "labels": {}, # type: Dict[str, Any] | None, can be omitted.
@@ -31,11 +33,13 @@ async def my_task():
 Parameters:
 
 - `cron` - crontab string when to run the task.
+- `cron_offset` - timezone offset for cron values. Explained [here](../guide/scheduling-tasks.md#working-with-timezones)
+- `time` - specific time when send the task.
 - `args` - args to use, when invoking the task.
 - `kwargs` - key-word arguments to use when invoking the task.
 - `labels` - additional labels to use when invoking the task.
 
-Usage:
+To enable this source, just add it to the list of sources:
 
 ```python
 from taskiq.scheduler import TaskiqScheduler
