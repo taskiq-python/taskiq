@@ -1,7 +1,7 @@
 import asyncio
 from datetime import datetime, timedelta
 from logging import basicConfig, getLevelName, getLogger
-from typing import List
+from typing import List, Optional
 
 import pytz
 from pycron import is_now
@@ -64,15 +64,15 @@ async def schedules_updater(
         await asyncio.sleep(scheduler.refresh_delay)
 
 
-def should_run(task: ScheduledTask) -> bool:
+def get_task_delay(task: ScheduledTask) -> Optional[int]:  # noqa: C901
     """
-    Checks if it's time to run a task.
+    Get delay of the task in seconds.
 
     :param task: task to check.
     :return: True if task must be sent.
     """
+    now = datetime.now(tz=pytz.UTC)
     if task.cron is not None:
-        now = datetime.now(tz=pytz.UTC)
         # If user specified cron offset we apply it.
         # If it's timedelta, we simply add the delta to current time.
         if task.cron_offset and isinstance(task.cron_offset, timedelta):
@@ -81,10 +81,42 @@ def should_run(task: ScheduledTask) -> bool:
         # offset and then apply.
         elif task.cron_offset and isinstance(task.cron_offset, str):
             now = now.astimezone(pytz.timezone(task.cron_offset))
-        return is_now(task.cron, now)
-    if task.time is not None:
-        return to_tz_aware(task.time) <= datetime.now(tz=pytz.UTC)
-    return False
+        if is_now(task.cron, now):
+            return 0
+        return None
+    elif task.time is not None:
+        task_time = to_tz_aware(task.time).replace(microsecond=0)
+        if task_time <= now:
+            return 0
+        one_min_ahead = (now + timedelta(minutes=1)).replace(second=1, microsecond=0)
+        if task_time <= one_min_ahead:
+            return int((task_time - now).total_seconds())
+    return None
+
+
+async def delayed_send(
+    scheduler: TaskiqScheduler,
+    task: ScheduledTask,
+    delay: int,
+) -> None:
+    """
+    Send a task with a delay.
+
+    This function waits for some time and then
+    sends a task.
+
+    The main idea is that scheduler gathers
+    tasks every minute and some of them have
+    specfic time. To respect the time, we calculate
+    the delay and send the task after some delay.
+
+    :param scheduler: current scheduler.
+    :param task: task to send.
+    :param delay: how long to wait.
+    """
+    if delay > 0:
+        await asyncio.sleep(delay)
+    await scheduler.on_ready(task)
 
 
 async def _run_loop(scheduler: TaskiqScheduler) -> None:
@@ -105,7 +137,7 @@ async def _run_loop(scheduler: TaskiqScheduler) -> None:
     while True:  # noqa: WPS457
         for task in tasks:
             try:
-                ready = should_run(task)
+                task_delay = get_task_delay(task)
             except ValueError:
                 logger.warning(
                     "Cannot parse cron: %s for task: %s",
@@ -113,9 +145,9 @@ async def _run_loop(scheduler: TaskiqScheduler) -> None:
                     task.task_name,
                 )
                 continue
-            if ready:
+            if task_delay is not None:
                 logger.info("Sending task %s.", task.task_name)
-                loop.create_task(scheduler.on_ready(task))
+                loop.create_task(delayed_send(scheduler, task, task_delay))
 
         delay = (
             datetime.now().replace(second=1, microsecond=0)
