@@ -1,9 +1,10 @@
 import datetime
 
 import pytz
+from freezegun import freeze_time
 from tzlocal import get_localzone
 
-from taskiq.cli.scheduler.run import should_run
+from taskiq.cli.scheduler.run import get_task_delay
 from taskiq.schedule_sources.label_based import LabelScheduleSource
 from taskiq.scheduler.scheduler import ScheduledTask
 
@@ -12,7 +13,7 @@ DUMMY_SOURCE = LabelScheduleSource(broker=None)  # type: ignore
 
 def test_should_run_success() -> None:
     hour = datetime.datetime.utcnow().hour
-    assert should_run(
+    delay = get_task_delay(
         ScheduledTask(
             task_name="",
             labels={},
@@ -22,12 +23,13 @@ def test_should_run_success() -> None:
             cron=f"* {hour} * * *",
         ),
     )
+    assert delay is not None and delay >= 0
 
 
 def test_should_run_cron_str_offset() -> None:
     hour = datetime.datetime.now().hour
     zone = get_localzone()
-    assert should_run(
+    delay = get_task_delay(
         ScheduledTask(
             task_name="",
             labels={},
@@ -38,12 +40,13 @@ def test_should_run_cron_str_offset() -> None:
             cron_offset=str(zone),
         ),
     )
+    assert delay is not None and delay >= 0
 
 
 def test_should_run_cron_td_offset() -> None:
     offset = 2
     hour = datetime.datetime.utcnow().hour + offset
-    assert should_run(
+    delay = get_task_delay(
         ScheduledTask(
             task_name="",
             labels={},
@@ -54,11 +57,12 @@ def test_should_run_cron_td_offset() -> None:
             cron_offset=datetime.timedelta(hours=offset),
         ),
     )
+    assert delay is not None and delay >= 0
 
 
 def test_time_utc_without_zone() -> None:
     time = datetime.datetime.utcnow()
-    assert should_run(
+    delay = get_task_delay(
         ScheduledTask(
             task_name="",
             labels={},
@@ -68,11 +72,12 @@ def test_time_utc_without_zone() -> None:
             time=time - datetime.timedelta(seconds=1),
         ),
     )
+    assert delay is not None and delay >= 0
 
 
 def test_time_utc_with_zone() -> None:
     time = datetime.datetime.now(tz=pytz.UTC)
-    assert should_run(
+    delay = get_task_delay(
         ScheduledTask(
             task_name="",
             labels={},
@@ -82,12 +87,13 @@ def test_time_utc_with_zone() -> None:
             time=time - datetime.timedelta(seconds=1),
         ),
     )
+    assert delay is not None and delay >= 0
 
 
 def test_time_utc_with_local_zone() -> None:
     localtz = get_localzone()
     time = datetime.datetime.now(tz=localtz)
-    assert should_run(
+    delay = get_task_delay(
         ScheduledTask(
             task_name="",
             labels={},
@@ -97,11 +103,12 @@ def test_time_utc_with_local_zone() -> None:
             time=time - datetime.timedelta(seconds=1),
         ),
     )
+    assert delay is not None and delay >= 0
 
 
 def test_time_localtime_without_zone() -> None:
     time = datetime.datetime.now(tz=pytz.FixedOffset(240)).replace(tzinfo=None)
-    assert not should_run(
+    delay = get_task_delay(
         ScheduledTask(
             task_name="",
             labels={},
@@ -111,3 +118,20 @@ def test_time_localtime_without_zone() -> None:
             time=time - datetime.timedelta(seconds=1),
         ),
     )
+    assert delay is None
+
+
+@freeze_time("2023-01-14 12:00:00")
+def test_time_delay() -> None:
+    time = datetime.datetime.now(tz=pytz.UTC) + datetime.timedelta(seconds=15)
+    delay = get_task_delay(
+        ScheduledTask(
+            task_name="",
+            labels={},
+            args=[],
+            kwargs={},
+            source=DUMMY_SOURCE,
+            time=time,
+        ),
+    )
+    assert delay is not None and 15 == delay
