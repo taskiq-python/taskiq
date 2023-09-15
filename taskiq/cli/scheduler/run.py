@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from logging import basicConfig, getLevelName, getLogger
 from typing import List
 
+import pytz
 from pycron import is_now
 
 from taskiq.cli.scheduler.args import SchedulerArgs
@@ -10,6 +11,22 @@ from taskiq.cli.utils import import_object, import_tasks
 from taskiq.scheduler.scheduler import ScheduledTask, TaskiqScheduler
 
 logger = getLogger(__name__)
+
+
+def to_tz_aware(time: datetime) -> datetime:
+    """
+    Convert datetime to timezone aware.
+
+    This function takes a datetime and if
+    timezone was not yet specified, it will
+    be set to UTC.
+
+    :param time: time to make timezone aware.
+    :return: timezone aware time.
+    """
+    if time.tzinfo is None:
+        return time.replace(tzinfo=pytz.UTC)
+    return time
 
 
 async def schedules_updater(
@@ -55,9 +72,18 @@ def should_run(task: ScheduledTask) -> bool:
     :return: True if task must be sent.
     """
     if task.cron is not None:
-        return is_now(task.cron, datetime.utcnow())
+        now = datetime.now(tz=pytz.UTC)
+        # If user specified cron offset we apply it.
+        # If it's timedelta, we simply add the delta to current time.
+        if task.cron_offset and isinstance(task.cron_offset, timedelta):
+            now += task.cron_offset
+        # If timezone was specified as string we convert it timzone
+        # offset and then apply.
+        elif task.cron_offset and isinstance(task.cron_offset, str):
+            now = now.astimezone(pytz.timezone(task.cron_offset))
+        return is_now(task.cron, now)
     if task.time is not None:
-        return task.time <= datetime.utcnow()
+        return to_tz_aware(task.time) <= datetime.now(tz=pytz.UTC)
     return False
 
 

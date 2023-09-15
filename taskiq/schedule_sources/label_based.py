@@ -43,6 +43,7 @@ class LabelScheduleSource(ScheduleSource):
                         kwargs=schedule.get("kwargs", {}),
                         cron=schedule.get("cron"),
                         time=schedule.get("time"),
+                        cron_offset=schedule.get("cron_offset"),
                         source=self,
                     ),
                 )
