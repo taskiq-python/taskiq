@@ -68,13 +68,13 @@ class AsyncBroker(ABC):
     in async mode.
     """
 
-    available_tasks: Dict[str, AsyncTaskiqDecoratedTask[Any, Any]] = {}
-
     def __init__(
         self,
         result_backend: "Optional[AsyncResultBackend[_T]]" = None,
         task_id_generator: Optional[Callable[[], str]] = None,
     ) -> None:
+        self.available_tasks: Dict[str, AsyncTaskiqDecoratedTask[Any, Any]] = {}
+
         if result_backend is None:
             result_backend = DummyResultBackend()
         else:
