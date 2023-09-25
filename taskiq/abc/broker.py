@@ -114,7 +114,7 @@ class AsyncBroker(ABC):
         # True only if broker runs in scheduler process.
         self.is_scheduler_process: bool = False
 
-    def find_task(self, task_name: str) -> AsyncTaskiqDecoratedTask[Any, Any] | None:
+    def find_task(self, task_name: str) -> Optional[AsyncTaskiqDecoratedTask[Any, Any]]:
         """
         Returns task by name.
 

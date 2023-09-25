@@ -80,3 +80,4 @@ class AsyncSharedBroker(AsyncBroker):
 
 
 async_shared_broker = AsyncSharedBroker()
+shared_task = async_shared_broker.task
