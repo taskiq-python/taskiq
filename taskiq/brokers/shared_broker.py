@@ -76,7 +76,7 @@ class AsyncSharedBroker(AsyncBroker):
         task_name: str,
         task: AsyncTaskiqDecoratedTask[Any, Any],
     ) -> None:
-        self.available_tasks[task_name] = task
+        self.global_task_registry[task_name] = task
 
 
 async_shared_broker = AsyncSharedBroker()

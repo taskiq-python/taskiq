@@ -69,7 +69,7 @@ class AsyncBroker(ABC):
     in async mode.
     """
 
-    available_tasks: ClassVar[Dict[str, AsyncTaskiqDecoratedTask[Any, Any]]] = {}
+    global_task_registry: ClassVar[Dict[str, AsyncTaskiqDecoratedTask[Any, Any]]] = {}
 
     def __init__(
         self,
@@ -99,7 +99,7 @@ class AsyncBroker(ABC):
         self.decorator_class = AsyncTaskiqDecoratedTask
         self.formatter: "TaskiqFormatter" = JSONFormatter()
         self.id_generator = task_id_generator
-        self.local_available_tasks: Dict[str, AsyncTaskiqDecoratedTask[Any, Any]] = {}
+        self.local_task_registry: Dict[str, AsyncTaskiqDecoratedTask[Any, Any]] = {}
         # Every event has a list of handlers.
         # Every handler is a function which takes state as a first argument.
         # And handler can be either sync or async.
@@ -128,7 +128,9 @@ class AsyncBroker(ABC):
         :param task_name: name of a task.
         :returns: found task or None.
         """
-        return self.local_available_tasks.get(task_name) or self.available_tasks.get(
+        return self.local_task_registry.get(
+            task_name,
+        ) or self.global_task_registry.get(
             task_name,
         )
 
@@ -145,7 +147,7 @@ class AsyncBroker(ABC):
 
         :return: dict of all tasks. Keys are task names, values are tasks.
         """
-        return {**self.available_tasks, **self.local_available_tasks}
+        return {**self.global_task_registry, **self.local_task_registry}
 
     def add_dependency_context(self, new_ctx: Dict[Any, Any]) -> None:
         """
@@ -466,4 +468,4 @@ class AsyncBroker(ABC):
         :param task_name: Name of a task.
         :param task: Decorated task.
         """
-        self.local_available_tasks[task_name] = task
+        self.local_task_registry[task_name] = task
