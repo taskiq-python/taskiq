@@ -346,6 +346,28 @@ class AsyncBroker(ABC):
             inner_labels=labels or {},
         )
 
+    def register_task(
+        self,
+        func: Callable[_FuncParams, _ReturnType],
+        task_name: Optional[str] = None,
+        **labels: Any,
+    ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]:
+        """
+        API for registering tasks programmatically.
+
+        This function is basically the same as `task` decorator,
+        but it doesn't decorate function, it just registers it
+        and returns AsyncTaskiqDecoratedTask object, that can
+        be called later.
+
+        :param func: function to register.
+        :param task_name: custom name of a task, defaults to qualified function's name.
+        :param labels: some addition labels for task.
+
+        :returns: registered task.
+        """
+        return self.task(task_name=task_name, **labels)(func)
+
     def on_event(self, *events: TaskiqEvents) -> Callable[[EventHandler], EventHandler]:
         """
         Adds event handler.
