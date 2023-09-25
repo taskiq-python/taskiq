@@ -60,7 +60,7 @@ class Receiver:
         self.task_hints: Dict[str, Dict[str, Any]] = {}
         self.dependency_graphs: Dict[str, DependencyGraph] = {}
         self.propagate_exceptions = propagate_exceptions
-        for task in self.broker.available_tasks.values():
+        for task in self.broker.get_all_tasks().values():
             self.task_signatures[task.task_name] = inspect.signature(task.original_func)
             self.task_hints[task.task_name] = get_type_hints(task.original_func)
             self.dependency_graphs[task.task_name] = DependencyGraph(task.original_func)
@@ -106,7 +106,8 @@ class Receiver:
             )
             return
         logger.debug(f"Received message: {taskiq_msg}")
-        if taskiq_msg.task_name not in self.broker.available_tasks:
+        task = self.broker.find_task(taskiq_msg.task_name)
+        if task is None:
             logger.warning(
                 'task "%s" is not found. Maybe you forgot to import it?',
                 taskiq_msg.task_name,
@@ -135,7 +136,7 @@ class Receiver:
             await maybe_awaitable(message.ack())
 
         result = await self.run_task(
-            target=self.broker.available_tasks[taskiq_msg.task_name].original_func,
+            target=task.original_func,
             message=taskiq_msg,
         )
 

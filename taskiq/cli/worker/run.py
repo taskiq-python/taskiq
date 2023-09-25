@@ -73,10 +73,9 @@ def start_listen(args: WorkerArgs, event: Event) -> None:  # noqa: WPS210, WPS21
     This function starts actual listening process.
 
     It imports broker and all tasks.
-    Since tasks registers themselves in a global set,
-    it's easy to just import module where you have decorated
-    function and they will be available in broker's `available_tasks`
-    field.
+    Since tasks auto registeres themselves in a broker,
+    we don't need to do anything else other than importing.
+
 
     :param args: CLI arguments.
     :param event: Event for notification.

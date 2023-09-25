@@ -27,7 +27,7 @@ def reset_broker() -> Generator[None, None, None]:
     broker variables to default state.
     """
     yield
-    AsyncBroker.available_tasks = {}
+    AsyncBroker.global_task_registry = {}
     AsyncBroker.is_worker_process = False
     AsyncBroker.is_scheduler_process = False
 
