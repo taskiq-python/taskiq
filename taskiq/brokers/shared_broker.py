@@ -1,4 +1,4 @@
-from typing import AsyncGenerator, Optional, TypeVar
+from typing import Any, AsyncGenerator, Optional, TypeVar
 
 from typing_extensions import ParamSpec
 
@@ -70,6 +70,13 @@ class AsyncSharedBroker(AsyncBroker):
         :raises TaskiqError: if called.
         """
         raise TaskiqError("Shared broker cannot listen")
+
+    def _register_task(
+        self,
+        task_name: str,
+        task: AsyncTaskiqDecoratedTask[Any, Any],
+    ) -> None:
+        self.available_tasks[task_name] = task
 
 
 async_shared_broker = AsyncSharedBroker()
