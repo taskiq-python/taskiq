@@ -32,6 +32,7 @@ def to_tz_aware(time: datetime) -> datetime:
 async def schedules_updater(
     scheduler: TaskiqScheduler,
     current_schedules: List[ScheduledTask],
+    event: asyncio.Event,
 ) -> None:
     """
     Periodic update to schedules.
@@ -42,6 +43,7 @@ async def schedules_updater(
 
     :param scheduler: current scheduler.
     :param current_schedules: list of schedules.
+    :param event: event when schedules are updated.
     """
     while True:  # noqa: WPS457
         logger.debug("Started schedule update.")
@@ -61,6 +63,7 @@ async def schedules_updater(
 
         current_schedules.clear()
         current_schedules.extend(new_schedules)
+        event.set()
         await asyncio.sleep(scheduler.refresh_delay)
 
 
@@ -120,7 +123,7 @@ async def delayed_send(
     await scheduler.on_ready(task)
 
 
-async def _run_loop(scheduler: TaskiqScheduler) -> None:
+async def run_scheduler_loop(scheduler: TaskiqScheduler) -> None:  # noqa: WPS210
     """
     Runs scheduler loop.
 
@@ -131,10 +134,19 @@ async def _run_loop(scheduler: TaskiqScheduler) -> None:
     """
     loop = asyncio.get_event_loop()
     tasks: "List[ScheduledTask]" = []
-    loop.create_task(schedules_updater(scheduler, tasks))
-    logger.info("Starting scheduler.")
-    await scheduler.startup()
-    logger.info("Startup completed.")
+
+    current_task = asyncio.current_task()
+    first_update_event = asyncio.Event()
+    updater_task = loop.create_task(
+        schedules_updater(
+            scheduler,
+            tasks,
+            first_update_event,
+        ),
+    )
+    if current_task is not None:
+        current_task.add_done_callback(lambda _: updater_task.cancel())
+    await first_update_event.wait()
     while True:  # noqa: WPS457
         for task in tasks:
             try:
@@ -190,8 +202,12 @@ async def run_scheduler(args: SchedulerArgs) -> None:  # noqa: WPS213
     for source in scheduler.sources:
         await source.startup()
 
+    logger.info("Starting scheduler.")
+    await scheduler.startup()
+    logger.info("Startup completed.")
+
     try:
-        await _run_loop(scheduler)
+        await run_scheduler_loop(scheduler)
     except asyncio.CancelledError:
         logger.warning("Shutting down scheduler.")
         await scheduler.shutdown()

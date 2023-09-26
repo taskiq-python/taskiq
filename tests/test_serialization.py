@@ -264,7 +264,9 @@ class Test_exception_to_python:
 
         result_exc = exception_to_python(test_exception)  # type: ignore
         del taskiq.TestParamException  # type: ignore
-        assert str(result_exc) == "<class 'test_serialization.paramexception'>(())"
+        assert (
+            str(result_exc) == "<class 'tests.test_serialization.paramexception'>(())"
+        )
 
 
 class Test_serialization:

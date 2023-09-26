@@ -52,14 +52,18 @@ class Receiver:
         max_async_tasks: "Optional[int]" = None,
         max_prefetch: int = 0,
         propagate_exceptions: bool = True,
+        run_starup: bool = True,
+        on_exit: Optional[Callable[["Receiver"], None]] = None,
     ) -> None:
         self.broker = broker
         self.executor = executor
+        self.run_startup = run_starup
         self.validate_params = validate_params
         self.task_signatures: Dict[str, inspect.Signature] = {}
         self.task_hints: Dict[str, Dict[str, Any]] = {}
         self.dependency_graphs: Dict[str, DependencyGraph] = {}
         self.propagate_exceptions = propagate_exceptions
+        self.on_exit = on_exit
         for task in self.broker.get_all_tasks().values():
             self.task_signatures[task.task_name] = inspect.signature(task.original_func)
             self.task_hints[task.task_name] = get_type_hints(task.original_func)
@@ -296,13 +300,17 @@ class Receiver:
         It uses listen() method of an AsyncBroker
         to get new messages from queues.
         """
-        await self.broker.startup()
+        if self.run_startup:
+            await self.broker.startup()
         logger.info("Listening started.")
         queue: "asyncio.Queue[Union[bytes, AckableMessage]]" = asyncio.Queue()
 
         async with anyio.create_task_group() as gr:
             gr.start_soon(self.prefetcher, queue)
             gr.start_soon(self.runner, queue)
+
+        if self.on_exit is not None:
+            self.on_exit(self)
 
     async def prefetcher(
         self,
@@ -320,7 +328,8 @@ class Receiver:
                 await self.sem_prefetch.acquire()
                 message = await iterator.__anext__()  # noqa: WPS609
                 await queue.put(message)
-
+            except asyncio.CancelledError:
+                break
             except StopAsyncIteration:
                 break
 
@@ -368,7 +377,8 @@ class Receiver:
 
             # We want the task to remove itself from the set when it's done.
             #
-            # Because python's GC can silently cancel task
-            # and it considered to be Hisenbug.
+            # Because if we won't save it anywhere,
+            # python's GC can silently cancel task
+            # and this behaviour considered to be a Hisenbug.
             # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
             task.add_done_callback(task_cb)
