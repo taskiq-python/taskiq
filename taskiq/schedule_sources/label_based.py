@@ -27,7 +27,7 @@ class LabelScheduleSource(ScheduleSource):
         :return: list of schedules.
         """
         schedules = []
-        for task_name, task in self.broker.available_tasks.items():
+        for task_name, task in self.broker.get_all_tasks().items():
             if task.broker != self.broker:
                 continue
             for schedule in task.labels.get("schedule", []):
@@ -61,7 +61,7 @@ class LabelScheduleSource(ScheduleSource):
         if scheduled_task.cron or not scheduled_task.time:
             return  # it's scheduled task with cron label, do not remove this trigger.
 
-        for task_name, task in self.broker.available_tasks.items():
+        for task_name, task in self.broker.get_all_tasks().items():
             if task.broker != self.broker or scheduled_task.task_name != task_name:
                 continue
 

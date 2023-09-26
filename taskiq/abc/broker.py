@@ -11,6 +11,7 @@ from typing import (  # noqa: WPS235
     AsyncGenerator,
     Awaitable,
     Callable,
+    ClassVar,
     DefaultDict,
     Dict,
     List,
@@ -68,7 +69,7 @@ class AsyncBroker(ABC):
     in async mode.
     """
 
-    available_tasks: Dict[str, AsyncTaskiqDecoratedTask[Any, Any]] = {}
+    global_task_registry: ClassVar[Dict[str, AsyncTaskiqDecoratedTask[Any, Any]]] = {}
 
     def __init__(
         self,
@@ -98,6 +99,7 @@ class AsyncBroker(ABC):
         self.decorator_class = AsyncTaskiqDecoratedTask
         self.formatter: "TaskiqFormatter" = JSONFormatter()
         self.id_generator = task_id_generator
+        self.local_task_registry: Dict[str, AsyncTaskiqDecoratedTask[Any, Any]] = {}
         # Every event has a list of handlers.
         # Every handler is a function which takes state as a first argument.
         # And handler can be either sync or async.
@@ -111,6 +113,41 @@ class AsyncBroker(ABC):
         self.is_worker_process: bool = False
         # True only if broker runs in scheduler process.
         self.is_scheduler_process: bool = False
+
+    def find_task(self, task_name: str) -> Optional[AsyncTaskiqDecoratedTask[Any, Any]]:
+        """
+        Returns task by name.
+
+        This method should be used to get task by name.
+        Instead of accessing `available_tasks` or `local_available_tasks` directly.
+
+        It searches task by name in dict of tasks that
+        were registered for this broker directly.
+        If it fails, it checks global dict of all available tasks.
+
+        :param task_name: name of a task.
+        :returns: found task or None.
+        """
+        return self.local_task_registry.get(
+            task_name,
+        ) or self.global_task_registry.get(
+            task_name,
+        )
+
+    def get_all_tasks(self) -> Dict[str, AsyncTaskiqDecoratedTask[Any, Any]]:
+        """
+        Method to fetch all tasks available in broker.
+
+        This method returns all tasks, globally and locally
+        available in broker. With local tasks having higher priority.
+
+        So, if you have two tasks with the same name,
+        one registered in global registry and one registered
+        in local registry, then local task will be returned.
+
+        :return: dict of all tasks. Keys are task names, values are tasks.
+        """
+        return {**self.global_task_registry, **self.local_task_registry}
 
     def add_dependency_context(self, new_ctx: Dict[Any, Any]) -> None:
         """
@@ -279,7 +316,10 @@ class AsyncBroker(ABC):
                                 os.path.sep,
                             ),
                         )
-                    inner_task_name = f"{fmodule}:{func.__name__}"  # noqa: WPS442
+                    fname = func.__name__
+                    if fname == "<lambda>":
+                        fname = f"lambda_{uuid4().hex}"
+                    inner_task_name = f"{fmodule}:{fname}"  # noqa: WPS442
                 wrapper = wraps(func)
 
                 decorated_task = wrapper(
@@ -291,7 +331,7 @@ class AsyncBroker(ABC):
                     ),
                 )
 
-                self.available_tasks[decorated_task.task_name] = decorated_task
+                self._register_task(decorated_task.task_name, decorated_task)
 
                 return decorated_task
 
@@ -308,6 +348,28 @@ class AsyncBroker(ABC):
             inner_task_name=task_name,
             inner_labels=labels or {},
         )
+
+    def register_task(
+        self,
+        func: Callable[_FuncParams, _ReturnType],
+        task_name: Optional[str] = None,
+        **labels: Any,
+    ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]:
+        """
+        API for registering tasks programmatically.
+
+        This function is basically the same as `task` decorator,
+        but it doesn't decorate function, it just registers it
+        and returns AsyncTaskiqDecoratedTask object, that can
+        be called later.
+
+        :param func: function to register.
+        :param task_name: custom name of a task, defaults to qualified function's name.
+        :param labels: some addition labels for task.
+
+        :returns: registered task.
+        """
+        return self.task(task_name=task_name, **labels)(func)
 
     def on_event(self, *events: TaskiqEvents) -> Callable[[EventHandler], EventHandler]:
         """
@@ -416,3 +478,19 @@ class AsyncBroker(ABC):
         """
         self.event_handlers[event].extend(handlers)
         return self
+
+    def _register_task(
+        self,
+        task_name: str,
+        task: AsyncTaskiqDecoratedTask[Any, Any],
+    ) -> None:
+        """
+        Mehtod is used to register tasks.
+
+        By default we register tasks in local task registry.
+        But this behaviour can be changed in subclasses.
+
+        :param task_name: Name of a task.
+        :param task: Decorated task.
+        """
+        self.local_task_registry[task_name] = task

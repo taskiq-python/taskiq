@@ -120,7 +120,7 @@ class InMemoryBroker(AsyncBroker):
 
         :raises TaskiqError: if someone wants to kick unknown task.
         """
-        target_task = self.available_tasks.get(message.task_name)
+        target_task = self.find_task(message.task_name)
         if target_task is None:
             raise TaskiqError("Unknown task.")
 

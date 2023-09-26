@@ -73,10 +73,9 @@ def start_listen(args: WorkerArgs, event: Event) -> None:  # noqa: WPS210, WPS21
     This function starts actual listening process.
 
     It imports broker and all tasks.
-    Since tasks registers themselves in a global set,
-    it's easy to just import module where you have decorated
-    function and they will be available in broker's `available_tasks`
-    field.
+    Since tasks auto registeres themselves in a broker,
+    we don't need to do anything else other than importing.
+
 
     :param args: CLI arguments.
     :param event: Event for notification.
@@ -127,7 +126,7 @@ def start_listen(args: WorkerArgs, event: Event) -> None:  # noqa: WPS210, WPS21
     import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
 
     receiver_type = get_receiver_type(args)
-    receiver_args = dict(args.receiver_arg)
+    receiver_kwargs = dict(args.receiver_arg)
 
     loop = asyncio.get_event_loop()
 
@@ -141,7 +140,7 @@ def start_listen(args: WorkerArgs, event: Event) -> None:  # noqa: WPS210, WPS21
                 max_async_tasks=args.max_async_tasks,
                 max_prefetch=args.max_prefetch,
                 propagate_exceptions=not args.no_propagate_errors,
-                **receiver_args,
+                **receiver_kwargs,  # type: ignore
             )
             loop.run_until_complete(receiver.listen())
     except KeyboardInterrupt:
