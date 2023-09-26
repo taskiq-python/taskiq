@@ -316,7 +316,10 @@ class AsyncBroker(ABC):
                                 os.path.sep,
                             ),
                         )
-                    inner_task_name = f"{fmodule}:{func.__name__}"  # noqa: WPS442
+                    fname = func.__name__
+                    if fname == "<lambda>":
+                        fname = f"lambda_{uuid4().hex}"
+                    inner_task_name = f"{fmodule}:{fname}"  # noqa: WPS442
                 wrapper = wraps(func)
 
                 decorated_task = wrapper(
