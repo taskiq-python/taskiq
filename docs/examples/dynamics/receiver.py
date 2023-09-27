@@ -17,7 +17,7 @@ async def main() -> None:
         task_name="dyn_task",
     )
 
-    # now we can send it.
+    # Now we can send it.
     await dyn_task.kiq(x=1)
 
     await asyncio.sleep(2)
