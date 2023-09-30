@@ -64,10 +64,9 @@ class Receiver:
         self.dependency_graphs: Dict[str, DependencyGraph] = {}
         self.propagate_exceptions = propagate_exceptions
         self.on_exit = on_exit
+        self.known_tasks: Set[str] = set()
         for task in self.broker.get_all_tasks().values():
-            self.task_signatures[task.task_name] = inspect.signature(task.original_func)
-            self.task_hints[task.task_name] = get_type_hints(task.original_func)
-            self.dependency_graphs[task.task_name] = DependencyGraph(task.original_func)
+            self._prepare_task(task.task_name, task.original_func)
         self.sem: "Optional[asyncio.Semaphore]" = None
         if max_async_tasks is not None and max_async_tasks > 0:
             self.sem = asyncio.Semaphore(max_async_tasks)
@@ -163,7 +162,7 @@ class Receiver:
             if raise_err:
                 raise exc
 
-    async def run_task(  # noqa: C901, WPS210
+    async def run_task(  # noqa: C901, WPS210, WPS213
         self,
         target: Callable[..., Any],
         message: TaskiqMessage,
@@ -190,6 +189,8 @@ class Receiver:
         returned = None
         found_exception: "Optional[BaseException]" = None
         signature = None
+        if message.task_name not in self.known_tasks:
+            self._prepare_task(message.task_name, target)
         if self.validate_params:
             signature = self.task_signatures.get(message.task_name)
         dependency_graph = self.dependency_graphs.get(message.task_name)
@@ -382,3 +383,23 @@ class Receiver:
             # and this behaviour considered to be a Hisenbug.
             # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
             task.add_done_callback(task_cb)
+
+    def _prepare_task(self, name: str, handler: Callable[..., Any]) -> None:
+        """
+        Prepare task for execution.
+
+        This function gets function's signature,
+        type hints and builds dependency graph.
+
+        It's useful for dynamic dependency resolution,
+        because sometimes the receiver can get
+        funcion that is defined in runtime. We need
+        to be aware of that.
+
+        :param name: task name.
+        :param handler: task handler.
+        """
+        self.known_tasks.add(name)
+        self.task_signatures[name] = inspect.signature(handler)
+        self.task_hints[name] = get_type_hints(handler)
+        self.dependency_graphs[name] = DependencyGraph(handler)
