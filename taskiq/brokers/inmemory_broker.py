@@ -1,10 +1,7 @@
 import asyncio
-import inspect
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, AsyncGenerator, Set, TypeVar, get_type_hints
-
-from taskiq_dependencies import DependencyGraph
+from typing import Any, AsyncGenerator, Set, TypeVar
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.result_backend import AsyncResultBackend, TaskiqResult
@@ -123,19 +120,6 @@ class InMemoryBroker(AsyncBroker):
         target_task = self.find_task(message.task_name)
         if target_task is None:
             raise TaskiqError("Unknown task.")
-
-        if not self.receiver.dependency_graphs.get(target_task.task_name):
-            self.receiver.dependency_graphs[target_task.task_name] = DependencyGraph(
-                target_task.original_func,
-            )
-        if not self.receiver.task_signatures.get(target_task.task_name):
-            self.receiver.task_signatures[target_task.task_name] = inspect.signature(
-                target_task.original_func,
-            )
-        if not self.receiver.task_hints.get(target_task.task_name):
-            self.receiver.task_hints[target_task.task_name] = get_type_hints(
-                target_task.original_func,
-            )
 
         task = asyncio.create_task(self.receiver.callback(message=message.message))
         self._running_tasks.add(task)

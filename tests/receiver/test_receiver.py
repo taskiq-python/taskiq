@@ -1,4 +1,5 @@
 import asyncio
+import random
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, AsyncGenerator, List, Optional, TypeVar
@@ -225,6 +226,41 @@ async def test_callback_success() -> None:
 
     await receiver.callback(broker_message.message)
     assert called_times == 1
+
+
+@pytest.mark.anyio
+async def test_callback_no_dep_info() -> None:
+    """Test that callback function works well."""
+    broker = InMemoryBroker()
+    expected = random.randint(1, 100)
+    ret_val = None
+
+    def dependency() -> int:
+        return expected
+
+    @broker.task
+    async def my_task(dep: int = Depends(dependency)) -> None:
+        nonlocal ret_val
+        ret_val = dep
+
+    receiver = get_receiver(broker)
+    receiver.known_tasks.remove(my_task.task_name)
+    receiver.dependency_graphs.pop(my_task.task_name, None)
+    receiver.task_signatures.pop(my_task.task_name, None)
+    receiver.task_hints.pop(my_task.task_name, None)
+
+    broker_message = broker.formatter.dumps(
+        TaskiqMessage(
+            task_id="task_id",
+            task_name=my_task.task_name,
+            labels={},
+            args=[],
+            kwargs={},
+        ),
+    )
+
+    await receiver.callback(broker_message.message)
+    assert ret_val == expected
 
 
 @pytest.mark.anyio
