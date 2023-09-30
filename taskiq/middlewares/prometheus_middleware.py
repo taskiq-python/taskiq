@@ -13,19 +13,19 @@ logger = getLogger("taskiq.prometheus")
 
 class PrometheusMiddleware(TaskiqMiddleware):
     """
-    Middleware that adds prometheus metrics for workers.
+    Middleware that adds Prometheus metrics for workers.
 
-    This middleware starts wsgi server with prometheus metrics.
-    Also it updates metrics on events.
+    This middleware starts a WSGI server with Prometheus metrics.
+    It also updates metrics on events.
 
-    :param server_port: meme
+    :param server_port: Port for the Prometheus server.
     """
 
     def __init__(
         self,
         metrics_path: Optional[Path] = None,
         server_port: int = 9000,
-        server_addr: str = "0.0.0.0",  # noqa: S104
+        server_addr: str = "0.0.0.0",  # noqa: S104 (No longer needed)
     ) -> None:
         super().__init__()
 
@@ -42,7 +42,7 @@ class PrometheusMiddleware(TaskiqMiddleware):
         logger.debug("Initializing metrics")
 
         try:
-            from prometheus_client import Counter, Histogram  # noqa: WPS433
+            from prometheus_client import Counter, Histogram  # noqa: WPS433 (No longer needed)
         except ImportError as exc:
             raise ImportError(
                 "Cannot initialize metrics. Please install 'taskiq[metrics]'.",
@@ -65,7 +65,7 @@ class PrometheusMiddleware(TaskiqMiddleware):
         )
         self.saved_results = Counter(
             "saved_results",
-            "Number of saved results in result backend",
+            "Number of saved results in the result backend",
             ["task_name"],
         )
         self.execution_time = Histogram(
@@ -80,43 +80,42 @@ class PrometheusMiddleware(TaskiqMiddleware):
         """
         Prometheus startup.
 
-        This function starts prometheus server.
-        It starts it only in case if it's a worker process.
+        This function starts the Prometheus server.
+        It starts it only in case it's a worker process.
         """
-        from prometheus_client import start_http_server  # noqa: WPS433
+        from prometheus_client import start_http_server  # noqa: WPS433 (No longer needed)
 
         if self.broker.is_worker_process:
             try:
                 start_http_server(port=self.server_port, addr=self.server_addr)
             except OSError as exc:
-                logger.debug("Cannot start prometheus server: %s", exc)
+                logger.debug("Cannot start Prometheus server: %s", exc)
 
     def pre_execute(
         self,
-        message: "TaskiqMessage",
-    ) -> "TaskiqMessage":
+        message: TaskiqMessage,
+    ) -> TaskiqMessage:
         """
         Function to track received tasks.
 
-        This function increments a counter of received tasks,
-        when called.
+        This function increments a counter of received tasks when called.
 
-        :param message: current message.
-        :return: message
+        :param message: Current message.
+        :return: Message
         """
         self.received_tasks.labels(message.task_name).inc()
         return message
 
     def post_execute(
         self,
-        message: "TaskiqMessage",
-        result: "TaskiqResult[Any]",
+        message: TaskiqMessage,
+        result: TaskiqResult[Any],
     ) -> None:
         """
-        This function tracks number of errors and success executions.
+        This function tracks the number of errors and successful executions.
 
-        :param message: received message.
-        :param result: result of the execution.
+        :param message: Received message.
+        :param result: Result of the execution.
         """
         if result.is_err:
             self.found_errors.labels(message.task_name).inc()
@@ -126,13 +125,13 @@ class PrometheusMiddleware(TaskiqMiddleware):
 
     def post_save(
         self,
-        message: "TaskiqMessage",
-        result: "TaskiqResult[Any]",
-    ) -> "None":
+        message: TaskiqMessage,
+        result: TaskiqResult[Any],
+    ) -> None:
         """
         Method to run on save.
 
-        :param message: received message.
-        :param result: result of execution.
+        :param message: Received message.
+        :param result: Result of execution.
         """
         self.saved_results.labels(message.task_name).inc()
