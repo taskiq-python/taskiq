@@ -1,7 +1,7 @@
 from collections import UserDict
 from typing import TYPE_CHECKING, Any
 
-if TYPE_CHECKING:  # pragma: no cover
+if TYPE_CHECKING:  # pragma: no cover  # noqa: SIM108
     _Base = UserDict[str, Any]
 else:
     _Base = UserDict
@@ -21,19 +21,23 @@ class TaskiqState(_Base):
     def __getattr__(self, name: str) -> Any:
         try:
             return self.__dict__["data"][name]
-        except KeyError:
+        except KeyError as exc:
             cls_name = self.__class__.__name__
-            raise AttributeError(f"'{cls_name}' object has no attribute '{name}'")
+            raise AttributeError(
+                f"'{cls_name}' object has no attribute '{name}'",
+            ) from exc
 
     def __setattr__(self, name: str, value: Any) -> None:
         self[name] = value
 
-    def __delattr__(self, name: str) -> None:  # noqa: WPS603
+    def __delattr__(self, name: str) -> None:
         try:
-            del self[name]  # noqa: WPS420
-        except KeyError:
+            del self[name]
+        except KeyError as exc:
             cls_name = self.__class__.__name__
-            raise AttributeError(f"'{cls_name}' object has no attribute '{name}'")
+            raise AttributeError(
+                f"'{cls_name}' object has no attribute '{name}'",
+            ) from exc
 
     def __str__(self) -> str:
         return "TaskiqState(%s)" % super().__str__()

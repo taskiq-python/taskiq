@@ -8,10 +8,8 @@ jobs:
       matrix:
         cmd:
           - black
-          - flake8
-          - isort
+          - ruff
           - mypy
-          - autoflake
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2

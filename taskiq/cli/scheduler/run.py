@@ -1,4 +1,5 @@
 import asyncio
+import sys
 from datetime import datetime, timedelta
 from logging import basicConfig, getLevelName, getLogger
 from typing import List, Optional
@@ -45,7 +46,7 @@ async def schedules_updater(
     :param current_schedules: list of schedules.
     :param event: event when schedules are updated.
     """
-    while True:  # noqa: WPS457
+    while True:
         logger.debug("Started schedule update.")
         new_schedules: "List[ScheduledTask]" = []
         for source in scheduler.sources:
@@ -67,7 +68,7 @@ async def schedules_updater(
         await asyncio.sleep(scheduler.refresh_delay)
 
 
-def get_task_delay(task: ScheduledTask) -> Optional[int]:  # noqa: C901
+def get_task_delay(task: ScheduledTask) -> Optional[int]:
     """
     Get delay of the task in seconds.
 
@@ -87,7 +88,7 @@ def get_task_delay(task: ScheduledTask) -> Optional[int]:  # noqa: C901
         if is_now(task.cron, now):
             return 0
         return None
-    elif task.time is not None:
+    if task.time is not None:
         task_time = to_tz_aware(task.time).replace(microsecond=0)
         if task_time <= now:
             return 0
@@ -123,7 +124,7 @@ async def delayed_send(
     await scheduler.on_ready(task)
 
 
-async def run_scheduler_loop(scheduler: TaskiqScheduler) -> None:  # noqa: WPS210
+async def run_scheduler_loop(scheduler: TaskiqScheduler) -> None:
     """
     Runs scheduler loop.
 
@@ -147,7 +148,7 @@ async def run_scheduler_loop(scheduler: TaskiqScheduler) -> None:  # noqa: WPS21
     if current_task is not None:
         current_task.add_done_callback(lambda _: updater_task.cancel())
     await first_update_event.wait()
-    while True:  # noqa: WPS457
+    while True:
         for task in tasks:
             try:
                 task_delay = get_task_delay(task)
@@ -169,7 +170,7 @@ async def run_scheduler_loop(scheduler: TaskiqScheduler) -> None:  # noqa: WPS21
         await asyncio.sleep(delay.total_seconds())
 
 
-async def run_scheduler(args: SchedulerArgs) -> None:  # noqa: WPS213
+async def run_scheduler(args: SchedulerArgs) -> None:
     """
     Run scheduler.
 
@@ -178,17 +179,6 @@ async def run_scheduler(args: SchedulerArgs) -> None:  # noqa: WPS213
 
     :param args: parsed CLI arguments.
     """
-    if isinstance(args.scheduler, str):
-        scheduler = import_object(args.scheduler)
-    else:
-        scheduler = args.scheduler
-    if not isinstance(scheduler, TaskiqScheduler):
-        print(  # noqa: WPS421
-            "Imported scheduler is not a subclass of TaskiqScheduler.",
-        )
-        exit(1)  # noqa: WPS421
-    scheduler.broker.is_scheduler_process = True
-    import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
     if args.configure_logging:
         basicConfig(
             level=getLevelName(args.log_level),
@@ -199,6 +189,17 @@ async def run_scheduler(args: SchedulerArgs) -> None:  # noqa: WPS213
             ),
         )
     getLogger("taskiq").setLevel(level=getLevelName(args.log_level))
+    if isinstance(args.scheduler, str):
+        scheduler = import_object(args.scheduler)
+    else:
+        scheduler = args.scheduler
+    if not isinstance(scheduler, TaskiqScheduler):
+        logger.error(
+            "Imported scheduler is not a subclass of TaskiqScheduler.",
+        )
+        sys.exit(1)
+    scheduler.broker.is_scheduler_process = True
+    import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
     for source in scheduler.sources:
         await source.startup()
 

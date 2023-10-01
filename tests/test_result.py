@@ -62,7 +62,7 @@ def test_pickle_error_serialization() -> None:
     data = pickle.loads(pickle.dumps(task))
 
     assert data.error.args == task.error.args  # type: ignore
-    assert type(data.error) == type(task.error)
+    assert type(data.error) == type(task.error)  # noqa: E721
 
 
 def test_result_raise_for_error_exc() -> None:

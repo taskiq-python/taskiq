@@ -1,7 +1,7 @@
 import inspect
 from typing import Any, Awaitable, Coroutine, TypeVar, Union
 
-_T = TypeVar("_T")  # noqa: WPS111
+_T = TypeVar("_T")
 
 
 async def maybe_awaitable(

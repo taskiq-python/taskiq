@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 
 import pytest
 
@@ -44,10 +45,8 @@ async def test_cancelation() -> None:
     assert kicked == 1
 
     receiver_task.cancel()
-    try:
+    with contextlib.suppress(asyncio.CancelledError):
         await receiver_task
-    except asyncio.CancelledError:
-        pass
 
     assert receiver_task.cancelled()
 

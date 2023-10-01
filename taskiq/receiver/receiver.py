@@ -44,7 +44,7 @@ def _run_sync(
 class Receiver:
     """Class that uses as a callback handler."""
 
-    def __init__(  # noqa: WPS211
+    def __init__(
         self,
         broker: AsyncBroker,
         executor: Optional[Executor] = None,
@@ -73,11 +73,11 @@ class Receiver:
         else:
             logger.warning(
                 "Setting unlimited number of async tasks "
-                + "can result in undefined behavior",
+                "can result in undefined behavior",
             )
         self.sem_prefetch = asyncio.Semaphore(max_prefetch)
 
-    async def callback(  # noqa: C901, WPS213, WPS217
+    async def callback(  # noqa: C901, PLR0912
         self,
         message: Union[bytes, AckableMessage],
         raise_err: bool = False,
@@ -94,10 +94,7 @@ class Receiver:
         :param raise_err: raise an error if cannot save result in
             result_backend.
         """
-        if isinstance(message, AckableMessage):
-            message_data = message.data
-        else:
-            message_data = message
+        message_data = message.data if isinstance(message, AckableMessage) else message
         try:
             taskiq_msg = self.broker.formatter.loads(message=message_data)
         except Exception as exc:
@@ -162,7 +159,7 @@ class Receiver:
             if raise_err:
                 raise exc
 
-    async def run_task(  # noqa: C901, WPS210, WPS213
+    async def run_task(  # noqa: C901, PLR0912, PLR0915
         self,
         target: Callable[..., Any],
         message: TaskiqMessage,
@@ -252,7 +249,7 @@ class Receiver:
                 message.task_name,
                 message.task_id,
             )
-        except BaseException as exc:  # noqa: WPS424
+        except BaseException as exc:
             found_exception = exc
             logger.error(
                 "Exception found while executing function: %s",
@@ -327,7 +324,7 @@ class Receiver:
         while True:
             try:
                 await self.sem_prefetch.acquire()
-                message = await iterator.__anext__()  # noqa: WPS609
+                message = await iterator.__anext__()
                 await queue.put(message)
             except asyncio.CancelledError:
                 break

@@ -1,6 +1,6 @@
 from dataclasses import asdict, is_dataclass
 from logging import getLogger
-from typing import (  # noqa: WPS235
+from typing import (
     TYPE_CHECKING,
     Any,
     Coroutine,
@@ -24,7 +24,7 @@ from taskiq.utils import maybe_awaitable
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.broker import AsyncBroker
 
-_T = TypeVar("_T")  # noqa: WPS111
+_T = TypeVar("_T")
 _FuncParams = ParamSpec("_FuncParams")
 _ReturnType = TypeVar("_ReturnType")
 
@@ -47,7 +47,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
 
     def with_labels(
         self,
-        **labels: Union[str, int, float],
+        **labels: Union[str, float],
     ) -> "AsyncKicker[_FuncParams, _ReturnType]":
         """
         Update function's labels before sending.
@@ -131,7 +131,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         try:
             await self.broker.kick(self.broker.formatter.dumps(message))
         except Exception as exc:
-            raise SendTaskError() from exc
+            raise SendTaskError from exc
 
         for middleware in self.broker.middlewares:
             if middleware.__class__.post_send != TaskiqMiddleware.post_send:
@@ -159,7 +159,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
             arg = asdict(arg)
         return arg
 
-    def _prepare_message(  # noqa: WPS210
+    def _prepare_message(
         self,
         *args: Any,
         **kwargs: Any,

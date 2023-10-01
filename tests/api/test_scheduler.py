@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 from datetime import datetime, timedelta
 
 import pytest
@@ -40,9 +41,7 @@ async def test_cancelation() -> None:
     assert msg
 
     scheduler_task.cancel()
-    try:
+    with contextlib.suppress(asyncio.CancelledError):
         await scheduler_task
-    except asyncio.CancelledError:
-        pass
 
     assert scheduler_task.cancelled()

@@ -47,19 +47,15 @@ pytz = "*"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"
+ruff = "^0.0.291"
 black = { version = "^22.6.0", allow-prereleases = true }
-flake8 = "^6"
-isort = "^5.10.1"
 mypy = "^1"
 pre-commit = "^2.20.0"
-yesqa = "^1.3.0"
-autoflake = "^1.4"
 coverage = "^6.4.2"
 pytest-cov = "^3.0.0"
 mock = "^4.0.3"
 pytest-xdist = { version = "^2.5.0", extras = ["psutil"] }
 types-mock = "^4.0.15"
-wemake-python-styleguide = "^0.18.0"
 tox = "^4.6.4"
 freezegun = "^1.2.2"
 pytest-mock = "^3.11.1"
@@ -96,7 +92,7 @@ profile = "black"
 multi_line_output = 3
 
 [tool.pytest.ini_options]
-log_level='INFO'
+log_level = 'INFO'
 
 [tool.coverage.run]
 omit = [
@@ -113,3 +109,73 @@ omit = [
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+# List of enabled rulsets.
+# See https://docs.astral.sh/ruff/rules/ for more information.
+select = [
+    "E",   # Error
+    "F",   # Pyflakes
+    "W",   # Pycodestyle
+    "C90", # McCabe complexity
+    "I",   # Isort
+    "N",   # pep8-naming
+    "D",   # Pydocstyle
+    "ANN", # Pytype annotations
+    "S",   # Bandit
+    "B",   # Bugbear
+    "COM", # Commas
+    "C4",  # Comprehensions
+    "ISC", # Implicit string concat
+    "PIE", # Unnecessary code
+    "T20", # Catch prints
+    "PYI", # validate pyi files
+    "Q",   # Checks for quotes
+    "RSE", # Checks raise statements
+    "RET", # Checks return statements
+    "SLF", # Self checks
+    "SIM", # Simplificator
+    "PTH", # Pathlib checks
+    "ERA", # Checks for commented out code
+    "PL",  # PyLint checks
+    "RUF", # Specific to Ruff checks
+]
+ignore = [
+    "D105",    # Missing docstring in magic method
+    "D107",    # Missing docstring in __init__
+    "D212",    # Multi-line docstring summary should start at the first line
+    "D401",    # First line should be in imperative mood
+    "D104",    # Missing docstring in public package
+    "D100",    # Missing docstring in public module
+    "ANN102",  # Missing type annotation for self in method
+    "ANN101",  # Missing type annotation for argument
+    "ANN401",  # typing.Any are disallowed in `**kwargs
+    "PLR0913", # Too many arguments for function call
+    "D106",    # Missing docstring in public nested class
+]
+exclude = [".venv/"]
+mccabe = { max-complexity = 10 }
+line-length = 88
+
+[tool.ruff.per-file-ignores]
+"tests/*" = [
+    "S101", # Use of assert detected
+    "S301", # Use of pickle detected
+    "D103", # Missing docstring in public function
+    "SLF001", # Private member accessed
+    "S311", # Standard pseudo-random generators are not suitable for security/cryptographic purposes
+    "D101", # Missing docstring in public class
+]
+
+[tool.ruff.pydocstyle]
+convention = "pep257"
+ignore-decorators = ["typing.overload"]
+
+[tool.ruff.pylint]
+allow-magic-value-types = ["int", "str", "float", "tuple"]
+
+[tool.ruff.flake8-bugbear]
+extend-immutable-calls = [
+    "taskiq_dependencies.Depends",
+    "taskiq.TaskiqDepends",
+]

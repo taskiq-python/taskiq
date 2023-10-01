@@ -7,7 +7,7 @@ from taskiq.result import TaskiqResult
 from taskiq.task import AsyncTaskiqTask
 
 
-async def gather(  # noqa: C901, WPS210
+async def gather(
     *tasks: AsyncTaskiqTask[Any],
     timeout: float = -1,
     with_logs: bool = False,
@@ -36,8 +36,8 @@ async def gather(  # noqa: C901, WPS210
     results = {}
 
     async def check_task(task: AsyncTaskiqTask[Any]) -> None:
-        nonlocal results  # noqa: WPS420
-        nonlocal task_ids  # noqa: WPS420
+        nonlocal results
+        nonlocal task_ids
         if await task.is_ready():
             try:
                 task_ids.remove(task.task_id)

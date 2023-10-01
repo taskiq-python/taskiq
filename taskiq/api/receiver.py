@@ -9,7 +9,7 @@ from taskiq.receiver.receiver import Receiver
 logger = getLogger("taskiq.receiver")
 
 
-async def run_receiver_task(  # noqa: WPS211
+async def run_receiver_task(
     broker: AsyncBroker,
     receiver_cls: Type[Receiver] = Receiver,
     sync_workers: int = 4,
