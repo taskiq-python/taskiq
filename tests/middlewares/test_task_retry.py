@@ -10,7 +10,6 @@ from taskiq.exceptions import NoResultError
 @pytest.mark.anyio
 async def test_wait_result() -> None:
     """Tests wait_result."""
-
     broker = InMemoryBroker().with_middlewares(
         SimpleRetryMiddleware(no_result_on_retry=True),
     )
@@ -36,7 +35,6 @@ async def test_wait_result() -> None:
 @pytest.mark.anyio
 async def test_wait_result_error() -> None:
     """Tests wait_result."""
-
     broker = InMemoryBroker().with_middlewares(
         SimpleRetryMiddleware(no_result_on_retry=False),
     )
@@ -66,7 +64,6 @@ async def test_wait_result_error() -> None:
 @pytest.mark.anyio
 async def test_wait_result_no_result() -> None:
     """Tests wait_result."""
-
     broker = InMemoryBroker().with_middlewares(
         SimpleRetryMiddleware(no_result_on_retry=False),
     )
@@ -83,7 +80,7 @@ async def test_wait_result_no_result() -> None:
 
         time.sleep(0.2)
         done = True
-        raise NoResultError()
+        raise NoResultError
 
     task = await run_task.kiq()
     resp = await task.wait_result(0.1, timeout=1)
@@ -101,7 +98,6 @@ async def test_wait_result_no_result() -> None:
 @pytest.mark.anyio
 async def test_max_retries() -> None:
     """Tests wait_result."""
-
     broker = InMemoryBroker().with_middlewares(
         SimpleRetryMiddleware(
             no_result_on_retry=True,

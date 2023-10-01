@@ -8,7 +8,7 @@ from taskiq.message import TaskiqMessage
 logger = getLogger(__name__)
 
 
-def parse_params(  # noqa: C901
+def parse_params(
     signature: Optional[inspect.Signature],
     type_hints: Dict[str, Any],
     message: TaskiqMessage,
@@ -55,7 +55,7 @@ def parse_params(  # noqa: C901
         return
     argnum = -1
     # Iterate over function's params.
-    for param_name in signature.parameters.keys():
+    for param_name in signature.parameters:
         # If parameter doesn't have an annotation.
         annot = type_hints.get(param_name)
         if annot is None:

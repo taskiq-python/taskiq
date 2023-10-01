@@ -134,4 +134,4 @@ def test_time_delay() -> None:
             time=time,
         ),
     )
-    assert delay is not None and 15 == delay
+    assert delay is not None and delay == 15

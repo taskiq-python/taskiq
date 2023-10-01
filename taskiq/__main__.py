@@ -8,7 +8,7 @@ from taskiq import __version__
 from taskiq.abc.cmd import TaskiqCMD
 
 
-def main() -> None:  # noqa: C901, WPS210  # pragma: no cover
+def main() -> None:  # pragma: no cover
     """
     Main entrypoint of the taskiq.
 
@@ -48,7 +48,7 @@ def main() -> None:  # noqa: C901, WPS210  # pragma: no cover
         try:
             cmd_class = entrypoint.load()
         except ImportError as exc:
-            print(f"Could not load {entrypoint.value}. Cause: {exc}")  # noqa: WPS421
+            print(f"Could not load {entrypoint.value}. Cause: {exc}")  # noqa: T201
             continue
         if issubclass(cmd_class, TaskiqCMD):
             subparsers.add_parser(
@@ -61,7 +61,7 @@ def main() -> None:  # noqa: C901, WPS210  # pragma: no cover
     args, _ = parser.parse_known_args()
 
     if args.version:
-        print(__version__)  # noqa: WPS421
+        print(__version__)  # noqa: T201
         return
 
     if args.subcommand is None:
@@ -72,7 +72,7 @@ def main() -> None:  # noqa: C901, WPS210  # pragma: no cover
     sys.argv.pop(0)
     status = command.exec(sys.argv[1:])
     if status is not None:
-        exit(status)  # noqa: WPS421
+        exit(status)  # noqa: PLR1722
 
 
 if __name__ == "__main__":  # pragma: no cover

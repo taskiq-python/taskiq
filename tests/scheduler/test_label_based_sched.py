@@ -87,7 +87,9 @@ async def test_task_scheduled_at_time_runs_only_once(mock_sleep: None) -> None:
 
         # Run scheduler
         loop = asyncio.get_running_loop()
-        loop.create_task(run_scheduler(SchedulerArgs(scheduler=scheduler, modules=[])))
+        sched_task = loop.create_task(
+            run_scheduler(SchedulerArgs(scheduler=scheduler, modules=[])),
+        )
 
         # Wait for task be called
         await asyncio.wait_for(event.wait(), 2.0)
@@ -100,3 +102,4 @@ async def test_task_scheduled_at_time_runs_only_once(mock_sleep: None) -> None:
         # Check that other scheduled task are not effected and still available
         tasks = [task.args for task in await scheduler.sources[0].get_schedules()]
         assert tasks == [[2], [3]]  # [1] not in a list as it was enqueued above
+    sched_task.cancel()

@@ -1,5 +1,5 @@
 import json
-import pickle  # noqa: S403
+import pickle
 from typing import Any, Dict, Generic, Optional, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
@@ -50,7 +50,7 @@ class TaskiqResult(BaseModel, Generic[_ReturnType]):
         return self
 
     def __getstate__(self) -> Dict[Any, Any]:
-        dict = super().__getstate__()  # noqa: WPS125
+        dict = super().__getstate__()
         vals: Dict[str, Any] = dict["__dict__"]
 
         if "error" in vals and vals["error"] is not None:

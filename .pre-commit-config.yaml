@@ -12,7 +12,7 @@ repos:
   - repo: https://github.com/asottile/add-trailing-comma
     rev: v2.1.0
     hooks:
-    -   id: add-trailing-comma
+      - id: add-trailing-comma
 
   - repo: local
     hooks:
@@ -22,35 +22,19 @@ repos:
         language: system
         types: [python]
 
-      - id: autoflake
-        name: autoflake
-        entry: poetry run autoflake
-        language: system
-        types: [ python ]
-        args: [ --in-place, --remove-all-unused-imports, --remove-duplicate-keys ]
-
-      - id: isort
-        name: isort
-        entry: poetry run isort
-        language: system
-        types: [ python ]
-
-      - id: flake8
-        name: Check with Flake8
-        entry: poetry run flake8
+      - id: ruff
+        name: Run ruff lints
+        entry: poetry run ruff
         language: system
         pass_filenames: false
-        types: [ python ]
-        args: [--count, taskiq]
+        types: [python]
+        args:
+          - "--fix"
+          - "taskiq"
+          - "tests"
 
       - id: mypy
         name: Validate types with MyPy
         entry: poetry run mypy
         language: system
-        types: [ python ]
-
-      - id: yesqa
-        name: Remove usless noqa
-        entry: poetry run yesqa
-        language: system
-        types: [ python ]
+        types: [python]

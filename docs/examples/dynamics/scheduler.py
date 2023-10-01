@@ -32,7 +32,7 @@ async def main() -> None:
     # We create scheduler after the task declaration,
     # so we don't have to wait a minute before it gets to the task.
     # However, defining a scheduler before the task declaration is also possible.
-    # but we have to wait till it gets to task execution for the second time.
+    # But we have to wait till it gets to task execution for the second time.
     worker_task = asyncio.create_task(run_receiver_task(dyn_broker))
     scheduler_task = asyncio.create_task(run_scheduler_task(dyn_scheduler))
 

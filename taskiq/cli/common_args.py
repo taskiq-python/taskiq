@@ -1,7 +1,7 @@
 import enum
 
 
-class LogLevel(str, enum.Enum):  # noqa: WPS600
+class LogLevel(str, enum.Enum):
     """Different log levels."""
 
     INFO = "INFO"

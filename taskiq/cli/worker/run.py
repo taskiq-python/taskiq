@@ -14,13 +14,13 @@ from taskiq.cli.worker.process_manager import ProcessManager
 from taskiq.receiver import Receiver
 
 try:
-    import uvloop  # noqa: WPS433
+    import uvloop
 except ImportError:
     uvloop = None  # type: ignore
 
 
 try:
-    from watchdog.observers import Observer  # noqa: WPS433
+    from watchdog.observers import Observer
 except ImportError:
     Observer = None  # type: ignore
 
@@ -68,7 +68,7 @@ def get_receiver_type(args: WorkerArgs) -> Type[Receiver]:
     return receiver_type
 
 
-def start_listen(args: WorkerArgs, event: Event) -> None:  # noqa: WPS210, WPS213
+def start_listen(args: WorkerArgs, event: Event) -> None:
     """
     This function starts actual listening process.
 
@@ -100,10 +100,10 @@ def start_listen(args: WorkerArgs, event: Event) -> None:  # noqa: WPS210, WPS21
         :raises KeyboardInterrupt: if termination hasn't begun.
         """
         logger.debug(f"Got signal {signum}.")
-        nonlocal shutting_down  # noqa: WPS420
+        nonlocal shutting_down
         if shutting_down:
             return
-        shutting_down = True  # noqa: WPS442
+        shutting_down = True
         raise KeyboardInterrupt
 
     signal.signal(signal.SIGINT, interrupt_handler)
@@ -148,7 +148,7 @@ def start_listen(args: WorkerArgs, event: Event) -> None:  # noqa: WPS210, WPS21
         loop.run_until_complete(shutdown_broker(broker, args.shutdown_timeout))
 
 
-def run_worker(args: WorkerArgs) -> Optional[int]:  # noqa: WPS213
+def run_worker(args: WorkerArgs) -> Optional[int]:
     """
     This function starts worker processes.
 
@@ -166,7 +166,7 @@ def run_worker(args: WorkerArgs) -> Optional[int]:  # noqa: WPS213
         logging.basicConfig(
             level=logging.getLevelName(args.log_level),
             format="[%(asctime)s][%(name)s][%(levelname)-7s]"
-            + "[%(processName)s] %(message)s",
+            "[%(processName)s] %(message)s",
         )
     logging.getLogger("taskiq").setLevel(level=logging.getLevelName(args.log_level))
     logging.getLogger("watchdog.observers.inotify_buffer").setLevel(level=logging.INFO)

@@ -18,7 +18,9 @@ class PrometheusMiddleware(TaskiqMiddleware):
     This middleware starts wsgi server with prometheus metrics.
     Also it updates metrics on events.
 
-    :param server_port: meme
+    :param server_port: The port to listen on.
+    :param server_addr: The address to listen on.
+    :paam metrics_path: The path to store metrics for multiproc env.
     """
 
     def __init__(
@@ -37,12 +39,12 @@ class PrometheusMiddleware(TaskiqMiddleware):
         logger.debug(f"Setting up multiproc dir to {metrics_path}")
 
         os.environ["PROMETHEUS_MULTIPROC_DIR"] = str(metrics_path)
-        os.environ["prometheus_multiproc_dir"] = str(metrics_path)
+        os.environ["PROMETHEUS_MULTIPROC_DIR"] = str(metrics_path)
 
         logger.debug("Initializing metrics")
 
         try:
-            from prometheus_client import Counter, Histogram  # noqa: WPS433
+            from prometheus_client import Counter, Histogram
         except ImportError as exc:
             raise ImportError(
                 "Cannot initialize metrics. Please install 'taskiq[metrics]'.",
@@ -83,7 +85,7 @@ class PrometheusMiddleware(TaskiqMiddleware):
         This function starts prometheus server.
         It starts it only in case if it's a worker process.
         """
-        from prometheus_client import start_http_server  # noqa: WPS433
+        from prometheus_client import start_http_server
 
         if self.broker.is_worker_process:
             try:

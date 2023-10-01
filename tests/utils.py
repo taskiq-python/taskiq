@@ -17,6 +17,7 @@ class AsyncQueueBroker(AsyncBroker):
         super().__init__(None, None)
 
     async def kick(self, message: BrokerMessage) -> None:
+        """Send a message to the queue."""
         await self.queue.put(message.message)
 
     async def wait_tasks(self) -> None:
@@ -24,6 +25,7 @@ class AsyncQueueBroker(AsyncBroker):
         await self.queue.join()
 
     async def listen(self) -> AsyncGenerator[bytes, None]:
+        """This method returns all tasks from queue."""
         while True:
             task = await self.queue.get()
             yield task

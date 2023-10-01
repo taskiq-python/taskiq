@@ -1,7 +1,8 @@
 import asyncio
+import random
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, AsyncGenerator, List, Optional, TypeVar
+from typing import Any, ClassVar, List, Optional
 
 import pytest
 from taskiq_dependencies import Depends
@@ -13,18 +14,7 @@ from taskiq.exceptions import NoResultError, TaskiqResultTimeoutError
 from taskiq.message import TaskiqMessage
 from taskiq.receiver import Receiver
 from taskiq.result import TaskiqResult
-
-_T = TypeVar("_T")
-
-
-class BrokerForTests(InMemoryBroker):
-    def __init__(self) -> None:
-        super().__init__()
-        self.to_send: "List[TaskiqMessage]" = []
-
-    async def listen(self) -> AsyncGenerator[bytes, None]:
-        for message in self.to_send:
-            yield self.formatter.dumps(message).message
+from tests.utils import AsyncQueueBroker
 
 
 def get_receiver(
@@ -100,7 +90,7 @@ async def test_run_task_exception() -> None:
     """Tests that run_task can run sync tasks."""
 
     def test_func() -> None:
-        raise ValueError()
+        raise ValueError
 
     receiver = get_receiver()
 
@@ -167,7 +157,7 @@ async def test_run_task_exception_middlewares() -> None:
     """Tests that run_task can run sync tasks."""
 
     class _TestMiddleware(TaskiqMiddleware):
-        found_exceptions = []
+        found_exceptions: ClassVar[List[BaseException]] = []
 
         def on_error(
             self,
@@ -178,7 +168,7 @@ async def test_run_task_exception_middlewares() -> None:
             self.found_exceptions.append(exception)
 
     def test_func() -> None:
-        raise ValueError()
+        raise ValueError
 
     broker = InMemoryBroker().with_middlewares(_TestMiddleware())
     receiver = get_receiver(broker)
@@ -225,6 +215,41 @@ async def test_callback_success() -> None:
 
     await receiver.callback(broker_message.message)
     assert called_times == 1
+
+
+@pytest.mark.anyio
+async def test_callback_no_dep_info() -> None:
+    """Test that callback function works well."""
+    broker = InMemoryBroker()
+    expected = random.randint(1, 100)
+    ret_val = None
+
+    def dependency() -> int:
+        return expected
+
+    @broker.task
+    async def my_task(dep: int = Depends(dependency)) -> None:
+        nonlocal ret_val
+        ret_val = dep
+
+    receiver = get_receiver(broker)
+    receiver.known_tasks.remove(my_task.task_name)
+    receiver.dependency_graphs.pop(my_task.task_name, None)
+    receiver.task_signatures.pop(my_task.task_name, None)
+    receiver.task_hints.pop(my_task.task_name, None)
+
+    broker_message = broker.formatter.dumps(
+        TaskiqMessage(
+            task_id="task_id",
+            task_name=my_task.task_name,
+            labels={},
+            args=[],
+            kwargs={},
+        ),
+    )
+
+    await receiver.callback(broker_message.message)
+    assert ret_val == expected
 
 
 @pytest.mark.anyio
@@ -378,7 +403,7 @@ async def test_custom_ctx() -> None:
 async def test_callback_semaphore() -> None:
     """Test that callback function semaphore works well."""
     max_async_tasks = 3
-    broker = BrokerForTests()
+    broker = AsyncQueueBroker()
     sem_num = 0
 
     @broker.task
@@ -388,24 +413,16 @@ async def test_callback_semaphore() -> None:
         await asyncio.sleep(1)
         return 1
 
-    broker.to_send = [
-        TaskiqMessage(
-            task_id="test_sem",
-            task_name=task_sem.task_name,
-            labels={},
-            args=[],
-            kwargs={},
-        )
-        for _ in range(max_async_tasks + 2)
-    ]
-
-    receiver = get_receiver(broker, max_async_tasks=3)
+    for _ in range(max_async_tasks + 2):
+        await task_sem.kiq()
+    receiver = get_receiver(broker, max_async_tasks=max_async_tasks)
 
     listen_task = asyncio.create_task(receiver.listen())
     await asyncio.sleep(0.3)
     assert sem_num == max_async_tasks
-    await listen_task
+    await broker.wait_tasks()
     assert sem_num == max_async_tasks + 2
+    listen_task.cancel()
 
 
 @pytest.mark.anyio
@@ -416,7 +433,7 @@ async def test_no_result_error() -> None:
     @broker.task
     async def task_no_result() -> int:
         executed.set()
-        raise NoResultError()
+        raise NoResultError
 
     task = await task_no_result.kiq()
     with pytest.raises(TaskiqResultTimeoutError):

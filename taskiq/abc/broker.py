@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from functools import wraps
 from logging import getLogger
-from typing import (  # noqa: WPS235
+from typing import (
     TYPE_CHECKING,
     Any,
     AsyncGenerator,
@@ -39,7 +39,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.formatter import TaskiqFormatter
     from taskiq.abc.result_backend import AsyncResultBackend
 
-_T = TypeVar("_T")  # noqa: WPS111
+_T = TypeVar("_T")
 _FuncParams = ParamSpec("_FuncParams")
 _ReturnType = TypeVar("_ReturnType")
 
@@ -307,7 +307,7 @@ class AsyncBroker(ABC):
             def inner(
                 func: Callable[_FuncParams, _ReturnType],
             ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]:
-                nonlocal inner_task_name  # noqa: WPS420
+                nonlocal inner_task_name
                 if inner_task_name is None:
                     fmodule = func.__module__
                     if fmodule == "__main__":  # pragma: no cover
@@ -319,7 +319,7 @@ class AsyncBroker(ABC):
                     fname = func.__name__
                     if fname == "<lambda>":
                         fname = f"lambda_{uuid4().hex}"
-                    inner_task_name = f"{fmodule}:{fname}"  # noqa: WPS442
+                    inner_task_name = f"{fmodule}:{fname}"
                 wrapper = wraps(func)
 
                 decorated_task = wrapper(

@@ -88,7 +88,7 @@ class AsyncTaskiqTask(_Task[_ReturnType]):
         try:
             return await self.result_backend.is_result_ready(self.task_id)
         except Exception as exc:
-            raise ResultIsReadyError() from exc
+            raise ResultIsReadyError from exc
 
     async def get_result(self, with_logs: bool = False) -> "TaskiqResult[_ReturnType]":
         """
@@ -106,7 +106,7 @@ class AsyncTaskiqTask(_Task[_ReturnType]):
                 with_logs=with_logs,
             )
         except Exception as exc:
-            raise ResultGetError() from exc
+            raise ResultGetError from exc
 
     async def wait_result(
         self,
@@ -135,5 +135,5 @@ class AsyncTaskiqTask(_Task[_ReturnType]):
         while not await self.is_ready():
             await asyncio.sleep(check_interval)
             if 0 < timeout < time() - start_time:
-                raise TaskiqResultTimeoutError()
+                raise TaskiqResultTimeoutError
         return await self.get_result(with_logs=with_logs)

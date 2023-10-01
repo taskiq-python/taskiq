@@ -44,7 +44,7 @@ def _run_sync(
 class Receiver:
     """Class that uses as a callback handler."""
 
-    def __init__(  # noqa: WPS211
+    def __init__(
         self,
         broker: AsyncBroker,
         executor: Optional[Executor] = None,
@@ -64,21 +64,20 @@ class Receiver:
         self.dependency_graphs: Dict[str, DependencyGraph] = {}
         self.propagate_exceptions = propagate_exceptions
         self.on_exit = on_exit
+        self.known_tasks: Set[str] = set()
         for task in self.broker.get_all_tasks().values():
-            self.task_signatures[task.task_name] = inspect.signature(task.original_func)
-            self.task_hints[task.task_name] = get_type_hints(task.original_func)
-            self.dependency_graphs[task.task_name] = DependencyGraph(task.original_func)
+            self._prepare_task(task.task_name, task.original_func)
         self.sem: "Optional[asyncio.Semaphore]" = None
         if max_async_tasks is not None and max_async_tasks > 0:
             self.sem = asyncio.Semaphore(max_async_tasks)
         else:
             logger.warning(
                 "Setting unlimited number of async tasks "
-                + "can result in undefined behavior",
+                "can result in undefined behavior",
             )
         self.sem_prefetch = asyncio.Semaphore(max_prefetch)
 
-    async def callback(  # noqa: C901, WPS213, WPS217
+    async def callback(  # noqa: C901, PLR0912
         self,
         message: Union[bytes, AckableMessage],
         raise_err: bool = False,
@@ -95,10 +94,7 @@ class Receiver:
         :param raise_err: raise an error if cannot save result in
             result_backend.
         """
-        if isinstance(message, AckableMessage):
-            message_data = message.data
-        else:
-            message_data = message
+        message_data = message.data if isinstance(message, AckableMessage) else message
         try:
             taskiq_msg = self.broker.formatter.loads(message=message_data)
         except Exception as exc:
@@ -163,7 +159,7 @@ class Receiver:
             if raise_err:
                 raise exc
 
-    async def run_task(  # noqa: C901, WPS210
+    async def run_task(  # noqa: C901, PLR0912, PLR0915
         self,
         target: Callable[..., Any],
         message: TaskiqMessage,
@@ -190,6 +186,8 @@ class Receiver:
         returned = None
         found_exception: "Optional[BaseException]" = None
         signature = None
+        if message.task_name not in self.known_tasks:
+            self._prepare_task(message.task_name, target)
         if self.validate_params:
             signature = self.task_signatures.get(message.task_name)
         dependency_graph = self.dependency_graphs.get(message.task_name)
@@ -251,7 +249,7 @@ class Receiver:
                 message.task_name,
                 message.task_id,
             )
-        except BaseException as exc:  # noqa: WPS424
+        except BaseException as exc:
             found_exception = exc
             logger.error(
                 "Exception found while executing function: %s",
@@ -326,7 +324,7 @@ class Receiver:
         while True:
             try:
                 await self.sem_prefetch.acquire()
-                message = await iterator.__anext__()  # noqa: WPS609
+                message = await iterator.__anext__()
                 await queue.put(message)
             except asyncio.CancelledError:
                 break
@@ -382,3 +380,23 @@ class Receiver:
             # and this behaviour considered to be a Hisenbug.
             # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
             task.add_done_callback(task_cb)
+
+    def _prepare_task(self, name: str, handler: Callable[..., Any]) -> None:
+        """
+        Prepare task for execution.
+
+        This function gets function's signature,
+        type hints and builds dependency graph.
+
+        It's useful for dynamic dependency resolution,
+        because sometimes the receiver can get
+        funcion that is defined in runtime. We need
+        to be aware of that.
+
+        :param name: task name.
+        :param handler: task handler.
+        """
+        self.known_tasks.add(name)
+        self.task_signatures[name] = inspect.signature(handler)
+        self.task_hints[name] = get_type_hints(handler)
+        self.dependency_graphs[name] = DependencyGraph(handler)

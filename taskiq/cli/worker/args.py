@@ -43,7 +43,7 @@ class WorkerArgs:
     max_fails: int = -1
 
     @classmethod
-    def from_cli(  # noqa: WPS213
+    def from_cli(
         cls,
         args: Optional[Sequence[str]] = None,
     ) -> "WorkerArgs":
@@ -152,7 +152,7 @@ class WorkerArgs:
             "-r",
             action="store_true",
             help="Reload workers if file is changed. "
-            + "`reload` extra is required for this option.",
+            "`reload` extra is required for this option.",
         )
         parser.add_argument(
             "--do-not-use-gitignore",

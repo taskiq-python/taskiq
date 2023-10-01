@@ -17,7 +17,7 @@ from taskiq.task import AsyncTaskiqTask
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.broker import AsyncBroker
 
-_T = TypeVar("_T")  # noqa: WPS111
+_T = TypeVar("_T")
 _FuncParams = ParamSpec("_FuncParams")
 _ReturnType = TypeVar("_ReturnType")
 
