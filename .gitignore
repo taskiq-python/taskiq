@@ -168,3 +168,6 @@ node_modules
 
 # macOS
 .DS_Store
+
+# Ruff
+.ruff_cache/

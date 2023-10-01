@@ -19,5 +19,5 @@ async def run_scheduler_task(
         await source.startup()
     if run_startup:
         await scheduler.startup()
-    while True:  # noqa: WPS457
+    while True:
         await run_scheduler_loop(scheduler)

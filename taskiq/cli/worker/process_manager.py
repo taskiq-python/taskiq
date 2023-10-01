@@ -8,9 +8,9 @@ from time import sleep
 from typing import Any, Callable, List, Optional
 
 try:
-    from watchdog.observers import Observer  # noqa: WPS433
+    from watchdog.observers import Observer
 
-    from taskiq.cli.watcher import FileWatcher  # noqa: WPS433
+    from taskiq.cli.watcher import FileWatcher
 except ImportError:
     Observer = None  # type: ignore
     FileWatcher = None  # type: ignore
@@ -200,7 +200,7 @@ class ProcessManager:
         for worker, event in zip(self.workers, events):
             _wait_for_worker_startup(worker, event)
 
-    def start(self) -> Optional[int]:  # noqa: C901, WPS213
+    def start(self) -> Optional[int]:  # noqa: C901
         """
         Start managing child processes.
 

@@ -1,5 +1,5 @@
 import json
-import pickle  # noqa: S403
+import pickle
 from functools import partial
 from typing import Any, Callable, Dict, Generic, Optional, TypeVar
 
@@ -53,7 +53,7 @@ class TaskiqResult(GenericModel, Generic[_ReturnType]):
         return self
 
     def __getstate__(self) -> Dict[Any, Any]:
-        dict = super().__getstate__()  # noqa: WPS125
+        dict = super().__getstate__()
         vals: Dict[str, Any] = dict["__dict__"]
 
         if "error" in vals and vals["error"] is not None:

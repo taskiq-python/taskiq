@@ -31,7 +31,7 @@ class Context:
         requeue_count += 1
         self.message.labels["X-Taskiq-requeue"] = str(requeue_count)
         await self.broker.kick(self.broker.formatter.dumps(self.message))
-        raise NoResultError()
+        raise NoResultError
 
     def reject(self) -> None:
         """
@@ -39,4 +39,4 @@ class Context:
 
         :raises TaskRejectedError: to reject current message.
         """
-        raise TaskRejectedError()
+        raise TaskRejectedError

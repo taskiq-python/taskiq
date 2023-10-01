@@ -7,12 +7,12 @@ from taskiq.abc.result_backend import AsyncResultBackend
 from taskiq.message import BrokerMessage
 
 try:
-    import zmq  # noqa: WPS433
-    from zmq.asyncio import Context, Socket  # noqa: WPS433
+    import zmq
+    from zmq.asyncio import Context, Socket
 except ImportError:
     zmq = None  # type: ignore
 
-_T = TypeVar("_T")  # noqa: WPS111
+_T = TypeVar("_T")
 
 logger = getLogger(__name__)
 
@@ -87,6 +87,6 @@ class ZeroMQBroker(AsyncBroker):
         :yields: incoming messages.
         """
         with self.socket.connect(self.sub_host) as sock:
-            while True:  # noqa: WPS457
+            while True:
                 data = await sock.recv_multipart()
                 yield b"".join(data)

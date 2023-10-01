@@ -39,9 +39,11 @@ class InmemoryResultBackend(AsyncResultBackend[_ReturnType]):
         :param task_id: id of a task.
         :param result: result of an execution.
         """
-        if self.max_stored_results != -1:
-            if len(self.results) >= self.max_stored_results:
-                self.results.popitem(last=False)
+        if (
+            self.max_stored_results != -1
+            and len(self.results) >= self.max_stored_results
+        ):
+            self.results.popitem(last=False)
         self.results[task_id] = result
 
     async def is_result_ready(self, task_id: str) -> bool:
@@ -85,7 +87,7 @@ class InMemoryBroker(AsyncBroker):
     It's useful for local development, if you don't want to setup real broker.
     """
 
-    def __init__(  # noqa: WPS211
+    def __init__(
         self,
         sync_tasks_pool_size: int = 4,
         max_stored_results: int = 100,
