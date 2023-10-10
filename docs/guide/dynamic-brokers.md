@@ -13,7 +13,7 @@ Taskiq allows you to set up broker instances throughout your application and reg
 
 To define tasks and assign them to a broker, use `register_task` method.
 
-@[code python](../examples/dynamics/broker.py)
+@[code python](../examples/dynamics/dyn_broker.py)
 
 In this example, the task is defined using a lambda within the `main` function. As the lambda is not visible outside of the `main` function scope, the task is not executable by `taskiq worker` command.
 
@@ -24,10 +24,10 @@ To overcome this issue, you can:
 
 Here's an example of a dynamic worker task creation:
 
-@[code python](../examples/dynamics/receiver.py)
+@[code python](../examples/dynamics/dyn_receiver.py)
 
 In this example, a named dynamic lambda task is created and registered in a broker, similar to the previous example. The difference is the creation of a new receiver coroutine for the worker task. It will listen to the new messages and execute them. The worker task will be executed in the current event loop. After exiting the scope, the worker task will get cancelled. For illustration purposes it is cancelled explicitly.
 
 It's possible to run a scheduler in the current event loop as well:
 
-@[code python](../examples/dynamics/scheduler.py)
+@[code python](../examples/dynamics/dyn_scheduler.py)
