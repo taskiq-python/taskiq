@@ -61,6 +61,7 @@ freezegun = "^1.2.2"
 pytest-mock = "^3.11.1"
 tzlocal = "^5.0.1"
 types-tzlocal = "^5.0.1.1"
+types-pytz = "^2023.3.1.1"
 
 [tool.poetry.extras]
 zmq = ["pyzmq"]

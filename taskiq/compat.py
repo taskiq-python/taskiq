@@ -16,6 +16,15 @@ if IS_PYDANTIC2:
     def parse_obj_as(annot: T, obj: Any) -> T:
         return pydantic.TypeAdapter(annot).validate_python(obj)
 
+    def model_validate(
+        model_class: Type[Model],
+        message: Dict[str, Any],
+    ) -> Model:
+        return model_class.model_validate(message)
+
+    def model_dump(instance: Model) -> Dict[str, Any]:
+        return instance.model_dump()
+
     def model_validate_json(
         model_class: Type[Model],
         message: Union[str, bytes, bytearray],
@@ -36,6 +45,15 @@ if IS_PYDANTIC2:
 
 else:
     parse_obj_as = pydantic.parse_obj_as  # type: ignore
+
+    def model_validate(
+        model_class: Type[Model],
+        message: Dict[str, Any],
+    ) -> Model:
+        return model_class.parse_obj(message)
+
+    def model_dump(instance: Model) -> Dict[str, Any]:
+        return instance.dict()
 
     def model_validate_json(
         model_class: Type[Model],

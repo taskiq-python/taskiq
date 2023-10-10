@@ -1,10 +1,18 @@
+from typing import TYPE_CHECKING
+
 from taskiq.abc.formatter import TaskiqFormatter
-from taskiq.compat import model_dump_json, model_validate_json
+from taskiq.compat import model_dump, model_validate
 from taskiq.message import BrokerMessage, TaskiqMessage
 
+if TYPE_CHECKING:
+    from taskiq.abc.broker import AsyncBroker
 
-class JSONFormatter(TaskiqFormatter):
-    """JSON taskiq formatter."""
+
+class ProxyFormatter(TaskiqFormatter):
+    """Default taskiq formatter."""
+
+    def __init__(self, broker: "AsyncBroker") -> None:
+        self.broker = broker
 
     def dumps(self, message: TaskiqMessage) -> BrokerMessage:
         """
@@ -16,7 +24,7 @@ class JSONFormatter(TaskiqFormatter):
         return BrokerMessage(
             task_id=message.task_id,
             task_name=message.task_name,
-            message=model_dump_json(message).encode(),
+            message=self.broker.serializer.dumpb(model_dump(message)),
             labels=message.labels,
         )
 
@@ -27,4 +35,4 @@ class JSONFormatter(TaskiqFormatter):
         :param message: broker's message.
         :return: parsed taskiq message.
         """
-        return model_validate_json(TaskiqMessage, message)
+        return model_validate(TaskiqMessage, self.broker.serializer.loadb(message))
