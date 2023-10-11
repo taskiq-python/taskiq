@@ -25,12 +25,14 @@ from uuid import uuid4
 from typing_extensions import ParamSpec, Self, TypeAlias
 
 from taskiq.abc.middleware import TaskiqMiddleware
+from taskiq.abc.serializer import TaskiqSerializer
 from taskiq.acks import AckableMessage
 from taskiq.decor import AsyncTaskiqDecoratedTask
 from taskiq.events import TaskiqEvents
-from taskiq.formatters.json_formatter import JSONFormatter
+from taskiq.formatters.proxy_formatter import ProxyFormatter
 from taskiq.message import BrokerMessage
 from taskiq.result_backends.dummy import DummyResultBackend
+from taskiq.serializers.json_serializer import JSONSerializer
 from taskiq.state import TaskiqState
 from taskiq.utils import maybe_awaitable, remove_suffix
 from taskiq.warnings import TaskiqDeprecationWarning
@@ -97,7 +99,8 @@ class AsyncBroker(ABC):
         self.middlewares: "List[TaskiqMiddleware]" = []
         self.result_backend = result_backend
         self.decorator_class = AsyncTaskiqDecoratedTask
-        self.formatter: "TaskiqFormatter" = JSONFormatter()
+        self.serializer: TaskiqSerializer = JSONSerializer()
+        self.formatter: "TaskiqFormatter" = ProxyFormatter(self)
         self.id_generator = task_id_generator
         self.local_task_registry: Dict[str, AsyncTaskiqDecoratedTask[Any, Any]] = {}
         # Every event has a list of handlers.
@@ -477,6 +480,19 @@ class AsyncBroker(ABC):
         :return: self
         """
         self.event_handlers[event].extend(handlers)
+        return self
+
+    def with_serializer(
+        self,
+        serializer: TaskiqSerializer,
+    ) -> "Self":  # pragma: no cover
+        """
+        Set a new serializer and return an updated broker.
+
+        :param serializer: new serializer.
+        :return: self
+        """
+        self.serializer = serializer
         return self
 
     def _register_task(
