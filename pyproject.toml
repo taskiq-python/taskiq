@@ -39,7 +39,7 @@ prometheus_client = { version = "^0", optional = true }
 # For ZMQBroker
 pyzmq = { version = "^23.2.0", optional = true }
 # For speed
-uvloop = { version = ">=0.16.0,<1", optional = true }
+uvloop = { version = ">=0.16.0,<1", optional = true, markers = "sys_platform != 'win32'" }
 # For hot-reload.
 watchdog = { version = "^2.1.9", optional = true }
 gitignore-parser = { version = "^0", optional = true }
