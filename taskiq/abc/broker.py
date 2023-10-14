@@ -495,7 +495,7 @@ class AsyncBroker(ABC):
         self.serializer = serializer
         return self
 
-    def with_formatter(self, formatter: TaskiqFormatter) -> "Self":
+    def with_formatter(self, formatter: "TaskiqFormatter") -> "Self":
         """
         Set new formatter and return an updated broker.
 
