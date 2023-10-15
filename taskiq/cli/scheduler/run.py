@@ -33,7 +33,7 @@ def to_tz_aware(time: datetime) -> datetime:
 
 async def schedules_updater(
     scheduler: TaskiqScheduler,
-    current_schedules: Dict[ScheduleSource, list[ScheduledTask]],
+    current_schedules: Dict[ScheduleSource, List[ScheduledTask]],
     event: asyncio.Event,
 ) -> None:
     """
@@ -49,7 +49,7 @@ async def schedules_updater(
     """
     while True:
         logger.debug("Started schedule update.")
-        new_schedules: "Dict[ScheduleSource, list[ScheduledTask]]" = {}
+        new_schedules: "Dict[ScheduleSource, List[ScheduledTask]]" = {}
         for source in scheduler.sources:
             try:
                 schedules = await source.get_schedules()
