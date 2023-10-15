@@ -36,7 +36,6 @@ async def test_label_discovery(schedule_label: List[Dict[str, Any]]) -> None:
             labels={"schedule": schedule_label},
             args=[],
             kwargs={},
-            source=source,
         ),
     ]
 

@@ -1,3 +1,4 @@
+import copy
 from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -34,8 +35,22 @@ def only_unique(
     :param new_tasks: newly discovered tasks.
     :return: list of unique schedules.
     """
-    result = old_tasks
+    result = copy.copy(old_tasks)
     for task in new_tasks:
         if task not in result:
             result.append(task)
     return result
+
+
+def only_new(
+    _old_tasks: List["ScheduledTask"],
+    new_tasks: List["ScheduledTask"],
+) -> List["ScheduledTask"]:
+    """
+    This function preserves only new schedules.
+
+    :param old_tasks: previously discovered tasks.
+    :param new_tasks: newly discovered schedules.
+    :return: list of new schedules.
+    """
+    return new_tasks

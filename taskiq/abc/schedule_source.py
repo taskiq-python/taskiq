@@ -18,7 +18,7 @@ class ScheduleSource(ABC):
     async def get_schedules(self) -> List["ScheduledTask"]:
         """Get list of taskiq schedules."""
 
-    async def add_schedule(self, schedule: "ScheduledTask") -> None:  # noqa: B027
+    async def add_schedule(self, schedule: "ScheduledTask") -> None:
         """
         Add a new schedule.
 
@@ -33,6 +33,9 @@ class ScheduleSource(ABC):
 
         :param schedule: schedule to add.
         """
+        raise NotImplementedError(
+            f"The source {self.__class__.__name__} does not support adding schedules.",
+        )
 
     def pre_send(  # noqa: B027
         self,

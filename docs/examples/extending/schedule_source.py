@@ -19,10 +19,6 @@ class MyScheduleSource(ScheduleSource):
                 args=[],
                 kwargs={},
                 cron="* * * * *",
-                #
-                # We need point on self source for calling pre_send / post_send when
-                # task is ready to be enqueued.
-                source=self,
             ),
         ]
 

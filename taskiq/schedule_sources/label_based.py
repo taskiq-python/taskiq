@@ -44,7 +44,6 @@ class LabelScheduleSource(ScheduleSource):
                         cron=schedule.get("cron"),
                         time=schedule.get("time"),
                         cron_offset=schedule.get("cron_offset"),
-                        source=self,
                     ),
                 )
         return schedules
