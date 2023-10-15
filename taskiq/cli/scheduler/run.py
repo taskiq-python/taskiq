@@ -2,11 +2,12 @@ import asyncio
 import sys
 from datetime import datetime, timedelta
 from logging import basicConfig, getLevelName, getLogger
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import pytz
 from pycron import is_now
 
+from taskiq.abc.schedule_source import ScheduleSource
 from taskiq.cli.scheduler.args import SchedulerArgs
 from taskiq.cli.utils import import_object, import_tasks
 from taskiq.scheduler.scheduler import ScheduledTask, TaskiqScheduler
@@ -32,7 +33,7 @@ def to_tz_aware(time: datetime) -> datetime:
 
 async def schedules_updater(
     scheduler: TaskiqScheduler,
-    current_schedules: List[ScheduledTask],
+    current_schedules: Dict[ScheduleSource, list[ScheduledTask]],
     event: asyncio.Event,
 ) -> None:
     """
@@ -48,7 +49,7 @@ async def schedules_updater(
     """
     while True:
         logger.debug("Started schedule update.")
-        new_schedules: "List[ScheduledTask]" = []
+        new_schedules: "Dict[ScheduleSource, list[ScheduledTask]]" = {}
         for source in scheduler.sources:
             try:
                 schedules = await source.get_schedules()
@@ -60,10 +61,13 @@ async def schedules_updater(
                 logger.debug(exc, exc_info=True)
                 continue
 
-            new_schedules = scheduler.merge_func(new_schedules, schedules)
+            new_schedules[source] = scheduler.merge_func(
+                new_schedules.get(source) or [],
+                schedules,
+            )
 
         current_schedules.clear()
-        current_schedules.extend(new_schedules)
+        current_schedules.update(new_schedules)
         event.set()
         await asyncio.sleep(scheduler.refresh_delay)
 
@@ -100,6 +104,7 @@ def get_task_delay(task: ScheduledTask) -> Optional[int]:
 
 async def delayed_send(
     scheduler: TaskiqScheduler,
+    source: ScheduleSource,
     task: ScheduledTask,
     delay: int,
 ) -> None:
@@ -115,13 +120,14 @@ async def delayed_send(
     the delay and send the task after some delay.
 
     :param scheduler: current scheduler.
+    :param source: source of the task.
     :param task: task to send.
     :param delay: how long to wait.
     """
     if delay > 0:
         await asyncio.sleep(delay)
     logger.info("Sending task %s.", task.task_name)
-    await scheduler.on_ready(task)
+    await scheduler.on_ready(source, task)
 
 
 async def run_scheduler_loop(scheduler: TaskiqScheduler) -> None:
@@ -134,14 +140,14 @@ async def run_scheduler_loop(scheduler: TaskiqScheduler) -> None:
     :param scheduler: current scheduler.
     """
     loop = asyncio.get_event_loop()
-    tasks: "List[ScheduledTask]" = []
+    schedules: "Dict[ScheduleSource, List[ScheduledTask]]" = {}
 
     current_task = asyncio.current_task()
     first_update_event = asyncio.Event()
     updater_task = loop.create_task(
         schedules_updater(
             scheduler,
-            tasks,
+            schedules,
             first_update_event,
         ),
     )
@@ -149,18 +155,19 @@ async def run_scheduler_loop(scheduler: TaskiqScheduler) -> None:
         current_task.add_done_callback(lambda _: updater_task.cancel())
     await first_update_event.wait()
     while True:
-        for task in tasks:
-            try:
-                task_delay = get_task_delay(task)
-            except ValueError:
-                logger.warning(
-                    "Cannot parse cron: %s for task: %s",
-                    task.cron,
-                    task.task_name,
-                )
-                continue
-            if task_delay is not None:
-                loop.create_task(delayed_send(scheduler, task, task_delay))
+        for source, task_list in schedules.items():
+            for task in task_list:
+                try:
+                    task_delay = get_task_delay(task)
+                except ValueError:
+                    logger.warning(
+                        "Cannot parse cron: %s for task: %s",
+                        task.cron,
+                        task.task_name,
+                    )
+                    continue
+                if task_delay is not None:
+                    loop.create_task(delayed_send(scheduler, source, task, task_delay))
 
         delay = (
             datetime.now().replace(second=1, microsecond=0)
