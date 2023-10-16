@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -6,6 +7,7 @@ from typing import (
     Dict,
     Generic,
     TypeVar,
+    Union,
     overload,
 )
 
@@ -16,6 +18,8 @@ from taskiq.task import AsyncTaskiqTask
 
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.broker import AsyncBroker
+    from taskiq.abc.schedule_source import ScheduleSource
+    from taskiq.scheduler.scheduled_task import CronSpec
 
 _T = TypeVar("_T")
 _FuncParams = ParamSpec("_FuncParams")
@@ -92,6 +96,56 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         :returns: taskiq task.
         """
         return await self.kicker().kiq(*args, **kwargs)
+
+    async def schedule_by_cron(
+        self,
+        source: "ScheduleSource",
+        cron: Union[str, "CronSpec"],
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> None:
+        """
+        Schedule task to run on cron.
+
+        This method requires a schedule source,
+        which is capable of dynamically adding new schedules.
+
+        :param source: schedule source.
+        :param cron: cron string or a CronSpec instance.
+        :param args: function's arguments.
+        :param kwargs: function's key word arguments.
+        """
+        await self.kicker().schedule_cron(
+            source,
+            cron,
+            *args,
+            **kwargs,
+        )
+
+    async def schedule_by_time(
+        self,
+        source: "ScheduleSource",
+        time: datetime,
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> None:
+        """
+        Schedule task to run on specific time.
+
+        This method requires a schedule source,
+        which is capable of dynamically adding new schedules.
+
+        :param source: schedule source.
+        :param time: time to run task.
+        :param args: function's arguments.
+        :param kwargs: function's key word arguments.
+        """
+        await self.kicker().schedule_time(
+            source,
+            time,
+            *args,
+            **kwargs,
+        )
 
     def kicker(self) -> AsyncKicker[_FuncParams, _ReturnType]:
         """

@@ -5,7 +5,7 @@ import pytest
 
 from taskiq.brokers.inmemory_broker import InMemoryBroker
 from taskiq.schedule_sources.label_based import LabelScheduleSource
-from taskiq.scheduler.scheduler import ScheduledTask
+from taskiq.scheduler.scheduled_task import ScheduledTask
 
 
 @pytest.mark.anyio

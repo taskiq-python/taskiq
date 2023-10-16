@@ -9,7 +9,8 @@ from taskiq.brokers.inmemory_broker import InMemoryBroker
 from taskiq.cli.scheduler.args import SchedulerArgs
 from taskiq.cli.scheduler.run import run_scheduler
 from taskiq.schedule_sources.label_based import LabelScheduleSource
-from taskiq.scheduler.scheduler import ScheduledTask, TaskiqScheduler
+from taskiq.scheduler.scheduled_task import ScheduledTask
+from taskiq.scheduler.scheduler import TaskiqScheduler
 
 
 @pytest.mark.anyio

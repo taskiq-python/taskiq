@@ -1,36 +1,13 @@
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Callable, List
 
-from taskiq.abc.broker import AsyncBroker
 from taskiq.kicker import AsyncKicker
 from taskiq.scheduler.merge_functions import only_new
+from taskiq.scheduler.scheduled_task import ScheduledTask
 from taskiq.utils import maybe_awaitable
 
 if TYPE_CHECKING:  # pragma: no cover
+    from taskiq.abc.broker import AsyncBroker
     from taskiq.abc.schedule_source import ScheduleSource
-
-
-@dataclass(frozen=True, eq=True)
-class ScheduledTask:
-    """Abstraction over task schedule."""
-
-    task_name: str
-    labels: Dict[str, Any]
-    args: List[Any]
-    kwargs: Dict[str, Any]
-    cron: Optional[str] = field(default=None)
-    cron_offset: Optional[Union[str, timedelta]] = field(default=None)
-    time: Optional[datetime] = field(default=None)
-
-    def __post_init__(self) -> None:
-        """
-        This method validates, that either `cron` or `time` field is present.
-
-        :raises ValueError: if cron and time are none.
-        """
-        if self.cron is None and self.time is None:
-            raise ValueError("Either cron or datetime must be present.")
 
 
 class TaskiqScheduler:
@@ -38,7 +15,7 @@ class TaskiqScheduler:
 
     def __init__(
         self,
-        broker: AsyncBroker,
+        broker: "AsyncBroker",
         sources: List["ScheduleSource"],
         merge_func: Callable[
             [List["ScheduledTask"], List["ScheduledTask"]],
