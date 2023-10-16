@@ -154,6 +154,7 @@ async def run_scheduler_loop(scheduler: TaskiqScheduler) -> None:
     if current_task is not None:
         current_task.add_done_callback(lambda _: updater_task.cancel())
     await first_update_event.wait()
+    running_schedules = set()
     while True:
         for source, task_list in schedules.items():
             for task in task_list:
@@ -167,7 +168,11 @@ async def run_scheduler_loop(scheduler: TaskiqScheduler) -> None:
                     )
                     continue
                 if task_delay is not None:
-                    loop.create_task(delayed_send(scheduler, source, task, task_delay))
+                    send_task = loop.create_task(
+                        delayed_send(scheduler, source, task, task_delay),
+                    )
+                    running_schedules.add(send_task)
+                    send_task.add_done_callback(running_schedules.discard)
 
         delay = (
             datetime.now().replace(second=1, microsecond=0)
