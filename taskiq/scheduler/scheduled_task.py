@@ -7,11 +7,11 @@ from typing import Any, Dict, List, Optional, Union
 class CronSpec:
     """Cron specification for running tasks."""
 
-    minutes: Optional[str | int] = "*"
-    hours: Optional[str | int] = "*"
-    days: Optional[str | int] = "*"
-    months: Optional[str | int] = "*"
-    weekdays: Optional[str | int] = "*"
+    minutes: Optional[Union[str, int]] = "*"
+    hours: Optional[Union[str, int]] = "*"
+    days: Optional[Union[str, int]] = "*"
+    months: Optional[Union[str, int]] = "*"
+    weekdays: Optional[Union[str, int]] = "*"
 
     offset: Optional[Union[str, timedelta]] = None
 
