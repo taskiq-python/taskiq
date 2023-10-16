@@ -1,4 +1,5 @@
 from dataclasses import asdict, is_dataclass
+from datetime import datetime
 from logging import getLogger
 from typing import (
     TYPE_CHECKING,
@@ -16,13 +17,16 @@ from pydantic import BaseModel
 from typing_extensions import ParamSpec
 
 from taskiq.abc.middleware import TaskiqMiddleware
+from taskiq.compat import model_dump
 from taskiq.exceptions import SendTaskError
 from taskiq.message import TaskiqMessage
+from taskiq.scheduler.scheduled_task import CronSpec, ScheduledTask
 from taskiq.task import AsyncTaskiqTask
 from taskiq.utils import maybe_awaitable
 
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.broker import AsyncBroker
+    from taskiq.abc.schedule_source import ScheduleSource
 
 _T = TypeVar("_T")
 _FuncParams = ParamSpec("_FuncParams")
@@ -142,6 +146,70 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
             result_backend=self.broker.result_backend,
         )
 
+    async def schedule_cron(
+        self,
+        source: "ScheduleSource",
+        cron: Union[str, "CronSpec"],
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> None:
+        """
+        Function to schedule task with cron.
+
+        :param source: schedule source.
+        :param cron: cron expression.
+        :param args: function's args.
+        :param cron_offset: cron offset.
+        :param kwargs: function's kwargs.
+        """
+        message = self._prepare_message(*args, **kwargs)
+        cron_offset = None
+        if isinstance(cron, CronSpec):
+            cron_str = cron.to_cron()
+            cron_offset = cron.offset
+        else:
+            cron_str = cron
+        await maybe_awaitable(
+            source.add_schedule(
+                ScheduledTask(
+                    task_name=message.task_name,
+                    labels=message.labels,
+                    args=message.args,
+                    kwargs=message.kwargs,
+                    cron=cron_str,
+                    cron_offset=cron_offset,
+                ),
+            ),
+        )
+
+    async def schedule_time(
+        self,
+        source: "ScheduleSource",
+        time: datetime,
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> None:
+        """
+        Function to schedule task to run at specific time.
+
+        :param source: schedule source.
+        :param time: time to run task at.
+        :param args: function's args.
+        :param kwargs: function's kwargs.
+        """
+        message = self._prepare_message(*args, **kwargs)
+        await maybe_awaitable(
+            source.add_schedule(
+                ScheduledTask(
+                    task_name=message.task_name,
+                    labels=message.labels,
+                    args=message.args,
+                    kwargs=message.kwargs,
+                    time=time,
+                ),
+            ),
+        )
+
     @classmethod
     def _prepare_arg(cls, arg: Any) -> Any:
         """
@@ -154,7 +222,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         :return: Formatted argument.
         """
         if isinstance(arg, BaseModel):
-            arg = arg.dict()
+            arg = model_dump(arg)
         if is_dataclass(arg):
             arg = asdict(arg)
         return arg

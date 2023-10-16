@@ -2,7 +2,7 @@ import copy
 from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:  # pragma: no cover
-    from taskiq.scheduler.scheduler import ScheduledTask
+    from taskiq.scheduler.scheduled_task import ScheduledTask
 
 
 def preserve_all(

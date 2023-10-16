@@ -1,5 +1,5 @@
 from taskiq.cli.scheduler.run import run_scheduler_loop
-from taskiq.scheduler import TaskiqScheduler
+from taskiq.scheduler.scheduler import TaskiqScheduler
 
 
 async def run_scheduler_task(

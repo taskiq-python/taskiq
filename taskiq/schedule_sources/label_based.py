@@ -3,7 +3,7 @@ from typing import List
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.schedule_source import ScheduleSource
-from taskiq.scheduler.scheduler import ScheduledTask
+from taskiq.scheduler.scheduled_task import ScheduledTask
 
 logger = getLogger(__name__)
 

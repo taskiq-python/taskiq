@@ -10,7 +10,8 @@ from pycron import is_now
 from taskiq.abc.schedule_source import ScheduleSource
 from taskiq.cli.scheduler.args import SchedulerArgs
 from taskiq.cli.utils import import_object, import_tasks
-from taskiq.scheduler.scheduler import ScheduledTask, TaskiqScheduler
+from taskiq.scheduler.scheduled_task import ScheduledTask
+from taskiq.scheduler.scheduler import TaskiqScheduler
 
 logger = getLogger(__name__)
 

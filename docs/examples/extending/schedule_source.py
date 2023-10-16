@@ -24,8 +24,9 @@ class MyScheduleSource(ScheduleSource):
 
     # This method is optional. You may not implement this.
     # It's just a helper to people to be able to interact with your source.
-    async def add_schedule(self, schedule: "ScheduledTask") -> None:
-        return await super().add_schedule(schedule)
+    # This method can be either sync or async.
+    def add_schedule(self, schedule: "ScheduledTask") -> None:
+        print("New schedule added:", schedule)
 
     # This method is optional. You may not implement this.
     # It's just a helper to people to be able to interact with your source.

@@ -5,7 +5,7 @@ from freezegun import freeze_time
 from tzlocal import get_localzone
 
 from taskiq.cli.scheduler.run import get_task_delay
-from taskiq.scheduler.scheduler import ScheduledTask
+from taskiq.scheduler.scheduled_task import ScheduledTask
 
 
 def test_should_run_success() -> None:

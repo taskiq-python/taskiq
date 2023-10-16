@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Coroutine, List, Union
 
 if TYPE_CHECKING:  # pragma: no cover
-    from taskiq.scheduler.scheduler import ScheduledTask
+    from taskiq.scheduler.scheduled_task import ScheduledTask
 
 
 class ScheduleSource(ABC):
@@ -18,7 +18,10 @@ class ScheduleSource(ABC):
     async def get_schedules(self) -> List["ScheduledTask"]:
         """Get list of taskiq schedules."""
 
-    async def add_schedule(self, schedule: "ScheduledTask") -> None:
+    def add_schedule(
+        self,
+        schedule: "ScheduledTask",
+    ) -> Union[None, Coroutine[Any, Any, None]]:
         """
         Add a new schedule.
 
