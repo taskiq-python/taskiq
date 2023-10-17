@@ -32,45 +32,45 @@ def to_tz_aware(time: datetime) -> datetime:
     return time
 
 
-async def schedules_updater(
-    scheduler: TaskiqScheduler,
-    current_schedules: Dict[ScheduleSource, List[ScheduledTask]],
-    event: asyncio.Event,
-) -> None:
+async def get_schedules(source: ScheduleSource) -> List[ScheduledTask]:
     """
-    Periodic update to schedules.
+    Get schedules from source.
 
-    This task periodically checks for new schedules,
-    assembles the final list and replaces current
-    schedule with a new one.
+    If source raises an exception, it will be
+    logged and an empty list will be returned.
+
+    :param source: source to get schedules from.
+    """
+    try:
+        return await source.get_schedules()
+    except Exception as exc:
+        logger.warning(
+            "Cannot update schedules with source: %s",
+            source,
+        )
+        logger.debug(exc, exc_info=True)
+        return []
+
+
+async def get_all_schedules(
+    scheduler: TaskiqScheduler,
+) -> Dict[ScheduleSource, List[ScheduledTask]]:
+    """
+    Task to update all schedules.
+
+    This function updates all schedules
+    from all sources and returns a dict
+    with source as a key and list of
+    scheduled tasks as a value.
 
     :param scheduler: current scheduler.
-    :param current_schedules: list of schedules.
-    :param event: event when schedules are updated.
+    :return: dict with source as a key and list of scheduled tasks as a value.
     """
-    while True:
-        logger.debug("Started schedule update.")
-        new_schedules: "Dict[ScheduleSource, List[ScheduledTask]]" = {}
-        for source in scheduler.sources:
-            try:
-                schedules = await source.get_schedules()
-            except Exception as exc:
-                logger.warning(
-                    "Cannot update schedules with source: %s",
-                    source,
-                )
-                logger.debug(exc, exc_info=True)
-                continue
-
-            new_schedules[source] = scheduler.merge_func(
-                new_schedules.get(source) or [],
-                schedules,
-            )
-
-        current_schedules.clear()
-        current_schedules.update(new_schedules)
-        event.set()
-        await asyncio.sleep(scheduler.refresh_delay)
+    logger.debug("Started schedule update.")
+    schedules = await asyncio.gather(
+        *[get_schedules(source) for source in scheduler.sources],
+    )
+    return dict(zip(scheduler.sources, schedules))
 
 
 def get_task_delay(task: ScheduledTask) -> Optional[int]:
@@ -141,23 +141,14 @@ async def run_scheduler_loop(scheduler: TaskiqScheduler) -> None:
     :param scheduler: current scheduler.
     """
     loop = asyncio.get_event_loop()
-    schedules: "Dict[ScheduleSource, List[ScheduledTask]]" = {}
-
-    current_task = asyncio.current_task()
-    first_update_event = asyncio.Event()
-    updater_task = loop.create_task(
-        schedules_updater(
-            scheduler,
-            schedules,
-            first_update_event,
-        ),
-    )
-    if current_task is not None:
-        current_task.add_done_callback(lambda _: updater_task.cancel())
-    await first_update_event.wait()
     running_schedules = set()
     while True:
-        for source, task_list in schedules.items():
+        # We use this method to correctly sleep for one minute.
+        next_minute = datetime.now().replace(second=0, microsecond=0) + timedelta(
+            minutes=1,
+        )
+        scheduled_tasks = await get_all_schedules(scheduler)
+        for source, task_list in scheduled_tasks.items():
             for task in task_list:
                 try:
                     task_delay = get_task_delay(task)
@@ -175,11 +166,7 @@ async def run_scheduler_loop(scheduler: TaskiqScheduler) -> None:
                     running_schedules.add(send_task)
                     send_task.add_done_callback(running_schedules.discard)
 
-        delay = (
-            datetime.now().replace(second=1, microsecond=0)
-            + timedelta(minutes=1)
-            - datetime.now()
-        )
+        delay = next_minute - datetime.now()
         await asyncio.sleep(delay.total_seconds())
 
 

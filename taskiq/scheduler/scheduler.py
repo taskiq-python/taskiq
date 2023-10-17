@@ -1,7 +1,6 @@
-from typing import TYPE_CHECKING, Callable, List
+from typing import TYPE_CHECKING, List
 
 from taskiq.kicker import AsyncKicker
-from taskiq.scheduler.merge_functions import only_new
 from taskiq.scheduler.scheduled_task import ScheduledTask
 from taskiq.utils import maybe_awaitable
 
@@ -17,16 +16,9 @@ class TaskiqScheduler:
         self,
         broker: "AsyncBroker",
         sources: List["ScheduleSource"],
-        merge_func: Callable[
-            [List["ScheduledTask"], List["ScheduledTask"]],
-            List["ScheduledTask"],
-        ] = only_new,
-        refresh_delay: float = 30.0,
     ) -> None:  # pragma: no cover
         self.broker = broker
         self.sources = sources
-        self.refresh_delay = refresh_delay
-        self.merge_func = merge_func
 
     async def startup(self) -> None:  # pragma: no cover
         """
