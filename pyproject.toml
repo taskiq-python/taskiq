@@ -37,7 +37,7 @@ packaging = ">=19"
 # For prometheus metrics
 prometheus_client = { version = "^0", optional = true }
 # For ZMQBroker
-pyzmq = { version = "^23.2.0", optional = true }
+pyzmq = { version = "^23.2.0", optional = true, markers = "python_version < '3.12'"}
 # For speed
 uvloop = { version = ">=0.16.0,<1", optional = true, markers = "sys_platform != 'win32'" }
 # For hot-reload.
