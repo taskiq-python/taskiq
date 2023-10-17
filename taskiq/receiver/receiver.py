@@ -131,14 +131,14 @@ class Receiver:
             taskiq_msg.task_id,
         )
 
-        # If broker has an ability to ack messages.
-        if isinstance(message, AckableMessage):
-            await maybe_awaitable(message.ack())
-
         result = await self.run_task(
             target=task.original_func,
             message=taskiq_msg,
         )
+
+        # If broker has an ability to ack messages.
+        if isinstance(message, AckableMessage):
+            await maybe_awaitable(message.ack())
 
         for middleware in self.broker.middlewares:
             if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
