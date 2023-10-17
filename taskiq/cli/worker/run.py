@@ -113,8 +113,10 @@ def start_listen(args: WorkerArgs, event: Event) -> None:
     event.set()
 
     if uvloop is not None:
-        logger.debug("UVLOOP found. Installing policy.")
-        uvloop.install()
+        logger.debug("UVLOOP found. Using it as async runner")
+        loop = uvloop.new_event_loop()  # type: ignore
+    else:
+        loop = asyncio.new_event_loop()
     # This option signals that current
     # broker is running as a worker.
     # We must set this field before importing tasks,
@@ -127,8 +129,6 @@ def start_listen(args: WorkerArgs, event: Event) -> None:
 
     receiver_type = get_receiver_type(args)
     receiver_kwargs = dict(args.receiver_arg)
-
-    loop = asyncio.get_event_loop()
 
     try:
         logger.debug("Initialize receiver.")
