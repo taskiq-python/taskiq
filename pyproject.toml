@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "taskiq"
-version = "0.9.3"
+version = "0.10.0"
 description = "Distributed task queue with full async support"
 authors = ["Pavel Kirilin <win10@list.ru>"]
 maintainers = ["Pavel Kirilin <win10@list.ru>"]
