@@ -5,7 +5,7 @@ import pytest
 
 from taskiq.brokers.inmemory_broker import InMemoryBroker
 from taskiq.schedule_sources.label_based import LabelScheduleSource
-from taskiq.scheduler.scheduler import ScheduledTask
+from taskiq.scheduler.scheduled_task import ScheduledTask
 
 
 @pytest.mark.anyio
@@ -36,7 +36,6 @@ async def test_label_discovery(schedule_label: List[Dict[str, Any]]) -> None:
             labels={"schedule": schedule_label},
             args=[],
             kwargs={},
-            source=source,
         ),
     ]
 

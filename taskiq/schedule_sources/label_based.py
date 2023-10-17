@@ -3,7 +3,7 @@ from typing import List
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.schedule_source import ScheduleSource
-from taskiq.scheduler.scheduler import ScheduledTask
+from taskiq.scheduler.scheduled_task import ScheduledTask
 
 logger = getLogger(__name__)
 
@@ -44,7 +44,6 @@ class LabelScheduleSource(ScheduleSource):
                         cron=schedule.get("cron"),
                         time=schedule.get("time"),
                         cron_offset=schedule.get("cron_offset"),
-                        source=self,
                     ),
                 )
         return schedules

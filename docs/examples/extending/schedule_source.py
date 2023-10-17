@@ -19,17 +19,14 @@ class MyScheduleSource(ScheduleSource):
                 args=[],
                 kwargs={},
                 cron="* * * * *",
-                #
-                # We need point on self source for calling pre_send / post_send when
-                # task is ready to be enqueued.
-                source=self,
             ),
         ]
 
     # This method is optional. You may not implement this.
     # It's just a helper to people to be able to interact with your source.
-    async def add_schedule(self, schedule: "ScheduledTask") -> None:
-        return await super().add_schedule(schedule)
+    # This method can be either sync or async.
+    def add_schedule(self, schedule: "ScheduledTask") -> None:
+        print("New schedule added:", schedule)
 
     # This method is optional. You may not implement this.
     # It's just a helper to people to be able to interact with your source.

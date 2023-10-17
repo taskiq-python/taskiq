@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "taskiq"
-version = "0.9.3"
+version = "0.10.0"
 description = "Distributed task queue with full async support"
 authors = ["Pavel Kirilin <win10@list.ru>"]
 maintainers = ["Pavel Kirilin <win10@list.ru>"]
@@ -39,11 +39,14 @@ prometheus_client = { version = "^0", optional = true }
 # For ZMQBroker
 pyzmq = { version = "^23.2.0", optional = true }
 # For speed
-uvloop = { version = ">=0.16.0,<1", optional = true }
+uvloop = { version = ">=0.16.0,<1", optional = true, markers = "sys_platform != 'win32'" }
 # For hot-reload.
 watchdog = { version = "^2.1.9", optional = true }
 gitignore-parser = { version = "^0", optional = true }
 pytz = "*"
+orjson = { version = "^3.9.9", optional = true }
+msgpack = { version = "^1.0.7", optional = true }
+cbor2 = { version = "^5.4.6", optional = true }
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"
@@ -68,6 +71,9 @@ zmq = ["pyzmq"]
 uv = ["uvloop"]
 metrics = ["prometheus_client"]
 reload = ["watchdog", "gitignore-parser"]
+orjson = ["orjson"]
+msgpack = ["msgpack"]
+cbor = ["cbor2"]
 
 [tool.poetry.scripts]
 taskiq = "taskiq.__main__:main"
@@ -160,12 +166,12 @@ line-length = 88
 
 [tool.ruff.per-file-ignores]
 "tests/*" = [
-    "S101", # Use of assert detected
-    "S301", # Use of pickle detected
-    "D103", # Missing docstring in public function
+    "S101",   # Use of assert detected
+    "S301",   # Use of pickle detected
+    "D103",   # Missing docstring in public function
     "SLF001", # Private member accessed
-    "S311", # Standard pseudo-random generators are not suitable for security/cryptographic purposes
-    "D101", # Missing docstring in public class
+    "S311",   # Standard pseudo-random generators are not suitable for security/cryptographic purposes
+    "D101",   # Missing docstring in public class
 ]
 
 [tool.ruff.pydocstyle]
@@ -176,7 +182,4 @@ ignore-decorators = ["typing.overload"]
 allow-magic-value-types = ["int", "str", "float", "tuple"]
 
 [tool.ruff.flake8-bugbear]
-extend-immutable-calls = [
-    "taskiq_dependencies.Depends",
-    "taskiq.TaskiqDepends",
-]
+extend-immutable-calls = ["taskiq_dependencies.Depends", "taskiq.TaskiqDepends"]

@@ -5,10 +5,7 @@ from freezegun import freeze_time
 from tzlocal import get_localzone
 
 from taskiq.cli.scheduler.run import get_task_delay
-from taskiq.schedule_sources.label_based import LabelScheduleSource
-from taskiq.scheduler.scheduler import ScheduledTask
-
-DUMMY_SOURCE = LabelScheduleSource(broker=None)  # type: ignore
+from taskiq.scheduler.scheduled_task import ScheduledTask
 
 
 def test_should_run_success() -> None:
@@ -19,7 +16,6 @@ def test_should_run_success() -> None:
             labels={},
             args=[],
             kwargs={},
-            source=DUMMY_SOURCE,
             cron=f"* {hour} * * *",
         ),
     )
@@ -35,7 +31,6 @@ def test_should_run_cron_str_offset() -> None:
             labels={},
             args=[],
             kwargs={},
-            source=DUMMY_SOURCE,
             cron=f"* {hour} * * *",
             cron_offset=str(zone),
         ),
@@ -45,14 +40,13 @@ def test_should_run_cron_str_offset() -> None:
 
 def test_should_run_cron_td_offset() -> None:
     offset = 2
-    hour = datetime.datetime.utcnow().hour + offset
+    hour = (datetime.datetime.utcnow().hour + offset) % 24
     delay = get_task_delay(
         ScheduledTask(
             task_name="",
             labels={},
             args=[],
             kwargs={},
-            source=DUMMY_SOURCE,
             cron=f"* {hour} * * *",
             cron_offset=datetime.timedelta(hours=offset),
         ),
@@ -68,7 +62,6 @@ def test_time_utc_without_zone() -> None:
             labels={},
             args=[],
             kwargs={},
-            source=DUMMY_SOURCE,
             time=time - datetime.timedelta(seconds=1),
         ),
     )
@@ -83,7 +76,6 @@ def test_time_utc_with_zone() -> None:
             labels={},
             args=[],
             kwargs={},
-            source=DUMMY_SOURCE,
             time=time - datetime.timedelta(seconds=1),
         ),
     )
@@ -99,7 +91,6 @@ def test_time_utc_with_local_zone() -> None:
             labels={},
             args=[],
             kwargs={},
-            source=DUMMY_SOURCE,
             time=time - datetime.timedelta(seconds=1),
         ),
     )
@@ -114,7 +105,6 @@ def test_time_localtime_without_zone() -> None:
             labels={},
             args=[],
             kwargs={},
-            source=DUMMY_SOURCE,
             time=time - datetime.timedelta(seconds=1),
         ),
     )
@@ -130,7 +120,6 @@ def test_time_delay() -> None:
             labels={},
             args=[],
             kwargs={},
-            source=DUMMY_SOURCE,
             time=time,
         ),
     )
