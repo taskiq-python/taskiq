@@ -34,6 +34,7 @@ async def test_label_discovery(schedule_label: List[Dict[str, Any]]) -> None:
     schedules = await LabelScheduleSource(broker).get_schedules()
     assert schedules == [
         ScheduledTask(
+            schedule_id=schedules[0].schedule_id,
             cron=schedule_label[0].get("cron"),
             time=schedule_label[0].get("time"),
             task_name="test_task",
