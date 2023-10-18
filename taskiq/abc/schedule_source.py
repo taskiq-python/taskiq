@@ -18,10 +18,10 @@ class ScheduleSource(ABC):
     async def get_schedules(self) -> List["ScheduledTask"]:
         """Get list of taskiq schedules."""
 
-    def add_schedule(
+    async def add_schedule(
         self,
         schedule: "ScheduledTask",
-    ) -> Union[None, Coroutine[Any, Any, None]]:
+    ) -> None:
         """
         Add a new schedule.
 
@@ -38,6 +38,19 @@ class ScheduleSource(ABC):
         """
         raise NotImplementedError(
             f"The source {self.__class__.__name__} does not support adding schedules.",
+        )
+
+    async def delete_schedule(self, schedule_id: str) -> None:
+        """
+        Method to delete schedule by id.
+
+        This is useful for schedule cancelation.
+
+        :param schedule_id: id of schedule to delete.
+        """
+        raise NotImplementedError(
+            f"The source {self.__class__.__name__} does "
+            "not support deleting schedules.",
         )
 
     def pre_send(  # noqa: B027

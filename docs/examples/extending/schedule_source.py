@@ -1,4 +1,4 @@
-from typing import List
+from typing import Any, Coroutine, List
 
 from taskiq import ScheduledTask, ScheduleSource
 
@@ -24,9 +24,13 @@ class MyScheduleSource(ScheduleSource):
 
     # This method is optional. You may not implement this.
     # It's just a helper to people to be able to interact with your source.
-    # This method can be either sync or async.
-    def add_schedule(self, schedule: "ScheduledTask") -> None:
+    async def add_schedule(self, schedule: "ScheduledTask") -> None:
         print("New schedule added:", schedule)
+
+    # This method is completely optional, but if you want to support
+    # schedule cancelation, you must implement it.
+    async def delete_schedule(self, schedule_id: str) -> None:
+        print("Deleting schedule:", schedule_id)
 
     # This method is optional. You may not implement this.
     # It's just a helper to people to be able to interact with your source.

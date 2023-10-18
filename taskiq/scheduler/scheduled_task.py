@@ -1,3 +1,4 @@
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Union
@@ -28,6 +29,7 @@ class ScheduledTask:
     labels: Dict[str, Any]
     args: List[Any]
     kwargs: Dict[str, Any]
+    schedule_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     cron: Optional[str] = field(default=None)
     cron_offset: Optional[Union[str, timedelta]] = field(default=None)
     time: Optional[datetime] = field(default=None)
