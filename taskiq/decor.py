@@ -14,6 +14,7 @@ from typing import (
 from typing_extensions import ParamSpec
 
 from taskiq.kicker import AsyncKicker
+from taskiq.scheduler.created_schedule import CreatedSchedule
 from taskiq.task import AsyncTaskiqTask
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -103,7 +104,7 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         cron: Union[str, "CronSpec"],
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
-    ) -> None:
+    ) -> CreatedSchedule[_ReturnType]:
         """
         Schedule task to run on cron.
 
@@ -114,8 +115,9 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         :param cron: cron string or a CronSpec instance.
         :param args: function's arguments.
         :param kwargs: function's key word arguments.
+        :return: schedule id.
         """
-        await self.kicker().schedule_cron(
+        return await self.kicker().schedule_by_cron(
             source,
             cron,
             *args,
@@ -128,7 +130,7 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         time: datetime,
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
-    ) -> None:
+    ) -> CreatedSchedule[_ReturnType]:
         """
         Schedule task to run on specific time.
 
@@ -139,8 +141,9 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         :param time: time to run task.
         :param args: function's arguments.
         :param kwargs: function's key word arguments.
+        :return: schedule id.
         """
-        await self.kicker().schedule_time(
+        return await self.kicker().schedule_by_time(
             source,
             time,
             *args,

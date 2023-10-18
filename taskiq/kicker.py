@@ -20,6 +20,7 @@ from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.compat import model_dump
 from taskiq.exceptions import SendTaskError
 from taskiq.message import TaskiqMessage
+from taskiq.scheduler.created_schedule import CreatedSchedule
 from taskiq.scheduler.scheduled_task import CronSpec, ScheduledTask
 from taskiq.task import AsyncTaskiqTask
 from taskiq.utils import maybe_awaitable
@@ -146,13 +147,13 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
             result_backend=self.broker.result_backend,
         )
 
-    async def schedule_cron(
+    async def schedule_by_cron(
         self,
         source: "ScheduleSource",
         cron: Union[str, "CronSpec"],
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
-    ) -> None:
+    ) -> CreatedSchedule[_ReturnType]:
         """
         Function to schedule task with cron.
 
@@ -161,7 +162,10 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         :param args: function's args.
         :param cron_offset: cron offset.
         :param kwargs: function's kwargs.
+
+        :return: schedule id.
         """
+        schedule_id = self.broker.id_generator()
         message = self._prepare_message(*args, **kwargs)
         cron_offset = None
         if isinstance(cron, CronSpec):
@@ -169,26 +173,25 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
             cron_offset = cron.offset
         else:
             cron_str = cron
-        await maybe_awaitable(
-            source.add_schedule(
-                ScheduledTask(
-                    task_name=message.task_name,
-                    labels=message.labels,
-                    args=message.args,
-                    kwargs=message.kwargs,
-                    cron=cron_str,
-                    cron_offset=cron_offset,
-                ),
-            ),
+        scheduled = ScheduledTask(
+            schedule_id=schedule_id,
+            task_name=message.task_name,
+            labels=message.labels,
+            args=message.args,
+            kwargs=message.kwargs,
+            cron=cron_str,
+            cron_offset=cron_offset,
         )
+        await source.add_schedule(scheduled)
+        return CreatedSchedule(self, source, scheduled)
 
-    async def schedule_time(
+    async def schedule_by_time(
         self,
         source: "ScheduleSource",
         time: datetime,
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
-    ) -> None:
+    ) -> CreatedSchedule[_ReturnType]:
         """
         Function to schedule task to run at specific time.
 
@@ -197,18 +200,18 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         :param args: function's args.
         :param kwargs: function's kwargs.
         """
+        schedule_id = self.broker.id_generator()
         message = self._prepare_message(*args, **kwargs)
-        await maybe_awaitable(
-            source.add_schedule(
-                ScheduledTask(
-                    task_name=message.task_name,
-                    labels=message.labels,
-                    args=message.args,
-                    kwargs=message.kwargs,
-                    time=time,
-                ),
-            ),
+        scheduled = ScheduledTask(
+            schedule_id=schedule_id,
+            task_name=message.task_name,
+            labels=message.labels,
+            args=message.args,
+            kwargs=message.kwargs,
+            time=time,
         )
+        await source.add_schedule(scheduled)
+        return CreatedSchedule(self, source, scheduled)
 
     @classmethod
     def _prepare_arg(cls, arg: Any) -> Any:
