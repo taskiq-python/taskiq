@@ -112,6 +112,7 @@ class AsyncBroker(ABC):
         ] = defaultdict(list)
         self.state = TaskiqState()
         self.custom_dependency_context: Dict[Any, Any] = {}
+        self.dependency_overrides: Dict[Any, Any] = {}
         # True only if broker runs in worker process.
         self.is_worker_process: bool = False
         # True only if broker runs in scheduler process.

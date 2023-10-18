@@ -207,7 +207,10 @@ class Receiver:
                     TaskiqState: self.broker.state,
                 },
             )
-            dep_ctx = dependency_graph.async_ctx(broker_ctx)
+            dep_ctx = dependency_graph.async_ctx(
+                broker_ctx,
+                self.broker.dependency_overrides or None,
+            )
             # Resolve all function's dependencies.
 
         # Start a timer.
