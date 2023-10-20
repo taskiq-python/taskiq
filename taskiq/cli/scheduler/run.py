@@ -212,4 +212,6 @@ async def run_scheduler(args: SchedulerArgs) -> None:
     except asyncio.CancelledError:
         logger.warning("Shutting down scheduler.")
         await scheduler.shutdown()
+        for source in scheduler.sources:
+            await source.shutdown()
         logger.info("Scheduler shut down. Good bye!")
