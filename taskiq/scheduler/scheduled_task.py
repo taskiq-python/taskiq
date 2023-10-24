@@ -1,11 +1,12 @@
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import field
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Union
 
+from pydantic import BaseModel
 
-@dataclass
-class CronSpec:
+
+class CronSpec(BaseModel):
     """Cron specification for running tasks."""
 
     minutes: Optional[Union[str, int]] = "*"
@@ -21,8 +22,7 @@ class CronSpec:
         return f"{self.minutes} {self.hours} {self.days} {self.months} {self.weekdays}"
 
 
-@dataclass(frozen=True, eq=True)
-class ScheduledTask:
+class ScheduledTask(BaseModel):
     """Abstraction over task schedule."""
 
     task_name: str

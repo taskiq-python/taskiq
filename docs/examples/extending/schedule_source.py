@@ -1,4 +1,4 @@
-from typing import Any, Coroutine, List
+from typing import List
 
 from taskiq import ScheduledTask, ScheduleSource
 
