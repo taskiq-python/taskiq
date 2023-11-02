@@ -135,7 +135,7 @@ def get_signal_handler(
 
         logger.debug(f"Got signal {signum}.")
         action_queue.put(ShutdownAction())
-        logger.warn("Workers are scheduled for shutdown.")
+        logger.warning("Workers are scheduled for shutdown.")
 
     return _signal_handler
 
