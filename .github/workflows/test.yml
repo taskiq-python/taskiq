@@ -37,6 +37,7 @@ jobs:
     strategy:
       matrix:
         py_version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        pydantic_ver: ["<2", ">=2,<3"]
         os: [ubuntu-latest, windows-latest]
     runs-on: "${{ matrix.os }}"
     steps:
@@ -50,6 +51,8 @@ jobs:
           cache: "poetry"
       - name: Install deps
         run: poetry install --all-extras
+      - name: Setup pydantic version
+        run: poetry run pip install "pydantic ${{ matrix.pydantic_ver }}"
       - name: Run pytest check
         run: poetry run pytest -vv -n auto --cov="taskiq" .
       - name: Generate report

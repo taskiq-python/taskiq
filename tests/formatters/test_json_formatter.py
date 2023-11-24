@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from taskiq.formatters.json_formatter import JSONFormatter
@@ -24,7 +26,11 @@ async def test_json_dumps() -> None:
         ),
         labels={"label1": 1, "label2": "text"},
     )
-    assert fmt.dumps(msg) == expected
+    dumped = fmt.dumps(msg)
+    assert dumped.task_id == expected.task_id
+    assert dumped.task_name == expected.task_name
+    assert dumped.labels == expected.labels
+    assert json.loads(dumped.message) == json.loads(expected.message)
 
 
 @pytest.mark.anyio
