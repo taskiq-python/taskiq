@@ -1,11 +1,14 @@
 from json import dumps, loads
-from typing import Any
+from typing import Any, Callable, Optional
 
 from taskiq.abc.serializer import TaskiqSerializer
 
 
 class JSONSerializer(TaskiqSerializer):
     """Default taskiq serizalizer."""
+
+    def __init__(self, default: Optional[Callable[..., None]] = None) -> None:
+        self.default = default
 
     def dumpb(self, value: Any) -> bytes:
         """
@@ -14,7 +17,10 @@ class JSONSerializer(TaskiqSerializer):
         :param message: message to send.
         :return: Dumped message.
         """
-        return dumps(value).encode()
+        return dumps(
+            value,
+            default=self.default,
+        ).encode()
 
     def loadb(self, value: bytes) -> Any:
         """
