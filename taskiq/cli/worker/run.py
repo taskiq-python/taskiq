@@ -141,6 +141,7 @@ def start_listen(args: WorkerArgs, event: Event) -> None:
                 max_async_tasks=args.max_async_tasks,
                 max_prefetch=args.max_prefetch,
                 propagate_exceptions=not args.no_propagate_errors,
+                ack_type=args.ack_type,
                 **receiver_kwargs,  # type: ignore
             )
             loop.run_until_complete(receiver.listen())
