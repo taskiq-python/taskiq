@@ -172,11 +172,11 @@ class Receiver:
             if raise_err:
                 raise exc
 
-            if self.ack_time == AcknowledgeType.WHEN_EXECUTED and isinstance(
-                message,
-                AckableMessage,
-            ):
-                await maybe_awaitable(message.ack())
+        if self.ack_time == AcknowledgeType.WHEN_SAVED and isinstance(
+            message,
+            AckableMessage,
+        ):
+            await maybe_awaitable(message.ack())
 
     async def run_task(  # noqa: C901, PLR0912, PLR0915
         self,
