@@ -6,6 +6,7 @@ from time import time
 from typing import Any, Callable, Dict, List, Optional, Set, Union, get_type_hints
 
 import anyio
+from taskiq.taskiq.acks import AckType
 from taskiq_dependencies import DependencyGraph
 
 from taskiq.abc.broker import AckableMessage, AsyncBroker
@@ -131,14 +132,21 @@ class Receiver:
             taskiq_msg.task_id,
         )
 
+        if self.broker.ack_type == AckType.ON_RECEIVE:
+            # If broker has an ability to ack messages.
+            if isinstance(message, AckableMessage):
+                await maybe_awaitable(message.ack())
+
         result = await self.run_task(
             target=task.original_func,
             message=taskiq_msg,
         )
 
-        # If broker has an ability to ack messages.
-        if isinstance(message, AckableMessage):
-            await maybe_awaitable(message.ack())
+        if not self.broker.result_backend or self.broker.ack_type == AckType.ON_COMPLETE:
+            # If broker has an ability to ack messages.
+            if isinstance(message, AckableMessage):
+                await maybe_awaitable(message.ack())
+
 
         for middleware in self.broker.middlewares:
             if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
@@ -147,6 +155,10 @@ class Receiver:
         try:
             if not isinstance(result.error, NoResultError):
                 await self.broker.result_backend.set_result(taskiq_msg.task_id, result)
+                if self.broker.ack_type == AckType.ON_RESULT:
+                    # If broker has an ability to ack messages.
+                    if isinstance(message, AckableMessage):
+                        await maybe_awaitable(message.ack())
                 for middleware in self.broker.middlewares:
                     if middleware.__class__.post_save != TaskiqMiddleware.post_save:
                         await maybe_awaitable(middleware.post_save(taskiq_msg, result))

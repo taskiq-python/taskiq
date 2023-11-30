@@ -26,7 +26,7 @@ from typing_extensions import ParamSpec, Self, TypeAlias
 
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.abc.serializer import TaskiqSerializer
-from taskiq.acks import AckableMessage
+from taskiq.acks import AckableMessage, AckType
 from taskiq.decor import AsyncTaskiqDecoratedTask
 from taskiq.events import TaskiqEvents
 from taskiq.formatters.proxy_formatter import ProxyFormatter
@@ -117,6 +117,7 @@ class AsyncBroker(ABC):
         self.is_worker_process: bool = False
         # True only if broker runs in scheduler process.
         self.is_scheduler_process: bool = False
+        self.ack_type = AckType.ON_RESULT
 
     def find_task(self, task_name: str) -> Optional[AsyncTaskiqDecoratedTask[Any, Any]]:
         """
