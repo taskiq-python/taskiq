@@ -14,6 +14,6 @@ All abstract classes can be found in `taskiq.abc` package.
 
 - [Brokers](./broker.md)
 - [Middlewares](./middleware.md)
-- [Result backends](./resutl-backend.md)
+- [Result backends](./result-backend.md)
 - [CLI](./cli.md)
 - [Schedule sources](./schedule-sources.md)

@@ -2,6 +2,7 @@ from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from dataclasses import dataclass, field
 from typing import List, Optional, Sequence, Tuple
 
+from taskiq.acks import AcknowledgeType
 from taskiq.cli.common_args import LogLevel
 
 
@@ -41,6 +42,7 @@ class WorkerArgs:
     max_prefetch: int = 0
     no_propagate_errors: bool = False
     max_fails: int = -1
+    ack_type: AcknowledgeType = AcknowledgeType.WHEN_SAVED
 
     @classmethod
     def from_cli(
@@ -186,6 +188,13 @@ class WorkerArgs:
             dest="max_fails",
             default=-1,
             help="Maximum number of child process exits.",
+        )
+        parser.add_argument(
+            "--ack-type",
+            type=lambda value: AcknowledgeType(value.lower()),
+            default=AcknowledgeType.WHEN_SAVED,
+            choices=[ack_type.name.lower() for ack_type in AcknowledgeType],
+            help="When to acknowledge message.",
         )
 
         namespace = parser.parse_args(args)

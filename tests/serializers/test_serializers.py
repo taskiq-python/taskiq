@@ -11,6 +11,7 @@ from taskiq.serializers import (
     JSONSerializer,
     MSGPackSerializer,
     ORJSONSerializer,
+    PickleSerializer,
 )
 
 
@@ -21,6 +22,7 @@ from taskiq.serializers import (
         ORJSONSerializer(),
         CBORSerializer(),
         MSGPackSerializer(),
+        PickleSerializer(),
     ],
 )
 @pytest.mark.parametrize(
@@ -43,6 +45,7 @@ def test_generic_serializer(serializer: TaskiqSerializer, data: Any) -> None:
     [
         ORJSONSerializer(),
         CBORSerializer(),
+        PickleSerializer(),
     ],
 )
 def test_uuid_serialization(serializer: TaskiqSerializer) -> None:
@@ -55,6 +58,7 @@ def test_uuid_serialization(serializer: TaskiqSerializer) -> None:
     [
         CBORSerializer(),
         MSGPackSerializer(),
+        PickleSerializer(),
     ],
 )
 def test_datetime_serialization(serializer: TaskiqSerializer) -> None:

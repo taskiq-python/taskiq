@@ -35,7 +35,7 @@ Now we need to start our scheduler with the `taskiq scheduler` command. Like thi
 taskiq scheduler module:scheduler
 ```
 
-::: danger Be careful!
+::: caution Be careful!
 
 Please always run only one instance of the scheduler!
 If you run more than one scheduler at a time, please be careful since
