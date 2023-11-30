@@ -15,7 +15,7 @@ If you use dark theme and cannot see words on diagram,
 try switching to light theme and back to dark.
 :::
 
-```sequence
+```mermaid
 rect rgb(191, 223, 255)
 note right of Your code: Client side.
 Your code ->> Kicker: assemble message

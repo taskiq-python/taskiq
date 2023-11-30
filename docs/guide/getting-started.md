@@ -37,7 +37,7 @@ We highly recommend [taskiq-aio-pika](https://pypi.org/project/taskiq-aio-pika/)
 
 Now you need to create a python module with broker declaration. It's just a plain python file with the variable of your broker. For this particular example, I'm going to use the `InMemoryBroker`.
 
-::: danger Important note
+::: caution Important note
 The InMemoryBroker doesn't send any data over the network,
 and you cannot use this broker in
 a real-world scenario, but it's still useful for
@@ -244,7 +244,7 @@ await my_task.kicker().with_labels(timeout=0.3).kiq()
 
 :::
 
-::: danger Cool alert
+::: caution Cool alert
 
 We use [run_in_executor](https://docs.python.org/3/library/asyncio-eventloop.html#asyncio.loop.run_in_executor) method to run sync functions. Timeouts will raise a TimeoutException, but
 synchronous function may not stop from execution. This is a constraint of python.

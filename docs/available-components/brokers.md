@@ -20,7 +20,7 @@ It's suitable for small projects with only ONE worker process, because of the ZM
 It publishes messages on the local port. All worker processes are reading messages from this port.
 If you run many worker processes, all tasks will be executed `N` times, where `N` is the total number of worker processes.
 
-::: danger Be careful!
+::: caution Be careful!
 If you choose this type of broker, please run taskiq with `-w 1` parameter,
 otherwise you may encounter undefined behavior.
 :::
