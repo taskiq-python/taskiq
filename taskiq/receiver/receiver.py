@@ -6,7 +6,6 @@ from time import time
 from typing import Any, Callable, Dict, List, Optional, Set, Union, get_type_hints
 
 import anyio
-from taskiq.taskiq.acks import AckType
 from taskiq_dependencies import DependencyGraph
 
 from taskiq.abc.broker import AckableMessage, AsyncBroker
@@ -17,6 +16,8 @@ from taskiq.message import TaskiqMessage
 from taskiq.receiver.params_parser import parse_params
 from taskiq.result import TaskiqResult
 from taskiq.state import TaskiqState
+from taskiq.taskiq.acks import AckType
+from taskiq.taskiq.result_backends.dummy import DummyResultBackend
 from taskiq.utils import maybe_awaitable
 
 logger = getLogger(__name__)
@@ -73,8 +74,7 @@ class Receiver:
             self.sem = asyncio.Semaphore(max_async_tasks)
         else:
             logger.warning(
-                "Setting unlimited number of async tasks "
-                "can result in undefined behavior",
+                "Setting unlimited number of async tasks " "can result in undefined behavior",
             )
         self.sem_prefetch = asyncio.Semaphore(max_prefetch)
 
@@ -142,11 +142,13 @@ class Receiver:
             message=taskiq_msg,
         )
 
-        if not self.broker.result_backend or self.broker.ack_type == AckType.ON_COMPLETE:
+        if (
+            isinstance(self.broker.result_backend, DummyResultBackend)
+            or self.broker.ack_type == AckType.ON_COMPLETE
+        ):
             # If broker has an ability to ack messages.
             if isinstance(message, AckableMessage):
                 await maybe_awaitable(message.ack())
-
 
         for middleware in self.broker.middlewares:
             if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
@@ -361,7 +363,7 @@ class Receiver:
 
         def task_cb(task: "asyncio.Task[Any]") -> None:
             """
-            Callback for tasks.
+
 
             This function used to remove task
             from the list of active tasks and release
