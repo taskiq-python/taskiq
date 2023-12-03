@@ -206,7 +206,15 @@ async def run_scheduler(args: SchedulerArgs) -> None:
     logger.info("Starting scheduler.")
     await scheduler.startup()
     logger.info("Startup completed.")
-
+    if args.skip_first_run:
+        next_minute = datetime.utcnow().replace(second=0, microsecond=0) + timedelta(
+            minutes=1,
+        )
+        delay = next_minute - datetime.utcnow()
+        delay_secs = int(delay.total_seconds())
+        logger.info(f"Skipping first run. Waiting {delay_secs} seconds.")
+        await asyncio.sleep(delay.total_seconds())
+        logger.info("First run skipped. The scheduler is now running.")
     try:
         await run_scheduler_loop(scheduler)
     except asyncio.CancelledError:

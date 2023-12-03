@@ -16,6 +16,7 @@ class SchedulerArgs:
     configure_logging: bool = True
     fs_discover: bool = False
     tasks_pattern: str = "tasks.py"
+    skip_first_run: bool = False
 
     @classmethod
     def from_cli(cls, args: Optional[Sequence[str]] = None) -> "SchedulerArgs":
@@ -65,5 +66,14 @@ class SchedulerArgs:
             action="store_false",
             dest="configure_logging",
             help="Use this parameter if your application configures custom logging.",
+        )
+        parser.add_argument(
+            "--skip-first-run",
+            action="store_true",
+            dest="skip_first_run",
+            help=(
+                "Skip first run of scheduler. "
+                "This option skips running tasks immediately after scheduler start."
+            ),
         )
         return cls(**parser.parse_args(args).__dict__)
