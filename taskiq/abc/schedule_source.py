@@ -60,6 +60,9 @@ class ScheduleSource(ABC):
         """
         Actions to execute before task will be sent to broker.
 
+        This method may raise ScheduledTaskCancelledError.
+        This cancels the task execution.
+
         :param task: task that will be sent
         """
 
