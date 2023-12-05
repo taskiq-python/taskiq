@@ -1,5 +1,7 @@
+from logging import getLogger
 from typing import TYPE_CHECKING, List
 
+from taskiq.exceptions import ScheduledTaskCancelledError
 from taskiq.kicker import AsyncKicker
 from taskiq.scheduler.scheduled_task import ScheduledTask
 from taskiq.utils import maybe_awaitable
@@ -7,6 +9,8 @@ from taskiq.utils import maybe_awaitable
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.broker import AsyncBroker
     from taskiq.abc.schedule_source import ScheduleSource
+
+logger = getLogger(__name__)
 
 
 class TaskiqScheduler:
@@ -36,12 +40,16 @@ class TaskiqScheduler:
         It's triggered on proper time depending on `task.cron` or `task.time` attribute.
         :param task: task to send
         """
-        await maybe_awaitable(source.pre_send(task))
-        await AsyncKicker(task.task_name, self.broker, task.labels).kiq(
-            *task.args,
-            **task.kwargs,
-        )
-        await maybe_awaitable(source.post_send(task))
+        try:
+            await maybe_awaitable(source.pre_send(task))
+        except ScheduledTaskCancelledError:
+            logger.info("Scheduled task %s has been cancelled.", task.task_name)
+        else:
+            await AsyncKicker(task.task_name, self.broker, task.labels).kiq(
+                *task.args,
+                **task.kwargs,
+            )
+            await maybe_awaitable(source.post_send(task))
 
     async def shutdown(self) -> None:
         """Shutdown the scheduler process."""
