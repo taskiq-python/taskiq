@@ -15,7 +15,7 @@ class SchedulerArgs:
     log_level: str = LogLevel.INFO.name
     configure_logging: bool = True
     fs_discover: bool = False
-    tasks_pattern: str = "**/tasks.py"
+    tasks_pattern: Sequence[str] = ("**/tasks.py",)
     skip_first_run: bool = False
 
     @classmethod
@@ -52,8 +52,9 @@ class SchedulerArgs:
         parser.add_argument(
             "--tasks-pattern",
             "-tp",
-            default="**/tasks.py",
-            help="Name of files in which taskiq will try to find modules.",
+            default=["**/tasks.py"],
+            action="append",
+            help="Glob patterns of files in which taskiq will try to find the tasks.",
         )
         parser.add_argument(
             "--log-level",
@@ -76,4 +77,10 @@ class SchedulerArgs:
                 "This option skips running tasks immediately after scheduler start."
             ),
         )
-        return cls(**parser.parse_args(args).__dict__)
+
+        namespace = parser.parse_args(args)
+        # If there are any patterns specified, remove default.
+        # This is an argparse limitation.
+        if len(namespace.tasks_pattern) > 1:
+            namespace.tasks_pattern.pop(0)
+        return cls(**namespace.__dict__)
