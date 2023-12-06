@@ -1,9 +1,10 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from logging import getLogger
-from typing import Type
+from typing import Optional, Type
 
 from taskiq.abc.broker import AsyncBroker
+from taskiq.acks import AcknowledgeType
 from taskiq.receiver.receiver import Receiver
 
 logger = getLogger("taskiq.receiver")
@@ -18,6 +19,7 @@ async def run_receiver_task(
     max_prefetch: int = 0,
     propagate_exceptions: bool = True,
     run_startup: bool = False,
+    ack_time: Optional[AcknowledgeType] = None,
 ) -> None:
     """
     Function to run receiver programmatically.
@@ -71,6 +73,7 @@ async def run_receiver_task(
                     max_prefetch=max_prefetch,
                     propagate_exceptions=propagate_exceptions,
                     on_exit=on_exit,
+                    ack_type=ack_time,
                 )
                 await receiver.listen()
             except asyncio.CancelledError:

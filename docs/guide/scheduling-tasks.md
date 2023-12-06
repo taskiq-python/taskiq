@@ -35,7 +35,7 @@ Now we need to start our scheduler with the `taskiq scheduler` command. Like thi
 taskiq scheduler module:scheduler
 ```
 
-::: danger Be careful!
+::: caution Be careful!
 
 Please always run only one instance of the scheduler!
 If you run more than one scheduler at a time, please be careful since
@@ -80,3 +80,15 @@ For the `time` field of `ScheduledTask` we use timezone information from datetim
 
 For `cron` tasks, we have an additional field called `cron_offset` that can be used to specify
 an offset of the cron task. An offset can be a string like `Europe/Berlin` or an instance of the `timedelta` class.
+
+## Skipping first run
+
+By default, when you start the scheduler it will get all tasks from the schedule source and check whether they should have been executed in this minute. If tasks should have been executed, they will be executed.
+
+This behaviour might be not convinient for some developers. For example, if you have a task that should be executed on every minute, it will be executed once you start the scheduler, even if it was executed a few seconds ago.
+
+To avoid this behaviour, you can pass the `--skip-first-run` flag to the `taskiq scheduler` command. In this case, the scheduler will wait until the start of the next minute and then start executing tasks.
+
+```bash:no-line-numbers
+taskiq scheduler module:scheduler --skip-first-run
+```

@@ -10,6 +10,7 @@ from taskiq_dependencies import DependencyGraph
 
 from taskiq.abc.broker import AckableMessage, AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
+from taskiq.acks import AcknowledgeType
 from taskiq.context import Context
 from taskiq.exceptions import NoResultError
 from taskiq.message import TaskiqMessage
@@ -53,6 +54,7 @@ class Receiver:
         max_prefetch: int = 0,
         propagate_exceptions: bool = True,
         run_starup: bool = True,
+        ack_type: Optional[AcknowledgeType] = None,
         on_exit: Optional[Callable[["Receiver"], None]] = None,
     ) -> None:
         self.broker = broker
@@ -64,6 +66,7 @@ class Receiver:
         self.dependency_graphs: Dict[str, DependencyGraph] = {}
         self.propagate_exceptions = propagate_exceptions
         self.on_exit = on_exit
+        self.ack_time = ack_type or AcknowledgeType.WHEN_SAVED
         self.known_tasks: Set[str] = set()
         for task in self.broker.get_all_tasks().values():
             self._prepare_task(task.task_name, task.original_func)
@@ -132,13 +135,21 @@ class Receiver:
             taskiq_msg.task_id,
         )
 
+        if self.ack_time == AcknowledgeType.WHEN_RECEIVED and isinstance(
+            message,
+            AckableMessage,
+        ):
+            await maybe_awaitable(message.ack())
+
         result = await self.run_task(
             target=task.original_func,
             message=taskiq_msg,
         )
 
-        # If broker has an ability to ack messages.
-        if isinstance(message, AckableMessage):
+        if self.ack_time == AcknowledgeType.WHEN_EXECUTED and isinstance(
+            message,
+            AckableMessage,
+        ):
             await maybe_awaitable(message.ack())
 
         for middleware in self.broker.middlewares:
@@ -148,9 +159,11 @@ class Receiver:
         try:
             if not isinstance(result.error, NoResultError):
                 await self.broker.result_backend.set_result(taskiq_msg.task_id, result)
+
                 for middleware in self.broker.middlewares:
                     if middleware.__class__.post_save != TaskiqMiddleware.post_save:
                         await maybe_awaitable(middleware.post_save(taskiq_msg, result))
+
         except Exception as exc:
             logger.exception(
                 "Can't set result in result backend. Cause: %s",
@@ -159,6 +172,12 @@ class Receiver:
             )
             if raise_err:
                 raise exc
+
+        if self.ack_time == AcknowledgeType.WHEN_SAVED and isinstance(
+            message,
+            AckableMessage,
+        ):
+            await maybe_awaitable(message.ack())
 
     async def run_task(  # noqa: C901, PLR0912, PLR0915
         self,
