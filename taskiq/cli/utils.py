@@ -82,7 +82,7 @@ def import_tasks(modules: List[str], pattern: str, fs_discover: bool) -> None:
         from filesystem.
     """
     if fs_discover:
-        for path in Path().rglob(pattern):
+        for path in Path().glob(pattern):
             modules.append(
                 remove_suffix(str(path), ".py").replace(os.path.sep, "."),
             )

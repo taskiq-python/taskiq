@@ -15,7 +15,7 @@ class SchedulerArgs:
     log_level: str = LogLevel.INFO.name
     configure_logging: bool = True
     fs_discover: bool = False
-    tasks_pattern: str = "tasks.py"
+    tasks_pattern: str = "**/tasks.py"
     skip_first_run: bool = False
 
     @classmethod
@@ -52,7 +52,7 @@ class SchedulerArgs:
         parser.add_argument(
             "--tasks-pattern",
             "-tp",
-            default="tasks.py",
+            default="**/tasks.py",
             help="Name of files in which taskiq will try to find modules.",
         )
         parser.add_argument(

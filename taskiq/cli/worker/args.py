@@ -26,7 +26,7 @@ class WorkerArgs:
 
     broker: str
     modules: List[str]
-    tasks_pattern: str = "tasks.py"
+    tasks_pattern: str = "**/tasks.py"
     fs_discover: bool = False
     configure_logging: bool = True
     log_level: LogLevel = LogLevel.INFO
@@ -87,7 +87,7 @@ class WorkerArgs:
         parser.add_argument(
             "--tasks-pattern",
             "-tp",
-            default="tasks.py",
+            default="**/tasks.py",
             help="Name of files in which taskiq will try to find modules.",
         )
         parser.add_argument(
