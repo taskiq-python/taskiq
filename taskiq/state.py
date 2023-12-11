@@ -1,7 +1,7 @@
 from collections import UserDict
 from typing import TYPE_CHECKING, Any
 
-if TYPE_CHECKING:  # pragma: no cover
+if TYPE_CHECKING:  # pragma: no cover  # noqa: SIM108
     _Base = UserDict[str, Any]
 else:
     _Base = UserDict
