@@ -79,7 +79,7 @@ class WorkerArgs:
             type=receiver_arg_type,
             default=[],
             help=(
-                "List of args fot receiver. "
+                "List of args for receiver. "
                 "This string must be specified in "
                 "`key=value` format."
             ),
