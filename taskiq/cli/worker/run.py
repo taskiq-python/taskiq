@@ -163,7 +163,7 @@ def run_worker(args: WorkerArgs) -> Optional[int]:
     :returns: Optional status code.
     """
     if platform == "darwin":
-        set_start_method("fork")
+        set_start_method("spawn")
     if args.configure_logging:
         logging.basicConfig(
             level=logging.getLevelName(args.log_level),
