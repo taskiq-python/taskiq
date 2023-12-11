@@ -26,7 +26,7 @@ That's why taskiq can auto-discover tasks in current directory recursively.
 We have two options for this:
 
 - `--tasks-pattern` or `-tp`.
-  It's a name of files to import. By default is searches for all `tasks.py` files.
+  It's a glob pattern of files to import. By default it is `**/tasks.py` which searches for all `tasks.py` files. May be specified multiple times.
 - `--fs-discover` or `-fsd`. This option enables search of task files in current directory recursively, using the given pattern.
 
 ### Acknowledgements
@@ -118,7 +118,7 @@ taskiq scheduler my_project.broker:scheduler my_project.module1 my_project.modul
 Path to scheduler is the only required argument.
 
 - `--tasks-pattern` or `-tp`.
-  It's a name of files to import. By default is searches for all `tasks.py` files.
+  It's a glob pattern of files to import. By default it is `**/tasks.py` which searches for all `tasks.py` files. May be specified multiple times.
 - `--fs-discover` or `-fsd`. This option enables search of task files in current directory recursively, using the given pattern.
 - `--no-configure-logging` - use this parameter if your application configures custom logging.
 - `--log-level` is used to set a log level (default `INFO`).
