@@ -57,7 +57,7 @@ class ReloadOneAction(ProcessActionBase):
         self,
         workers: List[Process],
         args: WorkerArgs,
-        worker_func: Callable[[WorkerArgs, EventType], None],
+        worker_func: Callable[[WorkerArgs], None],
     ) -> None:
         """
         This action reloads a single process.
@@ -79,7 +79,7 @@ class ReloadOneAction(ProcessActionBase):
         event: EventType = Event()
         new_process = Process(
             target=worker_func,
-            kwargs={"args": args, "event": event},
+            kwargs={"args": args},
             name=f"worker-{self.worker_num}",
             daemon=True,
         )
@@ -152,7 +152,7 @@ class ProcessManager:
     def __init__(
         self,
         args: WorkerArgs,
-        worker_function: Callable[[WorkerArgs, EventType], None],
+        worker_function: Callable[[WorkerArgs], None],
         observer: Optional[Observer] = None,  # type: ignore[valid-type]
         max_restarts: Optional[int] = None,
     ) -> None:
@@ -183,7 +183,7 @@ class ProcessManager:
             event = Event()
             work_proc = Process(
                 target=self.worker_function,
-                kwargs={"args": self.args, "event": event},
+                kwargs={"args": self.args},
                 name=f"worker-{process}",
                 daemon=True,
             )
