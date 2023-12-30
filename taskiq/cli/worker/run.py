@@ -117,7 +117,9 @@ def start_listen(args: WorkerArgs, event: Event) -> None:
         loop = uvloop.new_event_loop()  # type: ignore
     else:
         loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+
+    asyncio.set_event_loop(loop)
+
     # This option signals that current
     # broker is running as a worker.
     # We must set this field before importing tasks,
