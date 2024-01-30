@@ -154,7 +154,6 @@ class ProcessManager:
         args: WorkerArgs,
         worker_function: Callable[[WorkerArgs], None],
         observer: Optional[Observer] = None,  # type: ignore[valid-type]
-        max_restarts: Optional[int] = None,
     ) -> None:
         self.worker_function = worker_function
         self.action_queue: "Queue[ProcessActionBase]" = Queue(-1)
