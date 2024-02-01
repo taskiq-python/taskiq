@@ -1,11 +1,17 @@
 import enum
 from typing import Generic, Optional, Union
 
-from pydantic.generics import GenericModel
 from taskiq_dependencies import Depends
 from typing_extensions import TypeVar
 
+from taskiq.compat import IS_PYDANTIC2
 from taskiq.context import Context
+
+if IS_PYDANTIC2:
+    from pydantic import BaseModel as GenericModel
+else:
+    from pydantic.generics import GenericModel  # type: ignore[no-redef]
+
 
 _ProgressType = TypeVar("_ProgressType")
 
@@ -23,7 +29,7 @@ class TaskProgress(GenericModel, Generic[_ProgressType]):
     """Progress of task execution."""
 
     state: Union[TaskState, str]
-    meta: _ProgressType
+    meta: Optional[_ProgressType]
 
 
 class ProgressTracker(Generic[_ProgressType]):
