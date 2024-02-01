@@ -2,7 +2,9 @@ import asyncio
 import logging
 import signal
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Type
+from multiprocessing import set_start_method
+from sys import platform
+from typing import Any, Optional, Type
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.cli.utils import import_object, import_tasks
@@ -11,13 +13,13 @@ from taskiq.cli.worker.process_manager import ProcessManager
 from taskiq.receiver import Receiver
 
 try:
-    import uvloop  # noqa: WPS433
+    import uvloop
 except ImportError:
     uvloop = None  # type: ignore
 
 
 try:
-    from watchdog.observers import Observer  # noqa: WPS433
+    from watchdog.observers import Observer
 except ImportError:
     Observer = None  # type: ignore
 
@@ -65,36 +67,20 @@ def get_receiver_type(args: WorkerArgs) -> Type[Receiver]:
     return receiver_type
 
 
-def start_listen(args: WorkerArgs) -> None:  # noqa: WPS210, WPS213
+def start_listen(args: WorkerArgs) -> None:
     """
     This function starts actual listening process.
 
     It imports broker and all tasks.
-    Since tasks registers themselves in a global set,
-    it's easy to just import module where you have decorated
-    function and they will be available in broker's `available_tasks`
-    field.
+    Since tasks auto registeres themselves in a broker,
+    we don't need to do anything else other than importing.
+
 
     :param args: CLI arguments.
+    :param event: Event for notification.
     :raises ValueError: if broker is not an AsyncBroker instance.
     :raises ValueError: if receiver is not a Receiver type.
     """
-    if uvloop is not None:
-        logger.debug("UVLOOP found. Installing policy.")
-        uvloop.install()
-    # This option signals that current
-    # broker is running as a worker.
-    # We must set this field before importing tasks,
-    # so broker will remember all tasks it's related to.
-    AsyncBroker.is_worker_process = True
-    broker = import_object(args.broker)
-    import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
-    if not isinstance(broker, AsyncBroker):
-        raise ValueError("Unknown broker type. Please use AsyncBroker instance.")
-
-    receiver_type = get_receiver_type(args)
-    receiver_args = dict(args.receiver_arg)
-
     # Here how we manage interruptions.
     # We have to remember shutting_down state,
     # because KeyboardInterrupt can be send multiple
@@ -113,16 +99,35 @@ def start_listen(args: WorkerArgs) -> None:  # noqa: WPS210, WPS213
         :raises KeyboardInterrupt: if termination hasn't begun.
         """
         logger.debug(f"Got signal {signum}.")
-        nonlocal shutting_down  # noqa: WPS420
+        nonlocal shutting_down
         if shutting_down:
             return
-        shutting_down = True  # noqa: WPS442
+        shutting_down = True
         raise KeyboardInterrupt
 
     signal.signal(signal.SIGINT, interrupt_handler)
     signal.signal(signal.SIGTERM, interrupt_handler)
 
-    loop = asyncio.get_event_loop()
+    if uvloop is not None:
+        logger.debug("UVLOOP found. Using it as async runner")
+        loop = uvloop.new_event_loop()  # type: ignore
+    else:
+        loop = asyncio.new_event_loop()
+
+    asyncio.set_event_loop(loop)
+
+    # This option signals that current
+    # broker is running as a worker.
+    # We must set this field before importing tasks,
+    # so broker will remember all tasks it's related to.
+    broker = import_object(args.broker)
+    if not isinstance(broker, AsyncBroker):
+        raise ValueError("Unknown broker type. Please use AsyncBroker instance.")
+    broker.is_worker_process = True
+    import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
+
+    receiver_type = get_receiver_type(args)
+    receiver_kwargs = dict(args.receiver_arg)
 
     try:
         logger.debug("Initialize receiver.")
@@ -134,7 +139,8 @@ def start_listen(args: WorkerArgs) -> None:  # noqa: WPS210, WPS213
                 max_async_tasks=args.max_async_tasks,
                 max_prefetch=args.max_prefetch,
                 propagate_exceptions=not args.no_propagate_errors,
-                **receiver_args,
+                ack_type=args.ack_type,
+                **receiver_kwargs,  # type: ignore
             )
             loop.run_until_complete(receiver.listen())
     except KeyboardInterrupt:
@@ -142,7 +148,7 @@ def start_listen(args: WorkerArgs) -> None:  # noqa: WPS210, WPS213
         loop.run_until_complete(shutdown_broker(broker, args.shutdown_timeout))
 
 
-def run_worker(args: WorkerArgs) -> None:  # noqa: WPS213
+def run_worker(args: WorkerArgs) -> Optional[int]:
     """
     This function starts worker processes.
 
@@ -152,11 +158,17 @@ def run_worker(args: WorkerArgs) -> None:  # noqa: WPS213
     :param args: CLI arguments.
 
     :raises ValueError: if reload flag is used, but dependencies are not installed.
+    :returns: Optional status code.
     """
-    logging.basicConfig(
-        level=logging.getLevelName(args.log_level),
-        format="[%(asctime)s][%(name)s][%(levelname)-7s][%(processName)s] %(message)s",
-    )
+    if platform == "darwin":
+        set_start_method("spawn")
+    if args.configure_logging:
+        logging.basicConfig(
+            level=logging.getLevelName(args.log_level),
+            format="[%(asctime)s][%(name)s][%(levelname)-7s]"
+            "[%(processName)s] %(message)s",
+        )
+    logging.getLogger("taskiq").setLevel(level=logging.getLevelName(args.log_level))
     logging.getLogger("watchdog.observers.inotify_buffer").setLevel(level=logging.INFO)
     logger.info("Starting %s worker processes.", args.workers)
 
@@ -175,10 +187,11 @@ def run_worker(args: WorkerArgs) -> None:  # noqa: WPS213
 
     manager = ProcessManager(args=args, observer=observer, worker_function=start_listen)
 
-    manager.start()
+    status = manager.start()
 
     if observer is not None and observer.is_alive():
         if args.reload:
             logger.info("Stopping watching files.")
         observer.stop()
-    logger.info("Stopping logging thread.")
+
+    return status

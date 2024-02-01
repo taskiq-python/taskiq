@@ -9,8 +9,8 @@ def test_log_collector_std_success() -> None:
     """Tests that stdout and stderr calls are collected correctly."""
     log = StringIO()
     with log_collector(log, "%(message)s"):
-        print("log1")  # noqa: WPS421
-        print("log2", file=sys.stderr)  # noqa: WPS421
+        print("log1")  # noqa: T201
+        print("log2", file=sys.stderr)  # noqa: T201
     assert log.getvalue() == "log1\nlog2\n"
 
 

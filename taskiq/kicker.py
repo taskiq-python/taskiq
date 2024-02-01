@@ -1,6 +1,7 @@
 from dataclasses import asdict, is_dataclass
+from datetime import datetime
 from logging import getLogger
-from typing import (  # noqa: WPS235
+from typing import (
     TYPE_CHECKING,
     Any,
     Coroutine,
@@ -16,15 +17,19 @@ from pydantic import BaseModel
 from typing_extensions import ParamSpec
 
 from taskiq.abc.middleware import TaskiqMiddleware
+from taskiq.compat import model_dump
 from taskiq.exceptions import SendTaskError
 from taskiq.message import TaskiqMessage
+from taskiq.scheduler.created_schedule import CreatedSchedule
+from taskiq.scheduler.scheduled_task import CronSpec, ScheduledTask
 from taskiq.task import AsyncTaskiqTask
 from taskiq.utils import maybe_awaitable
 
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.broker import AsyncBroker
+    from taskiq.abc.schedule_source import ScheduleSource
 
-_T = TypeVar("_T")  # noqa: WPS111
+_T = TypeVar("_T")
 _FuncParams = ParamSpec("_FuncParams")
 _ReturnType = TypeVar("_ReturnType")
 
@@ -47,7 +52,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
 
     def with_labels(
         self,
-        **labels: Union[str, int, float],
+        **labels: Union[str, float],
     ) -> "AsyncKicker[_FuncParams, _ReturnType]":
         """
         Update function's labels before sending.
@@ -131,7 +136,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         try:
             await self.broker.kick(self.broker.formatter.dumps(message))
         except Exception as exc:
-            raise SendTaskError() from exc
+            raise SendTaskError from exc
 
         for middleware in self.broker.middlewares:
             if middleware.__class__.post_send != TaskiqMiddleware.post_send:
@@ -141,6 +146,72 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
             task_id=message.task_id,
             result_backend=self.broker.result_backend,
         )
+
+    async def schedule_by_cron(
+        self,
+        source: "ScheduleSource",
+        cron: Union[str, "CronSpec"],
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> CreatedSchedule[_ReturnType]:
+        """
+        Function to schedule task with cron.
+
+        :param source: schedule source.
+        :param cron: cron expression.
+        :param args: function's args.
+        :param cron_offset: cron offset.
+        :param kwargs: function's kwargs.
+
+        :return: schedule id.
+        """
+        schedule_id = self.broker.id_generator()
+        message = self._prepare_message(*args, **kwargs)
+        cron_offset = None
+        if isinstance(cron, CronSpec):
+            cron_str = cron.to_cron()
+            cron_offset = cron.offset
+        else:
+            cron_str = cron
+        scheduled = ScheduledTask(
+            schedule_id=schedule_id,
+            task_name=message.task_name,
+            labels=message.labels,
+            args=message.args,
+            kwargs=message.kwargs,
+            cron=cron_str,
+            cron_offset=cron_offset,
+        )
+        await source.add_schedule(scheduled)
+        return CreatedSchedule(self, source, scheduled)
+
+    async def schedule_by_time(
+        self,
+        source: "ScheduleSource",
+        time: datetime,
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> CreatedSchedule[_ReturnType]:
+        """
+        Function to schedule task to run at specific time.
+
+        :param source: schedule source.
+        :param time: time to run task at.
+        :param args: function's args.
+        :param kwargs: function's kwargs.
+        """
+        schedule_id = self.broker.id_generator()
+        message = self._prepare_message(*args, **kwargs)
+        scheduled = ScheduledTask(
+            schedule_id=schedule_id,
+            task_name=message.task_name,
+            labels=message.labels,
+            args=message.args,
+            kwargs=message.kwargs,
+            time=time,
+        )
+        await source.add_schedule(scheduled)
+        return CreatedSchedule(self, source, scheduled)
 
     @classmethod
     def _prepare_arg(cls, arg: Any) -> Any:
@@ -154,12 +225,12 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         :return: Formatted argument.
         """
         if isinstance(arg, BaseModel):
-            arg = arg.dict()
+            arg = model_dump(arg)
         if is_dataclass(arg):
             arg = asdict(arg)
         return arg
 
-    def _prepare_message(  # noqa: WPS210
+    def _prepare_message(
         self,
         *args: Any,
         **kwargs: Any,

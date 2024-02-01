@@ -16,6 +16,6 @@ It's a good practice to skip fetching logs from the storage unless `with_logs=Tr
 :::
 
 
-::: danger Important note!
+::: caution Important note!
 `with_logs` param is now deprecated. It will be removed in future releases.
 :::

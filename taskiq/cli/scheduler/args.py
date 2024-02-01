@@ -1,19 +1,22 @@
 from argparse import ZERO_OR_MORE, ArgumentDefaultsHelpFormatter, ArgumentParser
 from dataclasses import dataclass
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Union
 
 from taskiq.cli.common_args import LogLevel
+from taskiq.scheduler.scheduler import TaskiqScheduler
 
 
 @dataclass
 class SchedulerArgs:
     """Arguments for scheduler."""
 
-    scheduler: str
+    scheduler: Union[str, TaskiqScheduler]
     modules: List[str]
     log_level: str = LogLevel.INFO.name
+    configure_logging: bool = True
     fs_discover: bool = False
-    tasks_pattern: str = "tasks.py"
+    tasks_pattern: Sequence[str] = ("**/tasks.py",)
+    skip_first_run: bool = False
 
     @classmethod
     def from_cli(cls, args: Optional[Sequence[str]] = None) -> "SchedulerArgs":
@@ -49,8 +52,9 @@ class SchedulerArgs:
         parser.add_argument(
             "--tasks-pattern",
             "-tp",
-            default="tasks.py",
-            help="Name of files in which taskiq will try to find modules.",
+            default=["**/tasks.py"],
+            action="append",
+            help="Glob patterns of files in which taskiq will try to find the tasks.",
         )
         parser.add_argument(
             "--log-level",
@@ -58,4 +62,25 @@ class SchedulerArgs:
             choices=[level.name for level in LogLevel],
             help="scheduler log level",
         )
-        return cls(**parser.parse_args(args).__dict__)
+        parser.add_argument(
+            "--no-configure-logging",
+            action="store_false",
+            dest="configure_logging",
+            help="Use this parameter if your application configures custom logging.",
+        )
+        parser.add_argument(
+            "--skip-first-run",
+            action="store_true",
+            dest="skip_first_run",
+            help=(
+                "Skip first run of scheduler. "
+                "This option skips running tasks immediately after scheduler start."
+            ),
+        )
+
+        namespace = parser.parse_args(args)
+        # If there are any patterns specified, remove default.
+        # This is an argparse limitation.
+        if len(namespace.tasks_pattern) > 1:
+            namespace.tasks_pattern.pop(0)
+        return cls(**namespace.__dict__)

@@ -1,7 +1,7 @@
 from taskiq_aio_pika import AioPikaBroker
 
 from taskiq.schedule_sources import LabelScheduleSource
-from taskiq.scheduler import TaskiqScheduler
+from taskiq import TaskiqScheduler
 
 broker = AioPikaBroker("amqp://guest:guest@localhost:5672/")
 

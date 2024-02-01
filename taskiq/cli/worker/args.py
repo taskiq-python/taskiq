@@ -2,6 +2,7 @@ from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from dataclasses import dataclass, field
 from typing import List, Optional, Sequence, Tuple
 
+from taskiq.acks import AcknowledgeType
 from taskiq.cli.common_args import LogLevel
 
 
@@ -25,13 +26,11 @@ class WorkerArgs:
 
     broker: str
     modules: List[str]
-    tasks_pattern: str = "tasks.py"
+    tasks_pattern: Sequence[str] = ("**/tasks.py",)
     fs_discover: bool = False
+    configure_logging: bool = True
     log_level: LogLevel = LogLevel.INFO
     workers: int = 2
-    log_collector_format: str = (
-        "[%(asctime)s][%(levelname)-7s][%(module)s:%(funcName)s:%(lineno)d] %(message)s"
-    )
     max_threadpool_threads: int = 10
     no_parse: bool = False
     shutdown_timeout: float = 5
@@ -42,9 +41,11 @@ class WorkerArgs:
     receiver_arg: List[Tuple[str, str]] = field(default_factory=list)
     max_prefetch: int = 0
     no_propagate_errors: bool = False
+    max_fails: int = -1
+    ack_type: AcknowledgeType = AcknowledgeType.WHEN_SAVED
 
     @classmethod
-    def from_cli(  # noqa: WPS213
+    def from_cli(
         cls,
         args: Optional[Sequence[str]] = None,
     ) -> "WorkerArgs":
@@ -78,7 +79,7 @@ class WorkerArgs:
             type=receiver_arg_type,
             default=[],
             help=(
-                "List of args fot receiver. "
+                "List of args for receiver. "
                 "This string must be specified in "
                 "`key=value` format."
             ),
@@ -86,8 +87,9 @@ class WorkerArgs:
         parser.add_argument(
             "--tasks-pattern",
             "-tp",
-            default="tasks.py",
-            help="Name of files in which taskiq will try to find modules.",
+            default=["**/tasks.py"],
+            action="append",
+            help="Glob patterns of files in which taskiq will try to find the tasks.",
         )
         parser.add_argument(
             "modules",
@@ -117,18 +119,6 @@ class WorkerArgs:
             type=int,
             default=2,
             help="Number of worker child processes",
-        )
-        parser.add_argument(
-            "--log-collector-format",
-            "-lcf",
-            type=str,
-            default=(
-                "[%(asctime)s]"
-                "[%(levelname)-7s]"
-                "[%(module)s:%(funcName)s:%(lineno)d] "
-                "%(message)s"
-            ),
-            help="Format which is used when collecting logs from function execution",
         )
         parser.add_argument(
             "--no-parse",
@@ -165,7 +155,7 @@ class WorkerArgs:
             "-r",
             action="store_true",
             help="Reload workers if file is changed. "
-            + "`reload` extra is required for this option.",
+            "`reload` extra is required for this option.",
         )
         parser.add_argument(
             "--do-not-use-gitignore",
@@ -187,6 +177,30 @@ class WorkerArgs:
             default=0,
             help="Maximum prefetched tasks per worker process. ",
         )
+        parser.add_argument(
+            "--no-configure-logging",
+            action="store_false",
+            dest="configure_logging",
+            help="Use this parameter if your application configures custom logging.",
+        )
+        parser.add_argument(
+            "--max-fails",
+            type=int,
+            dest="max_fails",
+            default=-1,
+            help="Maximum number of child process exits.",
+        )
+        parser.add_argument(
+            "--ack-type",
+            type=lambda value: AcknowledgeType(value.lower()),
+            default=AcknowledgeType.WHEN_SAVED,
+            choices=[ack_type.name.lower() for ack_type in AcknowledgeType],
+            help="When to acknowledge message.",
+        )
 
         namespace = parser.parse_args(args)
+        # If there are any patterns specified, remove default.
+        # This is an argparse limitation.
+        if len(namespace.tasks_pattern) > 1:
+            namespace.tasks_pattern.pop(0)
         return WorkerArgs(**namespace.__dict__)

@@ -165,3 +165,9 @@ cython_debug/
 node_modules
 .temp
 .cache
+
+# macOS
+.DS_Store
+
+# Ruff
+.ruff_cache/

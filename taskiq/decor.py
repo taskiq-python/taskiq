@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -6,18 +7,22 @@ from typing import (
     Dict,
     Generic,
     TypeVar,
+    Union,
     overload,
 )
 
 from typing_extensions import ParamSpec
 
 from taskiq.kicker import AsyncKicker
+from taskiq.scheduler.created_schedule import CreatedSchedule
 from taskiq.task import AsyncTaskiqTask
 
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.broker import AsyncBroker
+    from taskiq.abc.schedule_source import ScheduleSource
+    from taskiq.scheduler.scheduled_task import CronSpec
 
-_T = TypeVar("_T")  # noqa: WPS111
+_T = TypeVar("_T")
 _FuncParams = ParamSpec("_FuncParams")
 _ReturnType = TypeVar("_ReturnType")
 
@@ -92,6 +97,58 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         :returns: taskiq task.
         """
         return await self.kicker().kiq(*args, **kwargs)
+
+    async def schedule_by_cron(
+        self,
+        source: "ScheduleSource",
+        cron: Union[str, "CronSpec"],
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> CreatedSchedule[_ReturnType]:
+        """
+        Schedule task to run on cron.
+
+        This method requires a schedule source,
+        which is capable of dynamically adding new schedules.
+
+        :param source: schedule source.
+        :param cron: cron string or a CronSpec instance.
+        :param args: function's arguments.
+        :param kwargs: function's key word arguments.
+        :return: schedule id.
+        """
+        return await self.kicker().schedule_by_cron(
+            source,
+            cron,
+            *args,
+            **kwargs,
+        )
+
+    async def schedule_by_time(
+        self,
+        source: "ScheduleSource",
+        time: datetime,
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> CreatedSchedule[_ReturnType]:
+        """
+        Schedule task to run on specific time.
+
+        This method requires a schedule source,
+        which is capable of dynamically adding new schedules.
+
+        :param source: schedule source.
+        :param time: time to run task.
+        :param args: function's arguments.
+        :param kwargs: function's key word arguments.
+        :return: schedule id.
+        """
+        return await self.kicker().schedule_by_time(
+            source,
+            time,
+            *args,
+            **kwargs,
+        )
 
     def kicker(self) -> AsyncKicker[_FuncParams, _ReturnType]:
         """

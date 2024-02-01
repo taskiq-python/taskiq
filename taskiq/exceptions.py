@@ -36,3 +36,11 @@ class SecurityError(TaskiqError):
 
 class NoResultError(TaskiqError):
     """Error if user does not want to set result."""
+
+
+class TaskRejectedError(TaskiqError):
+    """Task was rejected."""
+
+
+class ScheduledTaskCancelledError(TaskiqError):
+    """Scheduled task was cancelled and not sent to the queue."""

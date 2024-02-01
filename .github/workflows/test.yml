@@ -1,6 +1,11 @@
 name: Testing taskiq
 
-on: [pull_request]
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+      - master
 
 jobs:
   lint:
@@ -8,10 +13,8 @@ jobs:
       matrix:
         cmd:
           - black
-          - flake8
-          - isort
+          - ruff
           - mypy
-          - autoflake
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -20,10 +23,10 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.9"
+          python-version: "3.11"
           cache: "poetry"
       - name: Install deps
-        run: poetry install
+        run: poetry install --all-extras
       - name: Run lint check
         run: poetry run pre-commit run -a ${{ matrix.cmd }}
   pytest:
@@ -33,7 +36,8 @@ jobs:
       contents: write
     strategy:
       matrix:
-        py_version: ["3.7", "3.8", "3.9", "3.10"]
+        py_version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        pydantic_ver: ["<2", ">=2,<3"]
         os: [ubuntu-latest, windows-latest]
     runs-on: "${{ matrix.os }}"
     steps:
@@ -46,7 +50,9 @@ jobs:
           python-version: "${{ matrix.py_version }}"
           cache: "poetry"
       - name: Install deps
-        run: poetry install
+        run: poetry install --all-extras
+      - name: Setup pydantic version
+        run: poetry run pip install "pydantic ${{ matrix.pydantic_ver }}"
       - name: Run pytest check
         run: poetry run pytest -vv -n auto --cov="taskiq" .
       - name: Generate report

@@ -1,5 +1,5 @@
 ---
-order: 9
+order: 10
 ---
 
 # Testing with taskiq
@@ -137,6 +137,26 @@ It sets base dependencies for dependency resolution. You can use it for tests.
 
 Let's add a task that depends on `Path`. I guess this example is not meant to be used in production code bases, but it's suitable for illustration purposes.
 
+::: tabs
+
+@tab Annotated 3.10+
+
+```python
+from typing import Annotated
+from pathlib import Path
+from taskiq import TaskiqDepends
+
+from your_project.taskiq import broker
+
+
+@broker.task
+async def modify_path(some_path: Annotated[Path, TaskiqDepends()]):
+    return some_path.parent / "taskiq.py"
+
+```
+
+@tab default values
+
 ```python
 from pathlib import Path
 from taskiq import TaskiqDepends
@@ -149,6 +169,8 @@ async def modify_path(some_path: Path = TaskiqDepends()):
     return some_path.parent / "taskiq.py"
 
 ```
+
+:::
 
 To test the task itself, it's not different to the example without dependencies, but we jsut need to pass all
 expected dependencies manually as function's arguments or key-word arguments.

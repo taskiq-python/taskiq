@@ -6,7 +6,7 @@ order: 2
 
 Middlewares are super helpful. You can inject some code before or after task's execution.
 
-Middlewares must implement `taskiq.abc.middleware.TaskiqMiddleware` abstract class.
+Middlewares must implement [`taskiq.abc.middleware.TaskiqMiddleware`](https://github.com/taskiq-python/taskiq/blob/master/taskiq/abc/middleware.py) abstract class.
 Every method of a middleware can be either sync or async. Taskiq will execute it
 as you expect.
 

@@ -7,12 +7,11 @@ from pydantic import ValidationError
 from taskiq import (
     AsyncTaskiqDecoratedTask,
     InMemoryBroker,
-    ProgressTracker,
     TaskiqDepends,
     TaskiqMessage,
-    TaskState,
 )
 from taskiq.abc import AsyncBroker
+from taskiq.depends.progress_tracker import ProgressTracker, TaskState
 from taskiq.receiver import Receiver
 
 
@@ -43,9 +42,11 @@ def get_message(
     task: AsyncTaskiqDecoratedTask[Any, Any],
     task_id: Optional[str] = None,
     *args: Any,
-    labels: Dict[str, str] = {},
+    labels: Optional[Dict[str, str]] = None,
     **kwargs: Dict[str, Any],
 ) -> TaskiqMessage:
+    if labels is None:
+        labels = {}
     return TaskiqMessage(
         task_id=task_id or task.broker.id_generator(),
         task_name=task.task_name,
@@ -71,11 +72,11 @@ async def test_progress_tracker_ctx_raw(state: Any, meta: Any) -> None:
     async def test_func(tes_val: ProgressTracker[Any] = TaskiqDepends()) -> None:
         await tes_val.set_progress(state, meta)
 
-    receiver = get_receiver(broker)
-    result = await receiver.run_task(test_func, get_message(test_func, "task_id"))
+    kicker = await test_func.kiq()
+    result = await kicker.wait_result()
 
     assert not result.is_err
-    progress = await broker.result_backend.get_progress("task_id")
+    progress = await broker.result_backend.get_progress(kicker.task_id)
     assert progress is not None
     assert progress.meta == meta
     assert progress.state == state
@@ -89,26 +90,32 @@ async def test_progress_tracker_ctx_none() -> None:
     async def test_func() -> None:
         pass
 
-    receiver = get_receiver(broker)
-    result = await receiver.run_task(test_func, get_message(test_func, "task_id"))
+    kicker = await test_func.kiq()
+    result = await kicker.wait_result()
 
     assert not result.is_err
-    progress = await broker.result_backend.get_progress("task_id")
+    progress = await broker.result_backend.get_progress(kicker.task_id)
     assert progress is None
 
 
 @pytest.mark.anyio
-async def test_progress_tracker_validation_error() -> None:
+@pytest.mark.parametrize(
+    "state,meta",
+    [
+        (("state", "error"), 1),
+    ],
+)
+async def test_progress_tracker_validation_error(state: Any, meta: Any) -> None:
     broker = InMemoryBroker()
 
     @broker.task
     async def test_func(progress: ProgressTracker[int] = TaskiqDepends()) -> None:
-        await progress.set_progress(("hello", "world"), 123)  # type: ignore
+        await progress.set_progress(state, meta)  # type: ignore
 
-    receiver = get_receiver(broker)
-    result = await receiver.run_task(test_func, get_message(test_func, "task_id"))
+    kicker = await test_func.kiq()
+    result = await kicker.wait_result()
     with pytest.raises(ValidationError):
         result.raise_for_error()
 
-    progress = await broker.result_backend.get_progress("task_id")
+    progress = await broker.result_backend.get_progress(kicker.task_id)
     assert progress is None

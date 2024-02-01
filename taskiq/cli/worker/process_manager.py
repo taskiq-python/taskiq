@@ -1,14 +1,16 @@
 import logging
 import signal
+from contextlib import suppress
 from dataclasses import dataclass
-from multiprocessing import Process, Queue
+from multiprocessing import Event, Process, Queue, current_process
+from multiprocessing.synchronize import Event as EventType
 from time import sleep
 from typing import Any, Callable, List, Optional
 
 try:
-    from watchdog.observers import Observer  # noqa: WPS433
+    from watchdog.observers import Observer
 
-    from taskiq.cli.watcher import FileWatcher  # noqa: WPS433
+    from taskiq.cli.watcher import FileWatcher
 except ImportError:
     Observer = None  # type: ignore
     FileWatcher = None  # type: ignore
@@ -41,7 +43,7 @@ class ReloadAllAction(ProcessActionBase):
         :param action_queue: queue to send events to.
         """
         for worker_id in range(workers_num):
-            action_queue.put(ReloadOneAction(worker_num=worker_id))
+            action_queue.put(ReloadOneAction(worker_num=worker_id, is_reload_all=True))
 
 
 @dataclass
@@ -49,6 +51,7 @@ class ReloadOneAction(ProcessActionBase):
     """This action reloads single worker with particular id."""
 
     worker_num: int
+    is_reload_all: bool
 
     def handle(
         self,
@@ -73,6 +76,7 @@ class ReloadOneAction(ProcessActionBase):
             logger.debug(f"Process {worker.name} is already terminated.")
         # Waiting worker shutdown.
         worker.join()
+        event: EventType = Event()
         new_process = Process(
             target=worker_func,
             kwargs={"args": args},
@@ -82,11 +86,19 @@ class ReloadOneAction(ProcessActionBase):
         new_process.start()
         logger.info(f"Process {new_process.name} restarted with pid {new_process.pid}")
         workers[self.worker_num] = new_process
+        _wait_for_worker_startup(new_process, event)
 
 
 @dataclass
 class ShutdownAction(ProcessActionBase):
     """This action shuts down process manager loop."""
+
+
+def _wait_for_worker_startup(process: Process, event: EventType) -> None:
+    while process.is_alive():
+        with suppress(TimeoutError):
+            event.wait(0.1)
+            return
 
 
 def schedule_workers_reload(
@@ -118,9 +130,12 @@ def get_signal_handler(
     """
 
     def _signal_handler(signum: int, _frame: Any) -> None:
+        if current_process().name.startswith("worker"):
+            raise KeyboardInterrupt
+
         logger.debug(f"Got signal {signum}.")
         action_queue.put(ShutdownAction())
-        logger.warn("Workers are scheduled for shutdown.")
+        logger.warning("Workers are scheduled for shutdown.")
 
     return _signal_handler
 
@@ -138,7 +153,7 @@ class ProcessManager:
         self,
         args: WorkerArgs,
         worker_function: Callable[[WorkerArgs], None],
-        observer: Optional[Observer] = None,
+        observer: Optional[Observer] = None,  # type: ignore[valid-type]
     ) -> None:
         self.worker_function = worker_function
         self.action_queue: "Queue[ProcessActionBase]" = Queue(-1)
@@ -162,7 +177,9 @@ class ProcessManager:
 
     def prepare_workers(self) -> None:
         """Spawn multiple processes."""
+        events: List[EventType] = []
         for process in range(self.args.workers):
+            event = Event()
             work_proc = Process(
                 target=self.worker_function,
                 kwargs={"args": self.args},
@@ -176,8 +193,13 @@ class ProcessManager:
                 work_proc.pid,
             )
             self.workers.append(work_proc)
+            events.append(event)
 
-    def start(self) -> None:  # noqa: C901, WPS213
+        # Wait for workers startup
+        for worker, event in zip(self.workers, events):
+            _wait_for_worker_startup(worker, event)
+
+    def start(self) -> Optional[int]:  # noqa: C901
         """
         Start managing child processes.
 
@@ -202,7 +224,10 @@ class ProcessManager:
         After all events are handled, it iterates over all child processes and
         checks that all processes are healthy. If process was terminated for
         some reason, it schedules a restart for dead process.
+
+        :returns: status code or None.
         """
+        restarts = 0
         self.prepare_workers()
         while True:
             sleep(1)
@@ -217,6 +242,15 @@ class ProcessManager:
                         action_queue=self.action_queue,
                     )
                 elif isinstance(action, ReloadOneAction):
+                    # We check if max_fails is set.
+                    # If it's true, we check how many times
+                    # worker was reloaded.
+                    if not action.is_reload_all and self.args.max_fails >= 1:
+                        restarts += 1
+                        if restarts >= self.args.max_fails:
+                            logger.warning("Max restarts reached. Exiting.")
+                            # Returning error status.
+                            return -1
                     # If we just reloaded this worker, skip handling.
                     if action.worker_num in reloaded_workers:
                         continue
@@ -224,9 +258,14 @@ class ProcessManager:
                     reloaded_workers.add(action.worker_num)
                 elif isinstance(action, ShutdownAction):
                     logger.debug("Process manager closed.")
-                    return
+                    return None
 
             for worker_num, worker in enumerate(self.workers):
                 if not worker.is_alive():
                     logger.info(f"{worker.name} is dead. Scheduling reload.")
-                    self.action_queue.put(ReloadOneAction(worker_num=worker_num))
+                    self.action_queue.put(
+                        ReloadOneAction(
+                            worker_num=worker_num,
+                            is_reload_all=False,
+                        ),
+                    )

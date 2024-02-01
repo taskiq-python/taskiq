@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, Any, Coroutine, List, Union
 
 if TYPE_CHECKING:  # pragma: no cover
-    from taskiq.scheduler.scheduler import ScheduledTask
+    from taskiq.scheduler.scheduled_task import ScheduledTask
 
 
 class ScheduleSource(ABC):
@@ -18,7 +18,10 @@ class ScheduleSource(ABC):
     async def get_schedules(self) -> List["ScheduledTask"]:
         """Get list of taskiq schedules."""
 
-    async def add_schedule(self, schedule: "ScheduledTask") -> None:  # noqa: B027
+    async def add_schedule(
+        self,
+        schedule: "ScheduledTask",
+    ) -> None:
         """
         Add a new schedule.
 
@@ -32,4 +35,43 @@ class ScheduleSource(ABC):
         Note that this function may do nothing.
 
         :param schedule: schedule to add.
+        """
+        raise NotImplementedError(
+            f"The source {self.__class__.__name__} does not support adding schedules.",
+        )
+
+    async def delete_schedule(self, schedule_id: str) -> None:
+        """
+        Method to delete schedule by id.
+
+        This is useful for schedule cancelation.
+
+        :param schedule_id: id of schedule to delete.
+        """
+        raise NotImplementedError(
+            f"The source {self.__class__.__name__} does "
+            "not support deleting schedules.",
+        )
+
+    def pre_send(  # noqa: B027
+        self,
+        task: "ScheduledTask",
+    ) -> Union[None, Coroutine[Any, Any, None]]:
+        """
+        Actions to execute before task will be sent to broker.
+
+        This method may raise ScheduledTaskCancelledError.
+        This cancels the task execution.
+
+        :param task: task that will be sent
+        """
+
+    def post_send(  # noqa: B027
+        self,
+        task: "ScheduledTask",
+    ) -> Union[None, Coroutine[Any, Any, None]]:
+        """
+        Actions to execute after task was sent to broker.
+
+        :param task: task that just have sent
         """

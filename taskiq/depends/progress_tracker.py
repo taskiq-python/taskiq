@@ -1,5 +1,5 @@
 import enum
-from typing import Generic, Union
+from typing import Generic, Optional, Union
 
 from pydantic.generics import GenericModel
 from taskiq_dependencies import Depends
@@ -10,11 +10,9 @@ from taskiq.context import Context
 _ProgressType = TypeVar("_ProgressType")
 
 
-class TaskState(str, enum.Enum):  # noqa: WPS600
+class TaskState(str, enum.Enum):
     """State of task execution."""
 
-    PENDING = "PENDING"
-    RECEIVED = "RECEIVED"
     STARTED = "STARTED"
     FAILURE = "FAILURE"
     SUCCESS = "SUCCESS"
@@ -33,22 +31,36 @@ class ProgressTracker(Generic[_ProgressType]):
 
     def __init__(
         self,
-        context: Context = Depends(),  # noqa: WPS404
-    ):
+        context: Context = Depends(),
+    ) -> None:
         self.context = context
 
     async def set_progress(
         self,
         state: Union[TaskState, str],
-        meta: _ProgressType,
+        meta: Optional[_ProgressType] = None,
     ) -> None:
         """Set progress.
 
         :param state: TaskState or str
         :param meta: progress data
         """
-        progress = TaskProgress(state=state, meta=meta)
+        if meta is None:
+            progress = await self.get_progress()
+            meta = progress.meta if progress else meta
+
+        progress = TaskProgress(
+            state=state,
+            meta=meta,
+        )
+
         await self.context.broker.result_backend.set_progress(
             self.context.message.task_id,
             progress,
+        )
+
+    async def get_progress(self) -> Optional[TaskProgress[_ProgressType]]:
+        """Get progress."""
+        return await self.context.broker.result_backend.get_progress(
+            self.context.message.task_id,
         )

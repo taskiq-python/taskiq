@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from importlib import import_module
 from logging import getLogger
 from pathlib import Path
-from typing import Any, Generator, List
+from typing import Any, Generator, List, Sequence, Union
 
 from taskiq.utils import remove_suffix
 
@@ -22,17 +22,17 @@ def add_cwd_in_path() -> Generator[None, None, None]:
 
     :yield: none
     """
-    cwd = os.getcwd()
-    if cwd in sys.path:
+    cwd = Path.cwd()
+    if str(cwd) in sys.path:
         yield
     else:
         logger.debug(f"Inserting {cwd} in sys.path")
-        sys.path.insert(0, cwd)
+        sys.path.insert(0, str(cwd))
         try:
             yield
         finally:
-            try:  # noqa: WPS505
-                sys.path.remove(cwd)
+            try:
+                sys.path.remove(str(cwd))
             except ValueError:
                 logger.warning(f"Cannot remove '{cwd}' from sys.path")
 
@@ -69,7 +69,11 @@ def import_from_modules(modules: List[str]) -> None:
             logger.exception(err)
 
 
-def import_tasks(modules: List[str], pattern: str, fs_discover: bool) -> None:
+def import_tasks(
+    modules: List[str],
+    pattern: Union[str, Sequence[str]],
+    fs_discover: bool,
+) -> None:
     """
     Import tasks modules.
 
@@ -82,9 +86,14 @@ def import_tasks(modules: List[str], pattern: str, fs_discover: bool) -> None:
         from filesystem.
     """
     if fs_discover:
-        for path in Path(".").rglob(pattern):
-            modules.append(
-                remove_suffix(str(path), ".py").replace(os.path.sep, "."),
-            )
+        if isinstance(pattern, str):
+            pattern = (pattern,)
+        discovered_modules = set()
+        for glob_pattern in pattern:
+            for path in Path().glob(glob_pattern):
+                discovered_modules.add(
+                    remove_suffix(str(path), ".py").replace(os.path.sep, "."),
+                )
 
+        modules.extend(list(discovered_modules))
     import_from_modules(modules)

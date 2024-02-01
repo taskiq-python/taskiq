@@ -25,4 +25,30 @@ class MyScheduleSource(ScheduleSource):
     # This method is optional. You may not implement this.
     # It's just a helper to people to be able to interact with your source.
     async def add_schedule(self, schedule: "ScheduledTask") -> None:
-        return await super().add_schedule(schedule)
+        print("New schedule added:", schedule)
+
+    # This method is completely optional, but if you want to support
+    # schedule cancelation, you must implement it.
+    async def delete_schedule(self, schedule_id: str) -> None:
+        print("Deleting schedule:", schedule_id)
+
+    # This method is optional. You may not implement this.
+    # It's just a helper to people to be able to interact with your source.
+    async def pre_send(self, task: "ScheduledTask") -> None:
+        """
+        Actions to execute before task will be sent to broker.
+
+        This method may raise ScheduledTaskCancelledError.
+        This cancels the task execution.
+
+        :param task: task that will be sent
+        """
+
+    # This method is optional. You may not implement this.
+    # It's just a helper to people to be able to interact with your source.
+    async def post_send(self, task: "ScheduledTask") -> None:
+        """
+        Actions to execute after task was sent to broker.
+
+        :param task: task that just have sent
+        """

@@ -1,9 +1,10 @@
 from taskiq.abc.formatter import TaskiqFormatter
+from taskiq.compat import model_dump_json, model_validate_json
 from taskiq.message import BrokerMessage, TaskiqMessage
 
 
 class JSONFormatter(TaskiqFormatter):
-    """Default taskiq formatter."""
+    """JSON taskiq formatter."""
 
     def dumps(self, message: TaskiqMessage) -> BrokerMessage:
         """
@@ -15,7 +16,7 @@ class JSONFormatter(TaskiqFormatter):
         return BrokerMessage(
             task_id=message.task_id,
             task_name=message.task_name,
-            message=message.json().encode(),
+            message=model_dump_json(message).encode(),
             labels=message.labels,
         )
 
@@ -26,4 +27,4 @@ class JSONFormatter(TaskiqFormatter):
         :param message: broker's message.
         :return: parsed taskiq message.
         """
-        return TaskiqMessage.parse_raw(message)
+        return model_validate_json(TaskiqMessage, message)
