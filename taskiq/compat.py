@@ -1,4 +1,5 @@
 # flake8: noqa
+from functools import lru_cache
 from typing import Any, Dict, Optional, Type, TypeVar, Union
 
 import pydantic
@@ -13,8 +14,12 @@ IS_PYDANTIC2 = PYDANTIC_VER >= Version("2.0")
 if IS_PYDANTIC2:
     T = TypeVar("T")
 
+    @lru_cache(maxsize=None)
+    def create_type_adapter(annot: T) -> pydantic.TypeAdapter:
+        return pydantic.TypeAdapter(annot)
+
     def parse_obj_as(annot: T, obj: Any) -> T:
-        return pydantic.TypeAdapter(annot).validate_python(obj)
+        return create_type_adapter(annot).validate_python(obj)
 
     def model_validate(
         model_class: Type[Model],
