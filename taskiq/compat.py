@@ -14,7 +14,7 @@ IS_PYDANTIC2 = PYDANTIC_VER >= Version("2.0")
 if IS_PYDANTIC2:
     T = TypeVar("T")
 
-    @lru_cache(maxsize=None)
+    @lru_cache()
     def create_type_adapter(annot: T) -> pydantic.TypeAdapter[T]:
         return pydantic.TypeAdapter(annot)
 
