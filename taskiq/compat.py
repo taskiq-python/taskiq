@@ -15,7 +15,7 @@ if IS_PYDANTIC2:
     T = TypeVar("T")
 
     @lru_cache(maxsize=None)
-    def create_type_adapter(annot: T) -> pydantic.TypeAdapter:
+    def create_type_adapter(annot: T) -> pydantic.TypeAdapter[T]:
         return pydantic.TypeAdapter(annot)
 
     def parse_obj_as(annot: T, obj: Any) -> T:
