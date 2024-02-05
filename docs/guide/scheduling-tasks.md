@@ -96,7 +96,8 @@ taskiq scheduler module:scheduler --skip-first-run
 
 ## Dynamic scheduling
 
-Sometimes you may want to add new schedules to the scheduler on the fly. For example, you may want to run specific function in several minutes. You can easily do it with ScheduleSource that supports dynamic scheduling. Currently we can offer you RedisScheduleSource that is capable of doing so. List of such schedulers will be extended in the future. For list of available schedule sources see [Available schedule sources](../available-components/schedule-sources.md).
+Sometimes you may want to add new schedules to the scheduler on the fly. For example, you may want to run a specific function in several minutes from now. You can easily do it with ScheduleSources that support dynamic scheduling. Currently we suggest to use the `RedisScheduleSource` for that purpose. List of schedulers with dynamic task addition will be extended in the future.
+For list of available schedule sources see [Available schedule sources](../available-components/schedule-sources.md).
 
 Here's an example of using redis schedule source:
 
