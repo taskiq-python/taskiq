@@ -3,7 +3,6 @@ import logging
 import signal
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import set_start_method
-from multiprocessing.synchronize import Event
 from sys import platform
 from typing import Any, Optional, Type
 
@@ -68,7 +67,7 @@ def get_receiver_type(args: WorkerArgs) -> Type[Receiver]:
     return receiver_type
 
 
-def start_listen(args: WorkerArgs, event: Event) -> None:
+def start_listen(args: WorkerArgs) -> None:
     """
     This function starts actual listening process.
 
@@ -109,15 +108,14 @@ def start_listen(args: WorkerArgs, event: Event) -> None:
     signal.signal(signal.SIGINT, interrupt_handler)
     signal.signal(signal.SIGTERM, interrupt_handler)
 
-    # Notify parent process, worker is ready
-    event.set()
-
     if uvloop is not None:
         logger.debug("UVLOOP found. Using it as async runner")
         loop = uvloop.new_event_loop()  # type: ignore
     else:
         loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+
+    asyncio.set_event_loop(loop)
+
     # This option signals that current
     # broker is running as a worker.
     # We must set this field before importing tasks,
@@ -163,7 +161,7 @@ def run_worker(args: WorkerArgs) -> Optional[int]:
     :returns: Optional status code.
     """
     if platform == "darwin":
-        set_start_method("fork")
+        set_start_method("spawn")
     if args.configure_logging:
         logging.basicConfig(
             level=logging.getLevelName(args.log_level),

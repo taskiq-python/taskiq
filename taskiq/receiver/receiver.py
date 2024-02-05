@@ -100,6 +100,7 @@ class Receiver:
         message_data = message.data if isinstance(message, AckableMessage) else message
         try:
             taskiq_msg = self.broker.formatter.loads(message=message_data)
+            taskiq_msg.parse_labels()
         except Exception as exc:
             logger.warning(
                 "Cannot parse message: %s. Skipping execution.\n %s",

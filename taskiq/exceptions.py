@@ -40,3 +40,7 @@ class NoResultError(TaskiqError):
 
 class TaskRejectedError(TaskiqError):
     """Task was rejected."""
+
+
+class ScheduledTaskCancelledError(TaskiqError):
+    """Scheduled task was cancelled and not sent to the queue."""

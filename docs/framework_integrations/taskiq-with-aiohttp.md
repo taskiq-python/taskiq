@@ -6,7 +6,7 @@ order: 2
 
 AioHTTP is a framework for building robust applications. We created several libraries to make the experience with AioHTTP even better.
 
-# Dependency inecjeciton for AioHTTP
+# Dependency injection for AioHTTP
 
 We created a library [aiohttp-deps](https://pypi.org/project/aiohttp-deps/) to add FastAPI-like dependency injection in AioHTTP.
 

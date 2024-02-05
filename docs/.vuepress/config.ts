@@ -1,6 +1,6 @@
 import { defineUserConfig } from "vuepress";
-import { searchProPlugin } from "vuepress-plugin-search-pro";
 import { hopeTheme } from "vuepress-theme-hope";
+import { viteBundler } from '@vuepress/bundler-vite'
 
 export default defineUserConfig({
   lang: "en-US",
@@ -16,6 +16,8 @@ export default defineUserConfig({
     ],
   ],
 
+  bundler: viteBundler(),
+
   theme: hopeTheme({
     hostname: "https://taskiq-python.github.io",
     logo: "/logo.svg",
@@ -28,7 +30,6 @@ export default defineUserConfig({
     sidebar: "structure",
 
     pure: true,
-    backToTop: false,
 
     plugins: {
       readingTime: false,
@@ -45,8 +46,10 @@ export default defineUserConfig({
         changefreq: "daily",
         sitemapFilename: "sitemap.xml",
       },
+      searchPro: {
+        indexContent: true,
+        autoSuggestions: false,
+      }
     },
-  }),
-
-  plugins: [searchProPlugin({ indexContent: true })],
+  })
 });

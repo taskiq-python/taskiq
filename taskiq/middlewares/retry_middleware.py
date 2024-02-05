@@ -1,9 +1,9 @@
-from copy import deepcopy
 from logging import getLogger
 from typing import Any
 
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.exceptions import NoResultError
+from taskiq.kicker import AsyncKicker
 from taskiq.message import TaskiqMessage
 from taskiq.result import TaskiqResult
 
@@ -47,25 +47,32 @@ class SimpleRetryMiddleware(TaskiqMiddleware):
             return
 
         retry_on_error = message.labels.get("retry_on_error")
+        if isinstance(retry_on_error, str):
+            retry_on_error = retry_on_error.lower() == "true"
+
         if retry_on_error is None:
-            retry_on_error = "true" if self.default_retry_label else "false"
+            retry_on_error = self.default_retry_label
         # Check if retrying is enabled for the task.
-        if retry_on_error.lower() != "true":
+        if not retry_on_error:
             return
-        new_msg = deepcopy(message)
+
+        kicker: AsyncKicker[Any, Any] = AsyncKicker(
+            task_name=message.task_name,
+            broker=self.broker,
+            labels=message.labels,
+        ).with_task_id(message.task_id)
 
         # Getting number of previous retries.
-        retries = int(new_msg.labels.get("_retries", 0)) + 1
-        new_msg.labels["_retries"] = str(retries)
-        max_retries = int(new_msg.labels.get("max_retries", self.default_retry_count))
+        retries = int(message.labels.get("_retries", 0)) + 1
+        kicker.with_labels(_retries=retries)
+        max_retries = int(message.labels.get("max_retries", self.default_retry_count))
 
         if retries < max_retries:
             logger.info(
                 "Task '%s' invocation failed. Retrying.",
                 message.task_name,
             )
-            broker_message = self.broker.formatter.dumps(message=new_msg)
-            await self.broker.kick(broker_message)
+            await kicker.kiq(*message.args, **message.kwargs)
 
             if self.no_result_on_retry:
                 result.error = NoResultError()
