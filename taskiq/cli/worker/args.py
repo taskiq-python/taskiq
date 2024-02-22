@@ -1,5 +1,6 @@
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
 from taskiq.acks import AcknowledgeType
@@ -29,6 +30,7 @@ class WorkerArgs:
     tasks_pattern: Sequence[str] = ("**/tasks.py",)
     fs_discover: bool = False
     configure_logging: bool = True
+    log_config: Optional[Path] = None
     log_level: LogLevel = LogLevel.INFO
     workers: int = 2
     max_threadpool_threads: int = 10
@@ -182,6 +184,13 @@ class WorkerArgs:
             action="store_false",
             dest="configure_logging",
             help="Use this parameter if your application configures custom logging.",
+        )
+        parser.add_argument(
+            "--log-config",
+            type=Path,
+            dest="log_config",
+            default=None,
+            help="Configure logging from file.",
         )
         parser.add_argument(
             "--max-fails",
