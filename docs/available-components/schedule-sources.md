@@ -10,7 +10,7 @@ Currently we have only one schedule source.
 ## RedisScheduleSource
 
 This source is capable of adding new schedules in runtime. It uses Redis as a storage for schedules.
-To use this source you need to install `taskiq-redids` package.
+To use this source you need to install `taskiq-redis` package.
 
 ```python
 from taskiq_redis import RedisScheduleSource
