@@ -45,7 +45,7 @@ async def run_receiver_task(
     :param max_prefetch: maximum number of tasks to prefetch.
     :param propagate_exceptions: whether to propagate exceptions in generators or not.
     :param run_startup: whether to run startup function or not.
-
+    :param ack_time: acknowledge type to use.
     :raises asyncio.CancelledError: if the task was cancelled.
     """
 
