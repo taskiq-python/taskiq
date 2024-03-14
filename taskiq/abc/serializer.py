@@ -19,6 +19,6 @@ class TaskiqSerializer(ABC):
         """
         Parse byte-encoded value received from the wire.
 
-        :param message: value to parse.
+        :param value: value to decode.
         :return: decoded value.
         """

@@ -49,7 +49,7 @@ def only_new(
     """
     This function preserves only new schedules.
 
-    :param old_tasks: previously discovered tasks.
+    :param _old_tasks: previously discovered tasks.
     :param new_tasks: newly discovered schedules.
     :return: list of new schedules.
     """
