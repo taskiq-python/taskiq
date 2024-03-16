@@ -1,8 +1,11 @@
 import asyncio
+import json
 import logging
+import logging.config
 import signal
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import set_start_method
+from pathlib import Path
 from sys import platform
 from typing import Any, Optional, Type
 
@@ -22,6 +25,12 @@ try:
     from watchdog.observers import Observer
 except ImportError:
     Observer = None  # type: ignore
+
+
+try:
+    import yaml
+except ImportError:
+    yaml = None  # type: ignore
 
 logger = logging.getLogger("taskiq.worker")
 
@@ -148,6 +157,49 @@ def start_listen(args: WorkerArgs) -> None:
         loop.run_until_complete(shutdown_broker(broker, args.shutdown_timeout))
 
 
+def load_logging_config_file(log_config: Path) -> dict[str, Any]:
+    """
+    This function load logging configuration file to dictionary.
+
+    :param log_config: path to log configuration file.
+
+    :raises ValueError: if file format not supported.
+    :returns: Dictionary with logging configuration.
+    """
+    with log_config.open("r", encoding="utf-8") as log_config_file:
+        if log_config.suffix == ".json":
+            return json.load(log_config_file)
+        if log_config.suffix in [".yaml", ".yml"]:
+            if yaml is None:
+                raise ValueError(
+                    "To use --log-config with yaml, please install taskiq[pyyaml].",
+                )
+            return yaml.safe_load(log_config_file)
+        raise ValueError("Log config has invalid format.")
+
+
+def configure_logging(args: WorkerArgs) -> None:
+    """
+    This function configure logging.
+
+    :param args: CLI arguments.
+    """
+    if args.log_config is not None:
+        if args.log_config.suffix == ".ini":
+            logging.config.fileConfig(args.log_config)
+            return
+        logging.config.dictConfig(load_logging_config_file(args.log_config))
+        return
+    if args.configure_logging:
+        logging.basicConfig(
+            level=logging.getLevelName(args.log_level),
+            format="[%(asctime)s][%(name)s][%(levelname)-7s]"
+            "[%(processName)s] %(message)s",
+        )
+    logging.getLogger("taskiq").setLevel(level=logging.getLevelName(args.log_level))
+    logging.getLogger("watchdog.observers.inotify_buffer").setLevel(level=logging.INFO)
+
+
 def run_worker(args: WorkerArgs) -> Optional[int]:
     """
     This function starts worker processes.
@@ -162,14 +214,7 @@ def run_worker(args: WorkerArgs) -> Optional[int]:
     """
     if platform == "darwin":
         set_start_method("spawn")
-    if args.configure_logging:
-        logging.basicConfig(
-            level=logging.getLevelName(args.log_level),
-            format="[%(asctime)s][%(name)s][%(levelname)-7s]"
-            "[%(processName)s] %(message)s",
-        )
-    logging.getLogger("taskiq").setLevel(level=logging.getLevelName(args.log_level))
-    logging.getLogger("watchdog.observers.inotify_buffer").setLevel(level=logging.INFO)
+    configure_logging(args)
     logger.info("Starting %s worker processes.", args.workers)
 
     observer = None

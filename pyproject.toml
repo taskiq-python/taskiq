@@ -47,6 +47,8 @@ pytz = "*"
 orjson = { version = "^3.9.9", optional = true }
 msgpack = { version = "^1.0.7", optional = true }
 cbor2 = { version = "^5.4.6", optional = true }
+# For load log config from yaml
+pyyaml = {version = "^6.0.1", optional = true}
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"
@@ -65,6 +67,7 @@ pytest-mock = "^3.11.1"
 tzlocal = "^5.0.1"
 types-tzlocal = "^5.0.1.1"
 types-pytz = "^2023.3.1.1"
+types-pyyaml = "^6.0.12.12"
 
 [tool.poetry.extras]
 zmq = ["pyzmq"]
@@ -74,6 +77,7 @@ reload = ["watchdog", "gitignore-parser"]
 orjson = ["orjson"]
 msgpack = ["msgpack"]
 cbor = ["cbor2"]
+pyyaml = ["pyyaml"]
 
 [tool.poetry.scripts]
 taskiq = "taskiq.__main__:main"
