@@ -1,7 +1,9 @@
 import asyncio
 from abc import ABC, abstractmethod
 from time import time
-from typing import TYPE_CHECKING, Any, Coroutine, Generic, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Coroutine, Generic, Optional, Union
+
+from typing_extensions import TypeVar
 
 from taskiq.exceptions import (
     ResultGetError,
@@ -11,6 +13,7 @@ from taskiq.exceptions import (
 
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.result_backend import AsyncResultBackend
+    from taskiq.depends.progress_tracker import TaskProgress
     from taskiq.result import TaskiqResult
 
 _ReturnType = TypeVar("_ReturnType")
@@ -63,6 +66,19 @@ class _Task(ABC, Generic[_ReturnType]):
             before raising TaskiqResultTimeoutError.
         :param with_logs: whether you need to download logs.
         :return: TaskiqResult.
+        """
+
+    @abstractmethod
+    def get_progress(
+        self,
+    ) -> Union[
+        "Optional[TaskProgress[Any]]",
+        Coroutine[Any, Any, "Optional[TaskProgress[Any]]"],
+    ]:
+        """
+        Get task progress.
+
+        :return: task's progress.
         """
 
 
@@ -137,3 +153,11 @@ class AsyncTaskiqTask(_Task[_ReturnType]):
             if 0 < timeout < time() - start_time:
                 raise TaskiqResultTimeoutError
         return await self.get_result(with_logs=with_logs)
+
+    async def get_progress(self) -> "Optional[TaskProgress[Any]]":
+        """
+        Get task progress.
+
+        :return: task's progress.
+        """
+        return await self.result_backend.get_progress(self.task_id)
