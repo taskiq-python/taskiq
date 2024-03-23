@@ -84,9 +84,11 @@ class Receiver:
             )
         self.sem_prefetch = asyncio.Semaphore(max_prefetch)
         self._logging_handler = TaskiqLogHandler(logging.DEBUG)
-        self._logging_formatter = Formatter(
-            fmt="[%(asctime)s] [%(name)s] [%(levelname)s] > %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
+        self._logging_handler.setFormatter(
+            Formatter(
+                fmt="[%(asctime)s] [%(name)s] [%(levelname)s] > %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            ),
         )
         task_logger.addHandler(self._logging_handler)
 
@@ -246,7 +248,7 @@ class Receiver:
         # Start a timer.
         start_time = time()
 
-        log = None
+        log = []
         try:
             # We put kwargs resolving here,
             # to be able to catch any exception (for example ),

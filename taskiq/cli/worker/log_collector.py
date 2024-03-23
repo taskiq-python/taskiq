@@ -24,7 +24,7 @@ class TaskiqLogHandler(logging.Handler):
             if task:
                 return task.get_name()
 
-            raise RuntimeError
+            return None
 
     def associate(self, task_id: str) -> None:
         """
@@ -59,17 +59,15 @@ class TaskiqLogHandler(logging.Handler):
 
     def emit(self, record: LogRecord) -> None:
         """
-        Collect an outputted log record.
+        Collect a log record.
 
         :param record: The log record to collect.
         :type record: LogRecord
         """
-        try:
-            async_task_name = self._get_async_task_name()
-        except RuntimeError:
-            # If not in an async context, do nothing
+        self.format(record)
+        async_task_name = self._get_async_task_name()
+        if not async_task_name:
             return
-        record.async_task_name = async_task_name
         try:
             record.task_id = self._associations.inverse[async_task_name]
         except KeyError:

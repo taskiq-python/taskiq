@@ -1,15 +1,18 @@
 import asyncio
+import logging
 import random
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, ClassVar, List, Optional
 
 import pytest
+from anyio import sleep
 from taskiq_dependencies import Depends
 
 from taskiq.abc.broker import AckableMessage, AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.brokers.inmemory_broker import InMemoryBroker
+from taskiq.cli.worker.log_collector import TaskiqLogHandler
 from taskiq.exceptions import NoResultError, TaskiqResultTimeoutError
 from taskiq.message import TaskiqMessage
 from taskiq.receiver import Receiver
@@ -447,14 +450,22 @@ async def test_no_result_error() -> None:
 async def test_result() -> None:
     broker = InMemoryBroker()
 
+    handler = TaskiqLogHandler()
+    logger = logging.getLogger("taskiq.tasklogger")
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+
     @broker.task
-    async def task_no_result() -> str:
+    async def task_with_result() -> str:
+        logger.info("Some stuff")
         return "some value"
 
-    task = await task_no_result.kiq()
+    task = await task_with_result.kiq()
     resp = await task.wait_result(timeout=1)
 
     assert resp.return_value == "some value"
+    assert resp.log is not None
+    assert resp.log[0].message == "Some stuff"
     assert not broker._running_tasks
 
 
@@ -472,3 +483,48 @@ async def test_error_result() -> None:
     assert resp.return_value is None
     assert not broker._running_tasks
     assert isinstance(resp.error, ValueError)
+
+
+@pytest.mark.anyio
+async def test_concurrent_logs() -> None:
+    broker = InMemoryBroker()
+
+    handler = TaskiqLogHandler()
+    logger = logging.getLogger("taskiq.tasklogger")
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+
+    @broker.task
+    async def task1() -> int:
+        await sleep(1)
+        logger.info("Some stuff")
+        await sleep(1)
+        logger.info("End some stuff")
+        return 1
+
+    @broker.task
+    async def task2() -> int:
+        logger.info("Some more stuff")
+        logger.info("End more stuff")
+        return 2
+
+    t1 = await task1.kiq()
+    t2 = await task2.kiq()
+    await sleep(1)
+    t3 = await task1.kiq()
+    await sleep(1)
+    t4 = await task2.kiq()
+    resp1 = await t1.wait_result(timeout=5)
+    resp2 = await t2.wait_result(timeout=5)
+    resp3 = await t3.wait_result(timeout=5)
+    resp4 = await t4.wait_result(timeout=5)
+
+    assert (
+        resp1.log is not None
+        and resp2.log is not None
+        and resp3.log is not None
+        and resp4.log is not None
+    )
+    assert "some" in resp1.log[1].message and "more" in resp2.log[1].message
+    assert "some" in resp3.log[1].message and "more" in resp4.log[1].message
+    assert not broker._running_tasks
