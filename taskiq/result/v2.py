@@ -1,6 +1,7 @@
 import json
 import pickle
-from typing import Any, Dict, Generic, Optional, TypeVar
+from logging import LogRecord
+from typing import Any, Dict, Generic, List, Optional, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 from typing_extensions import Self
@@ -14,10 +15,7 @@ class TaskiqResult(BaseModel, Generic[_ReturnType]):
     """Result of a remote task invocation."""
 
     is_err: bool
-    # Log is a deprecated field. It would be removed in future
-    # releases of not, if we find a way to capture logs in async
-    # environment.
-    log: Optional[str] = None
+    log: Optional[List[LogRecord]] = None
     return_value: _ReturnType
     execution_time: float
     labels: Dict[str, Any] = Field(default_factory=dict)

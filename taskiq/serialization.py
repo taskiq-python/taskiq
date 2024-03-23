@@ -2,17 +2,7 @@ import sys
 import traceback
 from inspect import getmro
 from itertools import takewhile
-from typing import (
-    Any,
-    Generic,
-    Iterable,
-    List,
-    Optional,
-    Set,
-    Tuple,
-    Type,
-    Union,
-)
+from typing import Any, Generic, Iterable, List, Optional, Set, Tuple, Type, Union
 
 import pydantic
 from typing_extensions import Protocol, TypeVar, runtime_checkable

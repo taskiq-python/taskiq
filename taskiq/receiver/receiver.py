@@ -1,7 +1,8 @@
 import asyncio
 import inspect
+import logging
 from concurrent.futures import Executor
-from logging import getLogger
+from logging import Formatter, getLogger
 from time import time
 from typing import Any, Callable, Dict, List, Optional, Set, Union, get_type_hints
 
@@ -11,6 +12,7 @@ from taskiq_dependencies import DependencyGraph
 from taskiq.abc.broker import AckableMessage, AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.acks import AcknowledgeType
+from taskiq.cli.worker.log_collector import TaskiqLogHandler
 from taskiq.context import Context
 from taskiq.exceptions import NoResultError
 from taskiq.message import TaskiqMessage
@@ -20,6 +22,8 @@ from taskiq.state import TaskiqState
 from taskiq.utils import maybe_awaitable
 
 logger = getLogger(__name__)
+task_logger = getLogger("taskiq.tasklogger")
+task_logger.setLevel(logging.DEBUG)
 QUEUE_DONE = b"-1"
 
 
@@ -79,6 +83,12 @@ class Receiver:
                 "can result in undefined behavior",
             )
         self.sem_prefetch = asyncio.Semaphore(max_prefetch)
+        self._logging_handler = TaskiqLogHandler(logging.DEBUG)
+        self._logging_formatter = Formatter(
+            fmt="[%(asctime)s] [%(name)s] [%(levelname)s] > %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+        task_logger.addHandler(self._logging_handler)
 
     async def callback(  # noqa: C901, PLR0912
         self,
@@ -236,6 +246,7 @@ class Receiver:
         # Start a timer.
         start_time = time()
 
+        log = None
         try:
             # We put kwargs resolving here,
             # to be able to catch any exception (for example ),
@@ -245,26 +256,32 @@ class Receiver:
             # We udpate kwargs with kwargs from network.
             kwargs.update(message.kwargs)
             is_coroutine = True
-            # If the function is a coroutine, we await it.
-            if asyncio.iscoroutinefunction(target):
-                target_future = target(*message.args, **kwargs)
-            else:
-                is_coroutine = False
-                # If this is a synchronous function, we
-                # run it in executor.
-                target_future = loop.run_in_executor(
-                    self.executor,
-                    _run_sync,
-                    target,
-                    message.args,
-                    kwargs,
-                )
-            timeout = message.labels.get("timeout")
-            if timeout is not None:
-                if not is_coroutine:
-                    logger.warning("Timeouts for sync tasks don't work in python well.")
-                target_future = asyncio.wait_for(target_future, float(timeout))
-            returned = await target_future
+            self._logging_handler.associate(message.task_id)
+            try:
+                # If the function is a coroutine, we await it.
+                if asyncio.iscoroutinefunction(target):
+                    target_future = target(*message.args, **kwargs)
+                else:
+                    is_coroutine = False
+                    # If this is a synchronous function, we
+                    # run it in executor.
+                    target_future = loop.run_in_executor(
+                        self.executor,
+                        _run_sync,
+                        target,
+                        message.args,
+                        kwargs,
+                    )
+                timeout = message.labels.get("timeout")
+                if timeout is not None:
+                    if not is_coroutine:
+                        logger.warning(
+                            "Timeouts for sync tasks don't work in python well.",
+                        )
+                    target_future = asyncio.wait_for(target_future, float(timeout))
+                returned = await target_future
+            finally:
+                log = self._logging_handler.retrieve_logs(message.task_id)
         except NoResultError as no_res_exc:
             found_exception = no_res_exc
             logger.warning(
@@ -294,7 +311,7 @@ class Receiver:
         # Assemble result.
         result: "TaskiqResult[Any]" = TaskiqResult(
             is_err=found_exception is not None,
-            log=None,
+            log=log,
             return_value=returned,
             execution_time=round(execution_time, 2),
             error=found_exception,

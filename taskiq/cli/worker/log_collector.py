@@ -1,63 +1,80 @@
+import asyncio
 import logging
-import sys
-from contextlib import contextmanager
-from typing import IO, Any, Generator, List, TextIO
+from logging import LogRecord
+from typing import Dict, List, Union
+
+from bidict import bidict
 
 
-class Redirector:
-    """A class to write to multiple streams."""
+class TaskiqLogHandler(logging.Handler):
+    """Log handler class."""
 
-    def __init__(self, *streams: IO[Any]) -> None:
-        self.streams = streams
+    def __init__(self, level: Union[int, str] = 0) -> None:
+        self.stream: Dict[Union[str, None], List[logging.LogRecord]] = {}
+        self._associations: bidict[Union[str, None], Union[str, None]] = bidict()
+        super().__init__(level)
 
-    def write(self, message: Any) -> None:
+    @staticmethod
+    def _get_async_task_name() -> Union[str, None]:
+        try:
+            task = asyncio.current_task()
+        except RuntimeError:
+            return None
+        else:
+            if task:
+                return task.get_name()
+
+            raise RuntimeError
+
+    def associate(self, task_id: str) -> None:
         """
-        This write request writes to all available streams.
+        Associate the current async task with the Taskiq task ID.
 
-        :param message: message to write.
+        :param task_id: The Taskiq task ID.
+        :type task_id: str
         """
-        for stream in self.streams:
-            stream.write(message)
+        async_task_name = self._get_async_task_name()
+        self._associations[task_id] = async_task_name
 
+    def retrieve_logs(self, task_id: str) -> List[LogRecord]:
+        """
+        Collect logs.
 
-@contextmanager
-def log_collector(
-    new_target: TextIO,
-    custom_format: str,
-) -> "Generator[TextIO, None, None]":
-    """
-    Context manager to collect logs.
+        Collect the logs of a Taskiq task and return
+        them after removing them from memory.
 
-    This useful class redirects all logs
-    from stdout, stderr and root logger
-    to some new target.
+        :param task_id: The Taskiq task ID
+        :type task_id: str
+        :return: A list of LogRecords
+        :rtype: List[LogRecord]
+        """
+        async_task_name = self._associations[task_id]
+        try:
+            stream = self.stream[async_task_name]
+        except KeyError:
+            stream = []
+        else:
+            del self._associations[task_id]
+        return stream
 
-    It can be used like this:
+    def emit(self, record: LogRecord) -> None:
+        """
+        Collect an outputted log record.
 
-    >>> logs = io.StringIO()
-    >>> with log_collector(logs, "%(levelname)s %(message)s"):
-    >>>     print("A")
-    >>>
-    >>> print(f"Collected logs: {logs.get_value()}")
-
-    :param new_target: new target for logs. All
-        logs are written in new_target.
-    :param custom_format: custom format for
-        collected logging calls.
-    :yields: new target.
-    """
-    old_targets: "List[TextIO]" = []
-    log_handler = logging.StreamHandler(new_target)
-    log_handler.setFormatter(logging.Formatter(custom_format))
-
-    old_targets.extend([sys.stdout, sys.stderr])
-    logging.root.addHandler(log_handler)
-    sys.stdout = Redirector(new_target, sys.stdout)  # type: ignore
-    sys.stderr = Redirector(new_target, sys.stderr)  # type: ignore
-
-    try:
-        yield new_target
-    finally:
-        sys.stderr = old_targets.pop()
-        sys.stdout = old_targets.pop()
-        logging.root.removeHandler(log_handler)
+        :param record: The log record to collect.
+        :type record: LogRecord
+        """
+        try:
+            async_task_name = self._get_async_task_name()
+        except RuntimeError:
+            # If not in an async context, do nothing
+            return
+        record.async_task_name = async_task_name
+        try:
+            record.task_id = self._associations.inverse[async_task_name]
+        except KeyError:
+            return
+        try:
+            self.stream[async_task_name].append(record)
+        except KeyError:
+            self.stream[async_task_name] = [record]
