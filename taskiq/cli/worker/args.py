@@ -43,6 +43,8 @@ class WorkerArgs:
     no_propagate_errors: bool = False
     max_fails: int = -1
     ack_type: AcknowledgeType = AcknowledgeType.WHEN_SAVED
+    max_tasks_per_child: Optional[int] = None
+    wait_tasks_timeout: Optional[float] = None
 
     @classmethod
     def from_cli(
@@ -196,6 +198,19 @@ class WorkerArgs:
             default=AcknowledgeType.WHEN_SAVED,
             choices=[ack_type.name.lower() for ack_type in AcknowledgeType],
             help="When to acknowledge message.",
+        )
+        parser.add_argument(
+            "--max-tasks-per-child",
+            type=int,
+            default=None,
+            help="Maximum number of tasks to execute per child process.",
+        )
+        parser.add_argument(
+            "--wait-tasks-timeout",
+            type=float,
+            default=None,
+            help="Maximum time to wait for all current tasks "
+            "to finish before exiting.",
         )
 
         namespace = parser.parse_args(args)
