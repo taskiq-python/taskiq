@@ -53,7 +53,7 @@ class Receiver:
         max_async_tasks: "Optional[int]" = None,
         max_prefetch: int = 0,
         propagate_exceptions: bool = True,
-        run_starup: bool = True,
+        run_startup: bool = True,
         ack_type: Optional[AcknowledgeType] = None,
         on_exit: Optional[Callable[["Receiver"], None]] = None,
         max_tasks_to_execute: Optional[int] = None,
@@ -61,7 +61,7 @@ class Receiver:
     ) -> None:
         self.broker = broker
         self.executor = executor
-        self.run_startup = run_starup
+        self.run_startup = run_startup
         self.validate_params = validate_params
         self.task_signatures: Dict[str, inspect.Signature] = {}
         self.task_hints: Dict[str, Dict[str, Any]] = {}
