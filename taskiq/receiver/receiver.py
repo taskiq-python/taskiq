@@ -57,7 +57,7 @@ class Receiver:
         ack_type: Optional[AcknowledgeType] = None,
         on_exit: Optional[Callable[["Receiver"], None]] = None,
         max_tasks_to_execute: Optional[int] = None,
-        wait_tasks_timeout: Optional[int] = None,
+        wait_tasks_timeout: Optional[float] = None,
     ) -> None:
         self.broker = broker
         self.executor = executor
