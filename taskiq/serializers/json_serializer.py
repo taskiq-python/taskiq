@@ -5,7 +5,7 @@ from taskiq.abc.serializer import TaskiqSerializer
 
 
 class JSONSerializer(TaskiqSerializer):
-    """Default taskiq serizalizer."""
+    """Default taskiq serializer."""
 
     def __init__(self, default: Optional[Callable[..., None]] = None) -> None:
         self.default = default
@@ -14,7 +14,7 @@ class JSONSerializer(TaskiqSerializer):
         """
         Dumps taskiq message to some broker message format.
 
-        :param message: message to send.
+        :param value: message to send.
         :return: Dumped message.
         """
         return dumps(
@@ -26,7 +26,7 @@ class JSONSerializer(TaskiqSerializer):
         """
         Parse byte-encoded value received from the wire.
 
-        :param message: value to parse.
+        :param value: value to parse.
         :return: decoded value.
         """
         return loads(value.decode())
