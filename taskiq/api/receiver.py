@@ -67,7 +67,7 @@ async def run_receiver_task(
                 receiver = receiver_cls(
                     broker=broker,
                     executor=executor,
-                    run_starup=run_startup,
+                    run_startup=run_startup,
                     validate_params=validate_params,
                     max_async_tasks=max_async_tasks,
                     max_prefetch=max_prefetch,
