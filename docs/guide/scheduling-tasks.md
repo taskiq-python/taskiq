@@ -118,7 +118,7 @@ Now we can use this source to add new schedules in runtime. Here's an example:
     )
 ```
 
-Or if you want ot use cron schedules instead, just use `schedule_by_cron` method.
+Or if you want to use cron schedules instead, just use `schedule_by_cron` method.
 
 ```python
     await my_task.schedule_by_cron(
