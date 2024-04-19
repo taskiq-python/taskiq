@@ -11,12 +11,12 @@
   },
   "packageManager": "pnpm@7.22.0",
   "devDependencies": {
-    "@vuepress/bundler-vite": "2.0.0-rc.6",
+    "@vuepress/bundler-vite": "2.0.0-rc.9",
     "mermaid": "^10.8.0",
     "sass-loader": "^14.1.0",
     "vue": "^3.4.15",
-    "vuepress": "2.0.0-rc.6",
-    "vuepress-plugin-search-pro": "2.0.0-rc.22",
-    "vuepress-theme-hope": "2.0.0-rc.22"
+    "vuepress": "2.0.0-rc.9",
+    "vuepress-plugin-search-pro": "2.0.0-rc.36",
+    "vuepress-theme-hope": "2.0.0-rc.36"
   }
 }
