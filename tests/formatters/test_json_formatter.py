@@ -23,7 +23,8 @@ async def test_json_dumps() -> None:
             b'{"task_id":"task-id","task_name":"task.name",'
             b'"labels":{"label1":1,"label2":"text"},'
             b'"labels_types":null,'
-            b'"args":[1,"a"],"kwargs":{"p1":"v1"}}'
+            b'"args":[1,"a"],"kwargs":{"p1":"v1"},'
+            b'"ack":null}'
         ),
         labels={"label1": 1, "label2": "text"},
     )

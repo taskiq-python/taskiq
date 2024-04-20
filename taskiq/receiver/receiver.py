@@ -101,9 +101,15 @@ class Receiver:
         :param raise_err: raise an error if cannot save result in
             result_backend.
         """
-        message_data = message.data if isinstance(message, AckableMessage) else message
+        message_data, message_ack = (
+            (message.data, message.ack)
+            if isinstance(message, AckableMessage)
+            else (message, None)
+        )
         try:
             taskiq_msg = self.broker.formatter.loads(message=message_data)
+            if message_ack:
+                taskiq_msg.ack = message_ack
             taskiq_msg.parse_labels()
         except Exception as exc:
             logger.warning(
@@ -143,7 +149,7 @@ class Receiver:
             message,
             AckableMessage,
         ):
-            await maybe_awaitable(message.ack())
+            await maybe_awaitable(taskiq_msg.ack())
 
         result = await self.run_task(
             target=task.original_func,
@@ -154,7 +160,7 @@ class Receiver:
             message,
             AckableMessage,
         ):
-            await maybe_awaitable(message.ack())
+            await maybe_awaitable(taskiq_msg.ack())
 
         for middleware in self.broker.middlewares:
             if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
@@ -181,7 +187,7 @@ class Receiver:
             message,
             AckableMessage,
         ):
-            await maybe_awaitable(message.ack())
+            await maybe_awaitable(taskiq_msg.ack())
 
     async def run_task(  # noqa: C901, PLR0912, PLR0915
         self,
