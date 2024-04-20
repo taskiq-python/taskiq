@@ -53,13 +53,15 @@ class Receiver:
         max_async_tasks: "Optional[int]" = None,
         max_prefetch: int = 0,
         propagate_exceptions: bool = True,
-        run_starup: bool = True,
+        run_startup: bool = True,
         ack_type: Optional[AcknowledgeType] = None,
         on_exit: Optional[Callable[["Receiver"], None]] = None,
+        max_tasks_to_execute: Optional[int] = None,
+        wait_tasks_timeout: Optional[float] = None,
     ) -> None:
         self.broker = broker
         self.executor = executor
-        self.run_startup = run_starup
+        self.run_startup = run_startup
         self.validate_params = validate_params
         self.task_signatures: Dict[str, inspect.Signature] = {}
         self.task_hints: Dict[str, Dict[str, Any]] = {}
@@ -68,6 +70,8 @@ class Receiver:
         self.on_exit = on_exit
         self.ack_time = ack_type or AcknowledgeType.WHEN_SAVED
         self.known_tasks: Set[str] = set()
+        self.max_tasks_to_execute = max_tasks_to_execute
+        self.wait_tasks_timeout = wait_tasks_timeout
         for task in self.broker.get_all_tasks().values():
             self._prepare_task(task.task_name, task.original_func)
         self.sem: "Optional[asyncio.Semaphore]" = None
@@ -342,12 +346,20 @@ class Receiver:
 
         :param queue: queue for prefetched data.
         """
+        fetched_tasks: int = 0
         iterator = self.broker.listen()
 
         while True:
             try:
                 await self.sem_prefetch.acquire()
+                if (
+                    self.max_tasks_to_execute
+                    and fetched_tasks >= self.max_tasks_to_execute
+                ):
+                    logger.info("Max number of tasks executed.")
+                    break
                 message = await iterator.__anext__()
+                fetched_tasks += 1
                 await queue.put(message)
             except asyncio.CancelledError:
                 break
@@ -389,6 +401,8 @@ class Receiver:
             self.sem_prefetch.release()
             message = await queue.get()
             if message is QUEUE_DONE:
+                logger.info("Waiting for running tasks to complete.")
+                await asyncio.wait(tasks, timeout=self.wait_tasks_timeout)
                 break
 
             task = asyncio.create_task(

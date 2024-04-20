@@ -95,7 +95,9 @@ when you modify ignored files. To disable this functionality pass `--do-not-use-
 * `--receiver` - python path to custom receiver class.
 * `--receiver_arg` - custom args for receiver.
 * `--ack-type` - Type of acknowledgement. This parameter is used to set when to acknowledge the task. Possible values are `when_received`, `when_executed`, `when_saved`. Default is `when_saved`.
-- `--shutdown-timeout` - maximum amount of time for graceful broker's shutdown in seconds.
+* `max-tasks-per-child` - maximum number of tasks to be executed by a single worker process before restart.
+* `--shutdown-timeout` - maximum amount of time for graceful broker's shutdown in seconds.
+* `--wait-tasks-timeout` - if cannot read new messages from the broker or maximum number of tasks is reached, worker will wait for all current tasks to finish. This parameter sets the maximum amount of time to wait until shutdown.
 
 ## Scheduler
 

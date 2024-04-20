@@ -28,7 +28,7 @@ if IS_PYDANTIC2:
         return model_class.model_validate(message)
 
     def model_dump(instance: Model) -> Dict[str, Any]:
-        return instance.model_dump()
+        return instance.model_dump(mode="json")
 
     def model_validate_json(
         model_class: Type[Model],

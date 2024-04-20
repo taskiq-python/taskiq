@@ -140,6 +140,8 @@ def start_listen(args: WorkerArgs) -> None:
                 max_prefetch=args.max_prefetch,
                 propagate_exceptions=not args.no_propagate_errors,
                 ack_type=args.ack_type,
+                max_tasks_to_execute=args.max_tasks_per_child,
+                wait_tasks_timeout=args.wait_tasks_timeout,
                 **receiver_kwargs,  # type: ignore
             )
             loop.run_until_complete(receiver.listen())
