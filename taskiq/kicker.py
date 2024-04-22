@@ -19,6 +19,7 @@ from typing_extensions import ParamSpec
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.compat import model_dump
 from taskiq.exceptions import SendTaskError
+from taskiq.labels import prepare_label
 from taskiq.message import TaskiqMessage
 from taskiq.scheduler.created_schedule import CreatedSchedule
 from taskiq.scheduler.scheduled_task import CronSpec, ScheduledTask
@@ -245,12 +246,14 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         formatted_args = []
         formatted_kwargs = {}
         labels = {}
+        labels_types = {}
         for arg in args:
             formatted_args.append(self._prepare_arg(arg))
         for kwarg_name, kwarg_val in kwargs.items():
             formatted_kwargs[kwarg_name] = self._prepare_arg(kwarg_val)
+
         for label, label_val in self.labels.items():
-            labels[label] = str(label_val)
+            labels[label], labels_types[label] = prepare_label(label_val)
 
         task_id = self.custom_task_id
         if task_id is None:
@@ -260,6 +263,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
             task_id=task_id,
             task_name=self.task_name,
             labels=labels,
+            labels_types=labels_types,
             args=formatted_args,
             kwargs=formatted_kwargs,
         )

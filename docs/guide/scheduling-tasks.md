@@ -92,3 +92,79 @@ To avoid this behaviour, you can pass the `--skip-first-run` flag to the `taskiq
 ```bash:no-line-numbers
 taskiq scheduler module:scheduler --skip-first-run
 ```
+
+
+## Dynamic scheduling
+
+Sometimes you may want to add new schedules to the scheduler on the fly. For example, you may want to run a specific function in several minutes from now. You can easily do it with ScheduleSources that support dynamic scheduling. Currently we suggest to use the `RedisScheduleSource` for that purpose. List of schedulers with dynamic task addition will be extended in the future.
+For list of available schedule sources see [Available schedule sources](../available-components/schedule-sources.md).
+
+Here's an example of using redis schedule source:
+
+@[code python](../examples/schedule/redis_schedule.py)
+
+Now we can use this source to add new schedules in runtime. Here's an example:
+
+```python
+    await redis_source.startup()
+
+    await my_task.schedule_by_time(
+        redis_source,
+        # It's better to use UTC time, or add tzinfo to datetime.
+        datetime.datetime.utcnow() + datetime.timedelta(minutes=1, seconds=5),
+        # You can pass args and kwargs here as usual
+        11,
+        arg2="arg2",
+    )
+```
+
+Or if you want to use cron schedules instead, just use `schedule_by_cron` method.
+
+```python
+    await my_task.schedule_by_cron(
+        redis_source,
+        "*/5 * * * *",
+        11,
+        arg2="arg2",
+    )
+```
+
+If you want to pass additional labels, you can call these methods on the `Kicker` instance.
+
+```python
+    schedule = (
+        await my_task.kicker()
+        .with_labels(label1="value")
+        .schedule_by_time(
+            redis_source,
+            datetime.datetime.utcnow() + datetime.timedelta(seconds=10),
+            11,
+            arg2="arg2",
+        )
+    )
+```
+
+::: warning Cool warning!
+
+The `with_broker` method won't do anything in this case, since we have a broker assigned to each scheduler.
+
+:::
+
+Each of these methods return you an instance of the `CreatedSchedule` class. This object has unique schedule ID and some helper methods. For example, you can use the `unschedule` method to remove the schedule from the source.
+
+```python
+    schedule = await my_task.schedule_by_time(
+        redis_source,
+        datetime.datetime.utcnow() + datetime.timedelta(minutes=1, seconds=5),
+        11,
+        arg2="arg2",
+    )
+
+    await schedule.unschedule()
+```
+
+Or it can be done manually, by calling `delete_schedule` on schedule source providing it whith `schedule_id`.
+
+```python
+    await redis_source.delete_schedule(schedule.schedule_id)
+```

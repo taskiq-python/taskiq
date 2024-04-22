@@ -7,6 +7,23 @@ order: 4
 These objects are used to fetch current schedule for tasks.
 Currently we have only one schedule source.
 
+## RedisScheduleSource
+
+This source is capable of adding new schedules in runtime. It uses Redis as a storage for schedules.
+To use this source you need to install `taskiq-redis` package.
+
+```python
+from taskiq_redis import RedisScheduleSource
+
+from taskiq import TaskiqScheduler
+
+redis_source = RedisScheduleSource("redis://localhost:6379/0")
+scheduler = TaskiqScheduler(broker, sources=[redis_source])
+```
+
+For more information on how to use dynamic schedule sources read [Dynamic scheduling section](../guide/scheduling-tasks.md#dynamic-scheduling).
+
+
 ## LabelScheduleSource
 
 This source parses labels of tasks, and if it finds a `schedule` label, it considers this task as scheduled.

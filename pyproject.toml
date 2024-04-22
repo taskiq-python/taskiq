@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "taskiq"
-version = "0.10.4"
+version = "0.11.1"
 description = "Distributed task queue with full async support"
 authors = ["Pavel Kirilin <win10@list.ru>"]
 maintainers = ["Pavel Kirilin <win10@list.ru>"]
@@ -179,7 +179,7 @@ convention = "pep257"
 ignore-decorators = ["typing.overload"]
 
 [tool.ruff.pylint]
-allow-magic-value-types = ["int", "str", "float", "tuple"]
+allow-magic-value-types = ["int", "str", "float"]
 
 [tool.ruff.flake8-bugbear]
 extend-immutable-calls = ["taskiq_dependencies.Depends", "taskiq.TaskiqDepends"]

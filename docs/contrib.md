@@ -4,17 +4,6 @@ order: 5
 
 # Contribution guide
 
-We love contributions. This guide is for all folks who want to make taskiq
-better together.
-
-We have several rules for contributors:
-* Please do not add malware.
-* Please make sure that your request solves problem.
-
-If you struggle with something or feel frustrating, you either create an issue, create a discussion on page or publish draft PR and ask your question in description.
-
-We have lots of tests in CI. But since runs from first-time contributors should be approved you better test locally, it just takes less time.
-
 We love contributions. This guide is for all folks who want to make taskiq better together.
 We have several rules for contributors:
 * Please do not add malware.
