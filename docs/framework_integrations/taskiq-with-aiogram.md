@@ -67,7 +67,7 @@ bot = Bot(token="TOKEN")
 @dp.startup()
 async def setup_taskiq(bot: Bot, *_args, **_kwargs):
     # Here we check if it's a clien-side,
-    # Becuase otherwise you're going to
+    # Because otherwise you're going to
     # create infinite loop of startup events.
     if not broker.is_worker_process:
         logging.info("Setting up taskiq")

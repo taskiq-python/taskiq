@@ -144,9 +144,6 @@ async def run_scheduler_loop(scheduler: TaskiqScheduler) -> None:
     running_schedules = set()
     while True:
         # We use this method to correctly sleep for one minute.
-        next_minute = datetime.now().replace(second=0, microsecond=0) + timedelta(
-            minutes=1,
-        )
         scheduled_tasks = await get_all_schedules(scheduler)
         for source, task_list in scheduled_tasks.items():
             for task in task_list:
@@ -165,7 +162,9 @@ async def run_scheduler_loop(scheduler: TaskiqScheduler) -> None:
                     )
                     running_schedules.add(send_task)
                     send_task.add_done_callback(running_schedules.discard)
-
+        next_minute = datetime.now().replace(second=0, microsecond=0) + timedelta(
+            minutes=1,
+        )
         delay = next_minute - datetime.now()
         await asyncio.sleep(delay.total_seconds())
 
