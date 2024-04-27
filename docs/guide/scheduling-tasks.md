@@ -168,3 +168,12 @@ Or it can be done manually, by calling `delete_schedule` on schedule source prov
 ```python
     await redis_source.delete_schedule(schedule.schedule_id)
 ```
+
+Also, you can get schedule_id from the tasks's labels.
+
+```python
+@broker.task
+async def my_task(context: Context = TaskiqDepends()) -> None:
+    schedule_id = context.message.labels.get("schedule_id")
+    print("Schedule ID:", schedule_id)
+```

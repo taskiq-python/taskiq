@@ -151,9 +151,10 @@ async def run_scheduler_loop(scheduler: TaskiqScheduler) -> None:
                     task_delay = get_task_delay(task)
                 except ValueError:
                     logger.warning(
-                        "Cannot parse cron: %s for task: %s",
+                        "Cannot parse cron: %s for task: %s, schedule_id: %s",
                         task.cron,
                         task.task_name,
+                        task.schedule_id,
                     )
                     continue
                 if task_delay is not None:
