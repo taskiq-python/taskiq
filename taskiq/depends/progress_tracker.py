@@ -53,7 +53,7 @@ class ProgressTracker(Generic[_ProgressType]):
         """
         if meta is None:
             progress = await self.get_progress()
-            meta = progress.meta if progress else meta
+            meta = progress.meta if progress else None
 
         progress = TaskProgress(
             state=state,
