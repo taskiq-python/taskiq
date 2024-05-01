@@ -214,6 +214,34 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         await source.add_schedule(scheduled)
         return CreatedSchedule(self, source, scheduled)
 
+    async def schedule_by_period(
+        self,
+        source: "ScheduleSource",
+        period: Union[float],
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> CreatedSchedule[_ReturnType]:
+        """
+        Function to schedule task to run periodically.
+
+        :param source: schedule source.
+        :param period: period to run the tasks at.
+        :param args: function's args.
+        :param kwargs: function's kwargs.
+        """
+        schedule_id = self.broker.id_generator()
+        message = self._prepare_message(*args, **kwargs)
+        scheduled = ScheduledTask(
+            schedule_id=schedule_id,
+            task_name=message.task_name,
+            labels=message.labels,
+            args=message.args,
+            kwargs=message.kwargs,
+            period=int(period),
+        )
+        await source.add_schedule(scheduled)
+        return CreatedSchedule(self, source, scheduled)
+
     @classmethod
     def _prepare_arg(cls, arg: Any) -> Any:
         """

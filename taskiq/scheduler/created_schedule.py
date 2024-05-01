@@ -52,6 +52,7 @@ class CreatedSchedule(Generic[_ReturnType]):
             f"id={self.schedule_id}, "
             f"time={self.task.time}, "
             f"cron={self.task.cron}, "
+            f"period={self.task.period}, "
             f"cron_offset={self.task.cron_offset or 'UTC'}, "
             f"task_name={self.task.task_name}, "
             f"args={self.task.args}, "
