@@ -149,7 +149,7 @@ class Receiver:
             message,
             AckableMessage,
         ):
-            await maybe_awaitable(taskiq_msg.ack())
+            await maybe_awaitable(taskiq_msg.ack())  # type: ignore
 
         result = await self.run_task(
             target=task.original_func,
@@ -160,7 +160,7 @@ class Receiver:
             message,
             AckableMessage,
         ):
-            await maybe_awaitable(taskiq_msg.ack())
+            await maybe_awaitable(taskiq_msg.ack())  # type: ignore
 
         for middleware in self.broker.middlewares:
             if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
@@ -187,7 +187,7 @@ class Receiver:
             message,
             AckableMessage,
         ):
-            await maybe_awaitable(taskiq_msg.ack())
+            await maybe_awaitable(taskiq_msg.ack())  # type: ignore
 
     async def run_task(  # noqa: C901, PLR0912, PLR0915
         self,
