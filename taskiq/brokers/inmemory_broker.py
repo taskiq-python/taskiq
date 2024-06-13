@@ -1,10 +1,11 @@
 import asyncio
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, AsyncGenerator, Set, TypeVar
+from typing import Any, AsyncGenerator, Optional, Set, TypeVar
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.result_backend import AsyncResultBackend, TaskiqResult
+from taskiq.depends.progress_tracker import TaskProgress
 from taskiq.events import TaskiqEvents
 from taskiq.exceptions import TaskiqError
 from taskiq.message import BrokerMessage
@@ -27,6 +28,7 @@ class InmemoryResultBackend(AsyncResultBackend[_ReturnType]):
     def __init__(self, max_stored_results: int = 100) -> None:
         self.max_stored_results = max_stored_results
         self.results: OrderedDict[str, TaskiqResult[_ReturnType]] = OrderedDict()
+        self.progress: OrderedDict[str, TaskProgress[Any]] = OrderedDict()
 
     async def set_result(self, task_id: str, result: TaskiqResult[_ReturnType]) -> None:
         """
@@ -78,6 +80,37 @@ class InmemoryResultBackend(AsyncResultBackend[_ReturnType]):
         :return: result of a task execution.
         """
         return self.results[task_id]
+
+    async def set_progress(
+        self,
+        task_id: str,
+        progress: TaskProgress[Any],
+    ) -> None:
+        """
+        Set progress of task exection.
+
+        :param task_id: task id
+        :param progress: task execution progress
+        """
+        if (
+            self.max_stored_results != -1
+            and len(self.progress) >= self.max_stored_results
+        ):
+            self.progress.popitem(last=False)
+
+        self.progress[task_id] = progress
+
+    async def get_progress(
+        self,
+        task_id: str,
+    ) -> Optional[TaskProgress[Any]]:
+        """
+        Get progress of task execution.
+
+        :param task_id: task id
+        :return: progress or None
+        """
+        return self.progress.get(task_id)
 
 
 class InMemoryBroker(AsyncBroker):
