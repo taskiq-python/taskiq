@@ -84,7 +84,7 @@ To enable this option simply pass the `--reload` or `-r` option to worker taskiq
 Also this option supports `.gitignore` files. If you have such file in your directory, it won't reload worker
 when you modify ignored files. To disable this functionality pass `--do-not-use-gitignore` option.
 
-### Graceful reload
+### Graceful reload (available only on Unix systems)
 
 To perform graceful reload, send `SIGHUP` signal to the main worker process. This action will reload all workers with new code. It's useful for deployment that requires zero downtime, but don't use orchestration tools like Kubernetes.
 

@@ -1,5 +1,6 @@
 import logging
 import signal
+import sys
 from contextlib import suppress
 from dataclasses import dataclass
 from multiprocessing import Event, Process, Queue, current_process
@@ -174,10 +175,11 @@ class ProcessManager:
         shutdown_handler = get_signal_handler(self.action_queue, ShutdownAction())
         signal.signal(signal.SIGINT, shutdown_handler)
         signal.signal(signal.SIGTERM, shutdown_handler)
-        signal.signal(
-            signal.SIGHUP,
-            get_signal_handler(self.action_queue, ReloadAllAction()),
-        )
+        if sys.platform != "win32":
+            signal.signal(
+                signal.SIGHUP,
+                get_signal_handler(self.action_queue, ReloadAllAction()),
+            )
 
         self.workers: List[Process] = []
 
