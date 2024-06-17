@@ -31,6 +31,9 @@ class TaskProgress(GenericModel, Generic[_ProgressType]):
     state: Union[TaskState, str]
     meta: Optional[_ProgressType]
 
+    class Config:
+        arbitrary_types_allowed = True
+
 
 class ProgressTracker(Generic[_ProgressType]):
     """Task's dependency to set progress."""
