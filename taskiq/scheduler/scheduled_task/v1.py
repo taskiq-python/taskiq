@@ -4,6 +4,8 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, root_validator
 
+from taskiq.utils import get_present_object_fields
+
 
 class ScheduledTask(BaseModel):
     """Abstraction over task schedule."""
@@ -16,6 +18,7 @@ class ScheduledTask(BaseModel):
     cron: Optional[str] = None
     cron_offset: Optional[Union[str, timedelta]] = None
     time: Optional[datetime] = None
+    period: Optional[float | int] = None
 
     @root_validator(pre=False)  # type: ignore
     @classmethod
@@ -25,6 +28,9 @@ class ScheduledTask(BaseModel):
 
         :raises ValueError: if cron and time are none.
         """
-        if values.get("cron") is None and values.get("time") is None:
-            raise ValueError("Either cron or datetime must be present.")
+        required_fields = ("cron", "time", "period")
+        present_fields = get_present_object_fields(values, required_fields)
+        if not present_fields:
+            message = f"At least one of {required_fields} must be set."
+            raise ValueError(message)
         return values

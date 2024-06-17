@@ -1,5 +1,16 @@
 import inspect
-from typing import Any, Awaitable, Coroutine, TypeVar, Union
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Coroutine,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    TypeVar,
+    Union,
+)
 
 _T = TypeVar("_T")
 
@@ -35,3 +46,37 @@ def remove_suffix(text: str, suffix: str) -> str:
     if text.endswith(suffix):
         return text[: -len(suffix)]
     return text
+
+
+def get_present_object_fields(
+    obj: Any,
+    fields: Sequence[str],
+    check_condition: Optional[Callable[[Any, str], bool]] = None,
+) -> List[str]:
+    """
+    Check the presence of the fields in the object.
+
+    :param obj: Object to check fields in
+    :param fields: Sequence of fields
+    :param check_condition: A function to check the value is considered present
+    :return: present fields.
+    """
+    if not check_condition:
+        if isinstance(obj, dict):
+
+            def check_condition(obj: Dict[str, Any], field: str) -> bool:
+                return field in obj and obj[field] is not None
+
+        else:
+
+            def check_condition(obj: Any, field: str) -> bool:
+                return getattr(obj, field, None) is not None
+
+    present_fields = []
+    for field in fields:
+        try:
+            if check_condition(obj, field):
+                present_fields.append(field)
+        except AttributeError:
+            pass
+    return present_fields

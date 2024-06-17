@@ -14,6 +14,7 @@ from taskiq.scheduler.scheduled_task import ScheduledTask
     [
         pytest.param([{"cron": "* * * * *"}], id="cron"),
         pytest.param([{"time": datetime.utcnow()}], id="time"),
+        pytest.param([{"period": 1.0}], id="period"),
     ],
 )
 async def test_label_discovery(schedule_label: List[Dict[str, Any]]) -> None:
@@ -33,6 +34,7 @@ async def test_label_discovery(schedule_label: List[Dict[str, Any]]) -> None:
             schedule_id=schedules[0].schedule_id,
             cron=schedule_label[0].get("cron"),
             time=schedule_label[0].get("time"),
+            period=schedule_label[0].get("period"),
             task_name="test_task",
             labels={"schedule": schedule_label},
             args=[],
