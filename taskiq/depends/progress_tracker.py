@@ -7,12 +7,6 @@ from typing_extensions import TypeVar
 from taskiq.compat import IS_PYDANTIC2
 from taskiq.context import Context
 
-if IS_PYDANTIC2:
-    from pydantic import BaseModel as GenericModel
-else:
-    from pydantic.generics import GenericModel  # type: ignore[no-redef]
-
-
 _ProgressType = TypeVar("_ProgressType")
 
 
@@ -25,14 +19,25 @@ class TaskState(str, enum.Enum):
     RETRY = "RETRY"
 
 
-class TaskProgress(GenericModel, Generic[_ProgressType]):
+if IS_PYDANTIC2:
+    from pydantic import BaseModel, ConfigDict
+
+    class _TaskProgressConfig(BaseModel):
+        model_config = ConfigDict(arbitrary_types_allowed=True)
+
+else:
+    from pydantic.generics import GenericModel
+
+    class _TaskProgressConfig(GenericModel):  # type: ignore[no-redef]
+        class Config:
+            arbitrary_types_allowed = True
+
+
+class TaskProgress(_TaskProgressConfig, Generic[_ProgressType]):
     """Progress of task execution."""
 
     state: Union[TaskState, str]
     meta: Optional[_ProgressType]
-
-    class Config:
-        arbitrary_types_allowed = True
 
 
 class ProgressTracker(Generic[_ProgressType]):
