@@ -401,8 +401,10 @@ class Receiver:
             self.sem_prefetch.release()
             message = await queue.get()
             if message is QUEUE_DONE:
-                logger.info("Waiting for running tasks to complete.")
-                await asyncio.wait(tasks, timeout=self.wait_tasks_timeout)
+                # asyncio.wait will throw an error if there is nothing to wait for
+                if tasks:
+                    logger.info("Waiting for running tasks to complete.")
+                    await asyncio.wait(tasks, timeout=self.wait_tasks_timeout)
                 break
 
             task = asyncio.create_task(
