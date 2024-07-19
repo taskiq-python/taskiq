@@ -2,6 +2,7 @@ import asyncio
 import random
 import time
 from concurrent.futures import ThreadPoolExecutor
+from functools import wraps
 from typing import Any, ClassVar, List, Optional
 
 import pytest
@@ -472,3 +473,67 @@ async def test_error_result() -> None:
     assert resp.return_value is None
     assert not broker._running_tasks
     assert isinstance(resp.error, ValueError)
+
+
+@pytest.mark.anyio
+async def test_sync_decorator_on_async_function() -> None:
+    broker = InMemoryBroker()
+    wrapper_call = False
+
+    def wrapper(f: Any) -> Any:
+        @wraps(f)
+        def wrapper_impl(*args: Any, **kwargs: Any) -> Any:
+            nonlocal wrapper_call
+
+            wrapper_call = True
+            return f(*args, **kwargs)
+
+        return wrapper_impl
+
+    @broker.task
+    @wrapper
+    async def task_no_result() -> str:
+        return "some value"
+
+    task = await task_no_result.kiq()
+    resp = await task.wait_result(timeout=1)
+
+    assert resp.return_value == "some value"
+    assert not broker._running_tasks
+    assert wrapper_call is True
+
+
+@pytest.mark.anyio
+async def test_sync_decorator_on_async_function_with_timeout() -> None:
+    wrapper_call = False
+
+    def wrapper(f: Any) -> Any:
+        @wraps(f)
+        def wrapper_impl(*args: Any, **kwargs: Any) -> Any:
+            nonlocal wrapper_call
+
+            wrapper_call = True
+            return f(*args, **kwargs)
+
+        return wrapper_impl
+
+    @wrapper
+    async def test_func() -> None:
+        await asyncio.sleep(2)
+
+    receiver = get_receiver()
+
+    result = await receiver.run_task(
+        test_func,
+        TaskiqMessage(
+            task_id="",
+            task_name="",
+            labels={"timeout": "0.3"},
+            args=[],
+            kwargs={},
+        ),
+    )
+    assert result.return_value is None
+    assert result.execution_time < 2
+    assert result.is_err
+    assert wrapper_call is True
