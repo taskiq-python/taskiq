@@ -269,11 +269,13 @@ class Receiver:
                     logger.warning("Timeouts for sync tasks don't work in python well.")
 
                 with anyio.fail_after(float(timeout)):
-                    while inspect.isawaitable(target_future):
+                    target_future = await target_future
+                    if inspect.isawaitable(target_future):
                         target_future = await target_future
 
             else:
-                while inspect.isawaitable(target_future):
+                target_future = await target_future
+                if inspect.isawaitable(target_future):
                     target_future = await target_future
 
             returned = target_future
