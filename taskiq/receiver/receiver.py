@@ -267,8 +267,16 @@ class Receiver:
             if timeout is not None:
                 if not is_coroutine:
                     logger.warning("Timeouts for sync tasks don't work in python well.")
-                target_future = asyncio.wait_for(target_future, float(timeout))
-            returned = await target_future
+
+                with anyio.fail_after(float(timeout)):
+                    while inspect.isawaitable(target_future):
+                        target_future = await target_future
+
+            else:
+                while inspect.isawaitable(target_future):
+                    target_future = await target_future
+
+            returned = target_future
         except NoResultError as no_res_exc:
             found_exception = no_res_exc
             logger.warning(
