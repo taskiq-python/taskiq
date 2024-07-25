@@ -1,21 +1,38 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Optional
+
+from typing_extensions import TypeAlias
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.exceptions import NoResultError, TaskRejectedError
 from taskiq.message import TaskiqMessage
 
 if TYPE_CHECKING:  # pragma: no cover
+    from contextlib import _AsyncGeneratorContextManager
+
     from taskiq.state import TaskiqState
+
+    IdleType: TypeAlias = (
+        "Callable[[Optional[int]], _AsyncGeneratorContextManager[None]]"
+    )
+
+else:
+    IdleType: TypeAlias = Any
 
 
 class Context:
     """Context class."""
 
-    def __init__(self, message: TaskiqMessage, broker: AsyncBroker) -> None:
+    def __init__(
+        self,
+        message: TaskiqMessage,
+        broker: AsyncBroker,
+        idle: IdleType,
+    ) -> None:
         self.message = message
         self.broker = broker
         self.state: "TaskiqState" = None  # type: ignore
         self.state = broker.state
+        self.idle = idle
 
     async def requeue(self) -> None:
         """
