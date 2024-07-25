@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING
+from contextlib import _AsyncGeneratorContextManager
+from typing import TYPE_CHECKING, Callable, Optional
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.exceptions import NoResultError, TaskRejectedError
@@ -11,11 +12,17 @@ if TYPE_CHECKING:  # pragma: no cover
 class Context:
     """Context class."""
 
-    def __init__(self, message: TaskiqMessage, broker: AsyncBroker) -> None:
+    def __init__(
+        self,
+        message: TaskiqMessage,
+        broker: AsyncBroker,
+        idle: "Callable[[Optional[int]], _AsyncGeneratorContextManager[None]]",
+    ) -> None:
         self.message = message
         self.broker = broker
         self.state: "TaskiqState" = None  # type: ignore
         self.state = broker.state
+        self.idle = idle
 
     async def requeue(self) -> None:
         """
