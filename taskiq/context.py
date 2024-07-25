@@ -1,12 +1,22 @@
-from contextlib import _AsyncGeneratorContextManager
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
+
+from typing_extensions import TypeAlias
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.exceptions import NoResultError, TaskRejectedError
 from taskiq.message import TaskiqMessage
 
 if TYPE_CHECKING:  # pragma: no cover
+    from contextlib import _AsyncGeneratorContextManager
+
     from taskiq.state import TaskiqState
+
+    IdleType: TypeAlias = (
+        "Callable[[Optional[int]], _AsyncGeneratorContextManager[None]]"
+    )
+
+else:
+    IdleType: TypeAlias = Any
 
 
 class Context:
@@ -16,7 +26,7 @@ class Context:
         self,
         message: TaskiqMessage,
         broker: AsyncBroker,
-        idle: "Callable[[Optional[int]], _AsyncGeneratorContextManager[None]]",
+        idle: IdleType,
     ) -> None:
         self.message = message
         self.broker = broker
