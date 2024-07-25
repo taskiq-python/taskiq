@@ -1,9 +1,20 @@
 import asyncio
 import inspect
 from concurrent.futures import Executor
+from contextlib import asynccontextmanager
 from logging import getLogger
 from time import time
-from typing import Any, Callable, Dict, List, Optional, Set, Union, get_type_hints
+from typing import (
+    Any,
+    AsyncIterator,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Set,
+    Union,
+    get_type_hints,
+)
 
 import anyio
 from taskiq_dependencies import DependencyGraph
@@ -21,6 +32,7 @@ from taskiq.utils import maybe_awaitable
 
 logger = getLogger(__name__)
 QUEUE_DONE = b"-1"
+QUEUE_SKIP = b"-2"
 
 
 def _run_sync(
@@ -83,6 +95,11 @@ class Receiver:
                 "can result in undefined behavior",
             )
         self.sem_prefetch = asyncio.Semaphore(max_prefetch)
+        self.idle_tasks: "Set[asyncio.Task[Any]]" = set()
+        self.sem_lock: asyncio.Lock = asyncio.Lock()
+        self.listen_queue: "asyncio.Queue[Union[AckableMessage, bytes]]" = (
+            asyncio.Queue()
+        )
 
     async def callback(  # noqa: C901, PLR0912
         self,
@@ -227,7 +244,7 @@ class Receiver:
             broker_ctx = self.broker.custom_dependency_context
             broker_ctx.update(
                 {
-                    Context: Context(message, self.broker),
+                    Context: Context(message, self.broker, self.idle),
                     TaskiqState: self.broker.state,
                 },
             )
@@ -329,6 +346,7 @@ class Receiver:
             await self.broker.startup()
         logger.info("Listening started.")
         queue: "asyncio.Queue[Union[bytes, AckableMessage]]" = asyncio.Queue()
+        self.listen_queue = queue
 
         async with anyio.create_task_group() as gr:
             gr.start_soon(self.prefetcher, queue)
@@ -396,7 +414,8 @@ class Receiver:
         while True:
             # Waits for semaphore to be released.
             if self.sem is not None:
-                await self.sem.acquire()
+                async with self.sem_lock:
+                    await self.sem.acquire()
 
             self.sem_prefetch.release()
             message = await queue.get()
@@ -406,6 +425,11 @@ class Receiver:
                     logger.info("Waiting for running tasks to complete.")
                     await asyncio.wait(tasks, timeout=self.wait_tasks_timeout)
                 break
+
+            if message is QUEUE_SKIP:
+                if self.sem is not None:
+                    self.sem.release()
+                continue
 
             task = asyncio.create_task(
                 self.callback(message=message, raise_err=False),
@@ -419,6 +443,49 @@ class Receiver:
             # and this behaviour considered to be a Hisenbug.
             # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
             task.add_done_callback(task_cb)
+
+    @asynccontextmanager
+    async def idle(self, timeout: Optional[int] = None) -> AsyncIterator[None]:
+        """Idle task.
+
+        :param timeout: idle time
+        """
+        if self.sem is not None:
+            self.sem.release()
+
+        def acquire() -> "asyncio.Task[Any]":
+            if self.sem is None:
+                raise ValueError(self.sem)
+
+            task = asyncio.create_task(self.sem.acquire())
+            task.add_done_callback(self.idle_tasks.discard)
+            self.idle_tasks.add(task)
+            return task
+
+        cancelled = False
+        try:
+            with anyio.fail_after(timeout):
+                yield
+        except asyncio.CancelledError:
+            if self.sem:
+                acquire()
+
+            cancelled = True
+            raise
+
+        finally:
+            if not cancelled and self.sem is not None:
+                try:
+                    await self.sem_lock.acquire()
+                except asyncio.CancelledError:
+                    acquire()
+                    raise
+
+                try:
+                    self.listen_queue.put_nowait(QUEUE_SKIP)
+                    await acquire()
+                finally:
+                    self.sem_lock.release()
 
     def _prepare_task(self, name: str, handler: Callable[..., Any]) -> None:
         """
