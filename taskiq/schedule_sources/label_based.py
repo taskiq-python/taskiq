@@ -31,7 +31,7 @@ class LabelScheduleSource(ScheduleSource):
             if task.broker != self.broker:
                 continue
             for schedule in task.labels.get("schedule", []):
-                if "cron" not in schedule and "time" not in schedule:
+                if all(field not in schedule for field in ("cron", "time", "period")):
                     continue
                 labels = schedule.get("labels", {})
                 labels.update(task.labels)
@@ -43,6 +43,7 @@ class LabelScheduleSource(ScheduleSource):
                         kwargs=schedule.get("kwargs", {}),
                         cron=schedule.get("cron"),
                         time=schedule.get("time"),
+                        period=schedule.get("period"),
                         cron_offset=schedule.get("cron_offset"),
                     ),
                 )
