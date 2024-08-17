@@ -5,7 +5,7 @@ import signal
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import set_start_method
 from sys import platform
-from typing import Any, Optional, Type
+from typing import Any, Optional, Type, cast
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.cli.utils import import_object, import_tasks
@@ -121,7 +121,16 @@ def start_listen(args: WorkerArgs) -> None:
     # broker is running as a worker.
     # We must set this field before importing tasks,
     # so broker will remember all tasks it's related to.
-    broker = import_object(args.broker)
+
+    if not args.broker and not args.broker_factory:
+        raise ValueError("You must specified `broker` or `broker_factory`")
+
+    if args.broker:
+        broker = import_object(args.broker)
+    else:
+        args.broker_factory = cast(str, args.broker_factory)
+        broker_factory = import_object(args.broker_factory)
+        broker = broker_factory.get_broker()
     if not isinstance(broker, AsyncBroker):
         raise ValueError("Unknown broker type. Please use AsyncBroker instance.")
     broker.is_worker_process = True

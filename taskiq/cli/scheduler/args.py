@@ -2,6 +2,7 @@ from argparse import ZERO_OR_MORE, ArgumentDefaultsHelpFormatter, ArgumentParser
 from dataclasses import dataclass
 from typing import List, Optional, Sequence, Union
 
+from taskiq.abc.scheduler_factory import TaskiqSchedulerFactory
 from taskiq.cli.common_args import LogLevel
 from taskiq.scheduler.scheduler import TaskiqScheduler
 
@@ -10,8 +11,9 @@ from taskiq.scheduler.scheduler import TaskiqScheduler
 class SchedulerArgs:
     """Arguments for scheduler."""
 
-    scheduler: Union[str, TaskiqScheduler]
     modules: List[str]
+    scheduler: Union[str, TaskiqScheduler] = ""
+    scheduler_factory: Union[str, TaskiqSchedulerFactory] = ""
     log_level: str = LogLevel.INFO.name
     configure_logging: bool = True
     fs_discover: bool = False
@@ -32,7 +34,21 @@ class SchedulerArgs:
             formatter_class=ArgumentDefaultsHelpFormatter,
             description="Subcommand to run scheduler",
         )
-        parser.add_argument("scheduler", help="Path to scheduler")
+        parser.add_argument(
+            "--scheduler",
+            default=None,
+            help="Path to scheduler",
+        )
+        parser.add_argument(
+            "--scheduler-factory",
+            "-sf",
+            default=None,
+            help=(
+                "Where to search for SchedulerFactory. "
+                "This string must be specified in "
+                "'module.module:ClassName' format."
+            ),
+        )
         parser.add_argument(
             "modules",
             help="List of modules where to look for tasks.",
