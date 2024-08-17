@@ -130,7 +130,7 @@ def start_listen(args: WorkerArgs) -> None:
     else:
         args.broker_factory = cast(str, args.broker_factory)
         broker_factory = import_object(args.broker_factory)
-        broker = broker_factory.get_broker()
+        broker = broker_factory().get_broker()
     if not isinstance(broker, AsyncBroker):
         raise ValueError("Unknown broker type. Please use AsyncBroker instance.")
     broker.is_worker_process = True
