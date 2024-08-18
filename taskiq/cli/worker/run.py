@@ -129,8 +129,7 @@ def start_listen(args: WorkerArgs) -> None:
         broker = import_object(args.broker)
     else:
         args.broker_factory = cast(str, args.broker_factory)
-        broker_factory = import_object(args.broker_factory)
-        broker = broker_factory().get_broker()
+        broker = get_broker_from_factory(args.broker_factory)
     if not isinstance(broker, AsyncBroker):
         raise ValueError("Unknown broker type. Please use AsyncBroker instance.")
     broker.is_worker_process = True
@@ -208,3 +207,17 @@ def run_worker(args: WorkerArgs) -> Optional[int]:
         observer.stop()
 
     return status
+
+
+def get_broker_from_factory(broker_factory_path: str) -> AsyncBroker:
+    """
+    Get a AsyncBroker instance from a factory.
+
+    This function either imports the factory using its string representation
+    to obtain a AsyncBroker.
+
+    :param broker_factory_path: Either the string path of the factory.
+    :return: An instance of AsyncBroker.
+    """
+    broker_factory = import_object(broker_factory_path)
+    return broker_factory().get_broker()
