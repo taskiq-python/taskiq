@@ -128,8 +128,8 @@ def start_listen(args: WorkerArgs) -> None:
         broker = broker()
     if not isinstance(broker, AsyncBroker):
         raise ValueError(
-            "Unknown broker or broker factory type. Please use AsyncBroker instance "
-            "or pass broker factory function.",
+            "Unknown broker type. Please use AsyncBroker instance "
+            "or pass broker factory function that returns an AsyncBroker instance.",
         )
 
     broker.is_worker_process = True
