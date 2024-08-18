@@ -207,17 +207,3 @@ def run_worker(args: WorkerArgs) -> Optional[int]:
         observer.stop()
 
     return status
-
-
-def get_broker_from_factory(broker_factory_path: str) -> AsyncBroker:
-    """
-    Get a AsyncBroker instance from a factory.
-
-    This function either imports the factory using its string representation
-    to obtain a AsyncBroker.
-
-    :param broker_factory_path: Either the string path of the factory.
-    :return: An instance of AsyncBroker.
-    """
-    broker_factory = import_object(broker_factory_path)
-    return broker_factory().get_broker()

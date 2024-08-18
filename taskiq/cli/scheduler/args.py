@@ -34,7 +34,7 @@ class SchedulerArgs:
         )
         parser.add_argument(
             "scheduler",
-            help="Path to scheduler or scheduler factory",
+            help="Path to scheduler or scheduler factory function",
         )
         parser.add_argument(
             "modules",
