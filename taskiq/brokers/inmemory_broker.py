@@ -87,7 +87,7 @@ class InmemoryResultBackend(AsyncResultBackend[_ReturnType]):
         progress: TaskProgress[Any],
     ) -> None:
         """
-        Set progress of task exection.
+        Set progress of task execution.
 
         :param task_id: task id
         :param progress: task execution progress

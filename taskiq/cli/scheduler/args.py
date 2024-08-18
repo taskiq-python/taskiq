@@ -32,7 +32,10 @@ class SchedulerArgs:
             formatter_class=ArgumentDefaultsHelpFormatter,
             description="Subcommand to run scheduler",
         )
-        parser.add_argument("scheduler", help="Path to scheduler")
+        parser.add_argument(
+            "scheduler",
+            help="Path to scheduler or scheduler factory function",
+        )
         parser.add_argument(
             "modules",
             help="List of modules where to look for tasks.",
