@@ -24,9 +24,8 @@ def receiver_arg_type(string: str) -> Tuple[str, str]:
 class WorkerArgs:
     """Taskiq worker CLI arguments."""
 
+    broker: str
     modules: List[str]
-    broker: Optional[str] = None
-    broker_factory: Optional[str] = None
     tasks_pattern: Sequence[str] = ("**/tasks.py",)
     fs_discover: bool = False
     configure_logging: bool = True
@@ -60,22 +59,11 @@ class WorkerArgs:
         """
         parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
         parser.add_argument(
-            "--broker",
-            default=None,
+            "broker",
             help=(
-                "Where to search for broker. "
+                "Where to search for broker or broker factory. "
                 "This string must be specified in "
                 "'module.module:variable' format."
-            ),
-        )
-        parser.add_argument(
-            "--broker-factory",
-            "-bf",
-            default=None,
-            help=(
-                "Where to search for BrokerFactory. "
-                "This string must be specified in "
-                "'module.module:ClassName' format."
             ),
         )
         parser.add_argument(

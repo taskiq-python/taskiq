@@ -1,14 +1,14 @@
 import asyncio
+import inspect
 import sys
 from datetime import datetime, timedelta
 from logging import basicConfig, getLevelName, getLogger
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 
 import pytz
 from pycron import is_now
 
 from taskiq.abc.schedule_source import ScheduleSource
-from taskiq.abc.scheduler_factory import TaskiqSchedulerFactory
 from taskiq.cli.scheduler.args import SchedulerArgs
 from taskiq.cli.utils import import_object, import_tasks
 from taskiq.scheduler.scheduled_task import ScheduledTask
@@ -191,22 +191,18 @@ async def run_scheduler(args: SchedulerArgs) -> None:
         )
     getLogger("taskiq").setLevel(level=getLevelName(args.log_level))
 
-    if not args.scheduler and not args.scheduler_factory:
-        raise ValueError("You must specified `scheduler` or `scheduler_factory`")
-
-    if args.scheduler:
-        if isinstance(args.scheduler, str):
-            scheduler = import_object(args.scheduler)
-        else:
-            scheduler = args.scheduler
+    if isinstance(args.scheduler, str):
+        scheduler = import_object(args.scheduler)
+        if inspect.isfunction(scheduler):
+            scheduler = scheduler()
     else:
-        scheduler = get_scheduler_from_factory(args.scheduler_factory)
-
+        scheduler = args.scheduler
     if not isinstance(scheduler, TaskiqScheduler):
         logger.error(
             "Imported scheduler is not a subclass of TaskiqScheduler.",
         )
         sys.exit(1)
+
     scheduler.broker.is_scheduler_process = True
     import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
     for source in scheduler.sources:
@@ -232,31 +228,3 @@ async def run_scheduler(args: SchedulerArgs) -> None:
         for source in scheduler.sources:
             await source.shutdown()
         logger.info("Scheduler shut down. Good bye!")
-
-
-def get_scheduler_from_factory(
-    scheduler_factory: Union[str, TaskiqSchedulerFactory],
-) -> TaskiqScheduler:
-    """
-    Get a TaskiqScheduler instance from a factory.
-
-    This function either imports the factory using its string representation
-    or uses an existing TaskiqSchedulerFactory instance to obtain a
-    TaskiqScheduler.
-
-    :param scheduler_factory: Either the string path of the factory or
-                              an instance of TaskiqSchedulerFactory.
-    :return: An instance of TaskiqScheduler.
-    :raises TypeError: If the factory is not an instance of TaskiqSchedulerFactory.
-    """
-    if isinstance(scheduler_factory, str):
-        scheduler_factory = import_object(scheduler_factory)()
-
-    if not isinstance(scheduler_factory, TaskiqSchedulerFactory):
-        error_msg = (
-            "scheduler_factory should be an instance of TaskiqSchedulerFactory "
-            "after importing."
-        )
-        raise TypeError(error_msg)
-
-    return scheduler_factory.get_scheduler()
