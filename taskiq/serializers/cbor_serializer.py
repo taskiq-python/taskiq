@@ -1,5 +1,5 @@
 import datetime
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Dict, Optional
 
 from taskiq.abc.serializer import TaskiqSerializer
 
@@ -28,7 +28,7 @@ class CBORSerializer(TaskiqSerializer):
         # Decoder options
         tag_hook: Optional[Callable[["cbor2.CBORDecoder", Any], Any]] = None,
         object_hook: Optional[
-            Callable[["cbor2.CBORDecoder", dict[Any, Any]], Any]
+            Callable[["cbor2.CBORDecoder", Dict[Any, Any]], Any]
         ] = None,
     ) -> None:
         if cbor2 is None:
