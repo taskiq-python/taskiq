@@ -186,7 +186,7 @@ async def test_run_task_exception_middlewares() -> None:
     assert result.return_value is None
     assert result.is_err
     assert len(_TestMiddleware.found_exceptions) == 1
-    assert _TestMiddleware.found_exceptions[0].__class__ == ValueError
+    assert _TestMiddleware.found_exceptions[0].__class__ is ValueError
 
 
 @pytest.mark.anyio

@@ -278,7 +278,6 @@ def test_exception_to_python_when_type_error() -> None:
 
 def test_json_context() -> None:
     error1 = ValueError("Context")
-    ValueError("Cause")
     error3 = ValueError("Error")
 
     try:
@@ -336,7 +335,6 @@ def test_json_cause() -> None:
 
 def test_pickle_context() -> None:
     error1 = ValueError("Context")
-    ValueError("Cause")
     error3 = ValueError("Error")
 
     try:

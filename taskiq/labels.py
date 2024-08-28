@@ -34,7 +34,7 @@ def prepare_label(label_value: Any) -> Tuple[str, int]:
     var_type = type(label_value)
     if var_type in (int, str, float, bool):
         return str(label_value), LabelType[var_type.__name__.upper()].value
-    if var_type == bytes:
+    if var_type is bytes:
         return base64.b64encode(label_value).decode(), LabelType.BYTES.value
     return str(label_value), LabelType.ANY.value
 

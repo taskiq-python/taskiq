@@ -335,9 +335,9 @@ class AsyncBroker(ABC):
                     ),
                 )
 
-                self._register_task(decorated_task.task_name, decorated_task)
+                self._register_task(decorated_task.task_name, decorated_task)  # type: ignore
 
-                return decorated_task
+                return decorated_task  # type: ignore
 
             return inner
 
@@ -417,7 +417,7 @@ class AsyncBroker(ABC):
 
     def with_result_backend(
         self,
-        result_backend: "AsyncResultBackend[_T]",
+        result_backend: "AsyncResultBackend[Any]",
     ) -> "Self":  # pragma: no cover
         """
         Set a result backend and return updated broker.

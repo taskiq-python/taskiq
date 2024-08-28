@@ -26,8 +26,10 @@ class CBORSerializer(TaskiqSerializer):
         date_as_datetime: bool = True,
         string_referencing: bool = True,
         # Decoder options
-        tag_hook: "Optional[Callable[[cbor2.CborDecoder, Any], Any]]" = None,
-        object_hook: Optional[Callable[[Any], Any]] = None,
+        tag_hook: Optional[Callable[["cbor2.CBORDecoder", Any], Any]] = None,
+        object_hook: Optional[
+            Callable[["cbor2.CBORDecoder", dict[Any, Any]], Any]
+        ] = None,
     ) -> None:
         if cbor2 is None:
             raise ImportError("cbor2 is not installed")
@@ -43,7 +45,7 @@ class CBORSerializer(TaskiqSerializer):
 
     def dumpb(self, value: Any) -> bytes:
         """Dump value to bytes."""
-        return cbor2.dumps(
+        return cbor2.dumps(  # type: ignore
             value,
             datetime_as_timestamp=self.datetime_as_timestamp,
             timezone=self.timezone,
@@ -56,7 +58,7 @@ class CBORSerializer(TaskiqSerializer):
 
     def loadb(self, value: bytes) -> Any:
         """Load value from bytes."""
-        return cbor2.loads(
+        return cbor2.loads(  # type: ignore
             value,
             tag_hook=self.tag_hook,
             object_hook=self.object_hook,
