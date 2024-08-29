@@ -228,6 +228,10 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         if isinstance(arg, BaseModel):
             arg = model_dump(arg)
         if is_dataclass(arg):
+            if isinstance(arg, type):
+                raise ValueError(
+                    f"Cannot serialize types. The {arg} is not serializable.",
+                )
             arg = asdict(arg)
         return arg
 
