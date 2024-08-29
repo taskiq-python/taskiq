@@ -215,7 +215,7 @@ class AsyncBroker(ABC):
 
         for middleware in self.middlewares:
             if middleware.__class__.shutdown != TaskiqMiddleware.shutdown:
-                await maybe_awaitable(middleware.shutdown)
+                await maybe_awaitable(middleware.shutdown())
 
         await self.result_backend.shutdown()
 
