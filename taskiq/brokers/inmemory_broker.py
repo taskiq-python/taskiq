@@ -173,13 +173,23 @@ class InMemoryBroker(AsyncBroker):
 
     async def startup(self) -> None:
         """Runs startup events for client and worker side."""
-        for event in (TaskiqEvents.CLIENT_STARTUP, TaskiqEvents.WORKER_STARTUP):
-            for handler in self.event_handlers.get(event, []):
-                await maybe_awaitable(handler(self.state))
+        for handler in self.event_handlers.get(
+            TaskiqEvents.CLIENT_STARTUP
+            if self.is_worker_process
+            else TaskiqEvents.WORKER_STARTUP,
+            [],
+        ):
+            await maybe_awaitable(handler(self.state))
+        await super().startup()
 
     async def shutdown(self) -> None:
         """Runs shutdown events for client and worker side."""
-        for event in (TaskiqEvents.CLIENT_SHUTDOWN, TaskiqEvents.WORKER_SHUTDOWN):
-            for handler in self.event_handlers.get(event, []):
-                await maybe_awaitable(handler(self.state))
+        for handler in self.event_handlers.get(
+            TaskiqEvents.CLIENT_SHUTDOWN
+            if self.is_worker_process
+            else TaskiqEvents.WORKER_SHUTDOWN,
+            [],
+        ):
+            await maybe_awaitable(handler(self.state))
         self.executor.shutdown()
+        await super().shutdown()
