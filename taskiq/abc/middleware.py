@@ -131,7 +131,7 @@ class TaskiqMiddleware:  # pragma: no cover
         self,
         message: "TaskiqMessage",
         broker_message: "BrokerMessage",
-        exception: BaseException,
+        exception: Exception,
     ) -> "Union[Union[bool, None], Coroutine[Any, Any, Union[bool, None]]]":
         """
         This function is called when exception is raised while sending a message.
@@ -139,6 +139,9 @@ class TaskiqMiddleware:  # pragma: no cover
         In most cases, it would be a connection issue from the broker.
 
         Any exceptions occurred by broker's formatter will not trigger this.
+
+        SystemExit, KeyboardInterrupt as well as other BaseExceptions will not
+        be caught here as it would be essentially meaningless to catch them.
 
         :param message: the sending TaskiqMessage (not BrokerMessage)
         :param broker_message: the sending BrokerMessage (not TaskiqMessage)
