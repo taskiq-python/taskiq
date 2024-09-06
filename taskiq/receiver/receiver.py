@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+import signal
 from concurrent.futures import Executor
 from logging import getLogger
 from time import time
@@ -334,6 +335,12 @@ class Receiver:
             gr.start_soon(self.prefetcher, queue)
             gr.start_soon(self.runner, queue)
 
+            # Propagate cancellation to the prefetcher & runner
+            def _cancel(*_: Any) -> None:
+                gr.cancel_scope.cancel()
+
+            signal.signal(signal.SIGINT, _cancel)
+
         if self.on_exit is not None:
             self.on_exit(self)
 
@@ -361,9 +368,7 @@ class Receiver:
                 message = await iterator.__anext__()
                 fetched_tasks += 1
                 await queue.put(message)
-            except asyncio.CancelledError:
-                break
-            except StopAsyncIteration:
+            except (asyncio.CancelledError, StopAsyncIteration):
                 break
 
         await queue.put(QUEUE_DONE)
@@ -394,31 +399,35 @@ class Receiver:
                 self.sem.release()
 
         while True:
-            # Waits for semaphore to be released.
-            if self.sem is not None:
-                await self.sem.acquire()
+            try:
+                # Waits for semaphore to be released.
+                if self.sem is not None:
+                    await self.sem.acquire()
 
-            self.sem_prefetch.release()
-            message = await queue.get()
-            if message is QUEUE_DONE:
-                # asyncio.wait will throw an error if there is nothing to wait for
-                if tasks:
-                    logger.info("Waiting for running tasks to complete.")
-                    await asyncio.wait(tasks, timeout=self.wait_tasks_timeout)
+                self.sem_prefetch.release()
+                message = await queue.get()
+                if message is QUEUE_DONE:
+                    # asyncio.wait will throw an error if there is nothing to wait for
+                    if tasks:
+                        logger.info("Waiting for running tasks to complete.")
+                        await asyncio.wait(tasks, timeout=self.wait_tasks_timeout)
+                    break
+
+                task = asyncio.create_task(
+                    self.callback(message=message, raise_err=False),
+                )
+                tasks.add(task)
+
+                # We want the task to remove itself from the set when it's done.
+                #
+                # Because if we won't save it anywhere,
+                # python's GC can silently cancel task
+                # and this behaviour considered to be a Hisenbug.
+                # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
+                task.add_done_callback(task_cb)
+
+            except asyncio.CancelledError:
                 break
-
-            task = asyncio.create_task(
-                self.callback(message=message, raise_err=False),
-            )
-            tasks.add(task)
-
-            # We want the task to remove itself from the set when it's done.
-            #
-            # Because if we won't save it anywhere,
-            # python's GC can silently cancel task
-            # and this behaviour considered to be a Hisenbug.
-            # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
-            task.add_done_callback(task_cb)
 
     def _prepare_task(self, name: str, handler: Callable[..., Any]) -> None:
         """
