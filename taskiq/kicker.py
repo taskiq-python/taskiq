@@ -79,9 +79,9 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         return self
 
     def with_schedule_id(
-            self,
-            schedule_id: str,
-        ) -> "AsyncKicker[_FuncParams, _ReturnType]":
+        self,
+        schedule_id: str,
+    ) -> "AsyncKicker[_FuncParams, _ReturnType]":
         """
         Set schedule_id for current execution.
 
