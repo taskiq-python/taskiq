@@ -21,7 +21,7 @@ We use poetry for managing dependencies. To install it, please follow the offici
 After you have cloned the taskiq repo, install dependencies using this command:
 
 ```bash
-poetry install
+poetry install --all-extras
 ```
 
 It will install all required dependencies.
