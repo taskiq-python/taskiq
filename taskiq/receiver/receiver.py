@@ -144,7 +144,15 @@ class Receiver:
             message,
             AckableMessage,
         ):
-            await maybe_awaitable(message.ack())
+            if not result.is_err:
+                await maybe_awaitable(message.ack())
+            else:
+                # Do not acknowledge the message
+                logger.error(
+                    "Task %s with ID %s failed. Message not acknowledged.",
+                    taskiq_msg.task_name,
+                    taskiq_msg.task_id,
+                )
 
         result = await self.run_task(
             target=task.original_func,
@@ -155,7 +163,15 @@ class Receiver:
             message,
             AckableMessage,
         ):
-            await maybe_awaitable(message.ack())
+            if not result.is_err:
+                await maybe_awaitable(message.ack())
+            else:
+                # Do not acknowledge the message
+                logger.error(
+                    "Task %s with ID %s failed. Message not acknowledged.",
+                    taskiq_msg.task_name,
+                    taskiq_msg.task_id,
+                )
 
         for middleware in self.broker.middlewares:
             if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
@@ -182,7 +198,15 @@ class Receiver:
             message,
             AckableMessage,
         ):
-            await maybe_awaitable(message.ack())
+            if not result.is_err:
+                await maybe_awaitable(message.ack())
+            else:
+                # Do not acknowledge the message
+                logger.error(
+                    "Task %s with ID %s failed. Message not acknowledged.",
+                    taskiq_msg.task_name,
+                    taskiq_msg.task_id,
+                )
 
     async def run_task(  # noqa: C901, PLR0912, PLR0915
         self,
