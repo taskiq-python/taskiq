@@ -50,6 +50,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         self.broker = broker
         self.labels = labels
         self.custom_task_id: Optional[str] = None
+        self.custom_schedule_id: Optional[str] = None
 
     def with_labels(
         self,
@@ -75,6 +76,19 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         :return: kicker with custom task id.
         """
         self.custom_task_id = task_id
+        return self
+
+    def with_schedule_id(
+        self,
+        schedule_id: str,
+    ) -> "AsyncKicker[_FuncParams, _ReturnType]":
+        """
+        Set schedule_id for current execution.
+
+        :param schedule_id: custom schedule id.
+        :return: kicker with custom schedule id.
+        """
+        self.custom_schedule_id = schedule_id
         return self
 
     def with_broker(
@@ -166,7 +180,9 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
 
         :return: schedule id.
         """
-        schedule_id = self.broker.id_generator()
+        schedule_id = self.custom_schedule_id
+        if schedule_id is None:
+            schedule_id = self.broker.id_generator()
         message = self._prepare_message(*args, **kwargs)
         cron_offset = None
         if isinstance(cron, CronSpec):
@@ -201,7 +217,9 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         :param args: function's args.
         :param kwargs: function's kwargs.
         """
-        schedule_id = self.broker.id_generator()
+        schedule_id = self.custom_schedule_id
+        if schedule_id is None:
+            schedule_id = self.broker.id_generator()
         message = self._prepare_message(*args, **kwargs)
         scheduled = ScheduledTask(
             schedule_id=schedule_id,
