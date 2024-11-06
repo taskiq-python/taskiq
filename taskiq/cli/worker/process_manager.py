@@ -1,4 +1,5 @@
 import logging
+import os
 import signal
 import sys
 from contextlib import suppress
@@ -265,7 +266,10 @@ class ProcessManager:
                     action.handle(self.workers, self.args, self.worker_function)
                     reloaded_workers.add(action.worker_num)
                 elif isinstance(action, ShutdownAction):
-                    logger.debug("Process manager closed.")
+                    logger.debug("Process manager closed, killing workers.")
+                    for worker in self.workers:
+                        if worker.pid:
+                            os.kill(worker.pid, signal.SIGINT)
                     return None
 
             for worker_num, worker in enumerate(self.workers):
