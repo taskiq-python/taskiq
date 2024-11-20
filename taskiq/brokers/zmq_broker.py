@@ -77,7 +77,7 @@ class ZeroMQBroker(AsyncBroker):
             ]
             for idx in range(math.ceil(len(message.message) / part_len))
         ]
-        with self.socket.connect(self.sub_host) as sock:
+        with self.socket.connect(self.pub_host) as sock:
             await sock.send_multipart(parts)
 
     async def listen(self) -> AsyncGenerator[bytes, None]:
