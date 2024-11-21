@@ -45,6 +45,7 @@ class WorkerArgs:
     ack_type: AcknowledgeType = AcknowledgeType.WHEN_SAVED
     max_tasks_per_child: Optional[int] = None
     wait_tasks_timeout: Optional[float] = None
+    hardkill_count: int = 3
 
     @classmethod
     def from_cli(
@@ -211,6 +212,13 @@ class WorkerArgs:
             default=None,
             help="Maximum time to wait for all current tasks "
             "to finish before exiting.",
+        )
+        parser.add_argument(
+            "--hardkill-count",
+            type=int,
+            default=3,
+            help="Number of termination signals to the main "
+            "process before performing a hardkill.",
         )
 
         namespace = parser.parse_args(args)

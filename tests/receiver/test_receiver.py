@@ -417,7 +417,7 @@ async def test_callback_semaphore() -> None:
         await task_sem.kiq()
     receiver = get_receiver(broker, max_async_tasks=max_async_tasks)
 
-    listen_task = asyncio.create_task(receiver.listen())
+    listen_task = asyncio.create_task(receiver.listen(asyncio.Event()))
     await asyncio.sleep(0.3)
     assert sem_num == max_async_tasks
     await broker.wait_tasks()
