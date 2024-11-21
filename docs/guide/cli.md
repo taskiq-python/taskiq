@@ -86,12 +86,25 @@ when you modify ignored files. To disable this functionality pass `--do-not-use-
 
 ### Graceful reload (available only on Unix systems)
 
-To perform graceful reload, send `SIGHUP` signal to the main worker process. This action will reload all workers with new code. It's useful for deployment that requires zero downtime, but don't use orchestration tools like Kubernetes.
+To perform graceful reload, send `SIGHUP` signal to the main worker process. This action will reload all workers with new code. It's useful for deployment that requires zero downtime, but without using heavy orchestration tools like Kubernetes.
+
 
 ```bash
 taskiq worker my_module:broker
 kill -HUP <main pid>
 ```
+
+### Graceful and force shutdowns
+
+If you send `SIGINT` or `SIGKILL` to the main process by pressing <kbd>Ctrl</kbd>+<kbd>C</kbd> or using the `kill` command, it will initiate the shutdown process.
+By default, it will stop fetching new messages immediately after receiving the signal but will wait for the completion of all currently executing tasks.
+
+If you don't want to wait too long for tasks to complete each time you shut down the worker, you can either send termination signals three times to the main process to perform a hard kill or configure the `--wait-tasks-timeout` to set a hard time limit for shutting down.
+
+::: tip Cool tip
+The number of signals before a hard kill can be configured with the `--hardkill-count` CLI argument.
+:::
+
 
 ### Other parameters
 
@@ -107,6 +120,7 @@ kill -HUP <main pid>
 * `max-tasks-per-child` - maximum number of tasks to be executed by a single worker process before restart.
 * `--shutdown-timeout` - maximum amount of time for graceful broker's shutdown in seconds.
 * `--wait-tasks-timeout` - if cannot read new messages from the broker or maximum number of tasks is reached, worker will wait for all current tasks to finish. This parameter sets the maximum amount of time to wait until shutdown.
+* `--hardkill-count` - Number of termination signals to the main process before performing a hardkill.
 
 ## Scheduler
 

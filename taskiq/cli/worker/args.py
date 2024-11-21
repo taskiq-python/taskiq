@@ -217,7 +217,8 @@ class WorkerArgs:
             "--hardkill-count",
             type=int,
             default=3,
-            help="Number of SIGINT events before hardkill.",
+            help="Number of termination signals to the main "
+            "process before performing a hardkill.",
         )
 
         namespace = parser.parse_args(args)
