@@ -48,6 +48,7 @@ async def run_receiver_task(
     :param ack_time: acknowledge type to use.
     :raises asyncio.CancelledError: if the task was cancelled.
     """
+    finish_event = asyncio.Event()
 
     def on_exit(_: Receiver) -> None:
         """
@@ -58,6 +59,7 @@ async def run_receiver_task(
 
         :raises CancelledError: always.
         """
+        finish_event.set()
         raise asyncio.CancelledError
 
     with ThreadPoolExecutor(max_workers=sync_workers) as executor:
@@ -75,7 +77,7 @@ async def run_receiver_task(
                     on_exit=on_exit,
                     ack_type=ack_time,
                 )
-                await receiver.listen()
+                await receiver.listen(finish_event)
             except asyncio.CancelledError:
                 logger.warning("The listenig task was cancelled.")
                 raise

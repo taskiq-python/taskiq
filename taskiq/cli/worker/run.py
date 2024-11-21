@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import signal
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import set_start_method
 from sys import platform
@@ -82,11 +83,8 @@ def start_listen(args: WorkerArgs) -> None:
     :raises ValueError: if broker is not an AsyncBroker instance.
     :raises ValueError: if receiver is not a Receiver type.
     """
-    # Here how we manage interruptions.
-    # We have to remember shutting_down state,
-    # because KeyboardInterrupt can be send multiple
-    # times. And it may interrupt the broker's shutdown process.
-    shutting_down = False
+    shutdown_event = asyncio.Event()
+    hardkill_counter = 0
 
     def interrupt_handler(signum: int, _frame: Any) -> None:
         """
@@ -100,14 +98,21 @@ def start_listen(args: WorkerArgs) -> None:
         :raises KeyboardInterrupt: if termination hasn't begun.
         """
         logger.debug(f"Got signal {signum}.")
-        nonlocal shutting_down
-        if shutting_down:
-            return
-        shutting_down = True
-        raise KeyboardInterrupt
+        nonlocal shutdown_event
+        nonlocal hardkill_counter
+        # Soft kill is a signal to start shutdown.
+        shutdown_event.set()
+        # Hard kill is a signal that we should stop
+        # everything immediately.
+        if hardkill_counter > args.hardkill_count:
+            logger.warning("Hard kill. Exiting.")
+            raise KeyboardInterrupt
+        hardkill_counter += 1
 
     signal.signal(signal.SIGINT, interrupt_handler)
     signal.signal(signal.SIGTERM, interrupt_handler)
+    if sys.platform != "win32":
+        signal.signal(signal.SIGHUP, interrupt_handler)
 
     if uvloop is not None:
         logger.debug("UVLOOP found. Using it as async runner")
@@ -145,7 +150,7 @@ def start_listen(args: WorkerArgs) -> None:
                 wait_tasks_timeout=args.wait_tasks_timeout,
                 **receiver_kwargs,  # type: ignore
             )
-            loop.run_until_complete(receiver.listen())
+            loop.run_until_complete(receiver.listen(shutdown_event))
     except KeyboardInterrupt:
         logger.warning("Worker process interrupted.")
         loop.run_until_complete(shutdown_broker(broker, args.shutdown_timeout))

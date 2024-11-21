@@ -1,6 +1,5 @@
 import asyncio
 import inspect
-import signal
 from concurrent.futures import Executor
 from logging import getLogger
 from time import time
@@ -319,12 +318,15 @@ class Receiver:
 
         return result
 
-    async def listen(self) -> None:  # pragma: no cover
+    async def listen(self, finish_event: asyncio.Event) -> None:  # pragma: no cover
         """
         This function iterates over tasks asynchronously.
 
         It uses listen() method of an AsyncBroker
         to get new messages from queues.
+
+        Also it has a finish_event, that indicates that
+        we need to stop listening for new tasks and shutdown.
         """
         if self.run_startup:
             await self.broker.startup()
@@ -332,14 +334,8 @@ class Receiver:
         queue: "asyncio.Queue[Union[bytes, AckableMessage]]" = asyncio.Queue()
 
         async with anyio.create_task_group() as gr:
-            gr.start_soon(self.prefetcher, queue)
+            gr.start_soon(self.prefetcher, queue, finish_event)
             gr.start_soon(self.runner, queue)
-
-            # Propagate cancellation to the prefetcher & runner
-            def _cancel(*_: Any) -> None:
-                gr.cancel_scope.cancel()
-
-            signal.signal(signal.SIGINT, _cancel)
 
         if self.on_exit is not None:
             self.on_exit(self)
@@ -347,16 +343,23 @@ class Receiver:
     async def prefetcher(
         self,
         queue: "asyncio.Queue[Union[bytes, AckableMessage]]",
+        finish_event: asyncio.Event,
     ) -> None:
         """
         Prefetch tasks data.
 
         :param queue: queue for prefetched data.
+        :param finish_event: event to indicate that we need to stop prefetching.
         """
         fetched_tasks: int = 0
         iterator = self.broker.listen()
+        current_message: asyncio.Task[bytes | AckableMessage] = asyncio.create_task(
+            iterator.__anext__(),  # type: ignore
+        )
 
         while True:
+            if finish_event.is_set():
+                break
             try:
                 await self.sem_prefetch.acquire()
                 if (
@@ -365,13 +368,27 @@ class Receiver:
                 ):
                     logger.info("Max number of tasks executed.")
                     break
-                message = await iterator.__anext__()
+                # Here we wait for the message to be fetched,
+                # but we make it with timeout so it can be interrupted
+                done, _ = await asyncio.wait({current_message}, timeout=0.3)
+                # If the message is not fetched, we release the semaphore
+                # and continue the loop. So it will check if finished event was set.
+                if not done:
+                    self.sem_prefetch.release()
+                    continue
+                # We're done, so now we need to check
+                # wether task has returned an error.
+                message = current_message.result()
+                current_message = asyncio.create_task(iterator.__anext__())  # type: ignore
                 fetched_tasks += 1
                 await queue.put(message)
             except (asyncio.CancelledError, StopAsyncIteration):
                 break
-
+        # We don't want to fetch new messages if we are shutting down.
+        logger.info("Stoping prefetching messages...")
+        current_message.cancel()
         await queue.put(QUEUE_DONE)
+        self.sem_prefetch.release()
 
     async def runner(
         self,
@@ -409,8 +426,11 @@ class Receiver:
                 if message is QUEUE_DONE:
                     # asyncio.wait will throw an error if there is nothing to wait for
                     if tasks:
-                        logger.info("Waiting for running tasks to complete.")
+                        logger.info(
+                            f"Waiting for {len(tasks)} running tasks to complete...",
+                        )
                         await asyncio.wait(tasks, timeout=self.wait_tasks_timeout)
+                        logger.info("No more tasks to wait for. Shutting down.")
                     break
 
                 task = asyncio.create_task(
@@ -428,6 +448,7 @@ class Receiver:
 
             except asyncio.CancelledError:
                 break
+        logger.info("The runner is stopped.")
 
     def _prepare_task(self, name: str, handler: Callable[..., Any]) -> None:
         """
