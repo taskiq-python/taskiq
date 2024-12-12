@@ -85,3 +85,39 @@ async def test_execution() -> None:
 
     result = await task.wait_result()
     assert result.return_value == test_value
+
+
+@pytest.mark.anyio
+async def test_inline_awaits() -> None:
+    broker = InMemoryBroker(await_inplace=True)
+    slept = False
+
+    @broker.task
+    async def test_task() -> None:
+        nonlocal slept
+        await asyncio.sleep(0.2)
+        slept = True
+
+    task = await test_task.kiq()
+    assert slept
+    assert await task.is_ready()
+    assert not broker._running_tasks
+
+
+@pytest.mark.anyio
+async def test_wait_all() -> None:
+    broker = InMemoryBroker()
+    slept = False
+
+    @broker.task
+    async def test_task() -> None:
+        nonlocal slept
+        await asyncio.sleep(0.2)
+        slept = True
+
+    task = await test_task.kiq()
+    assert not slept
+    await broker.wait_all()
+    assert slept
+    assert await task.is_ready()
+    assert not broker._running_tasks

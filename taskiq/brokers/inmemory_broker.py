@@ -127,6 +127,7 @@ class InMemoryBroker(AsyncBroker):
         cast_types: bool = True,
         max_async_tasks: int = 30,
         propagate_exceptions: bool = True,
+        await_inplace: bool = False,
     ) -> None:
         super().__init__()
         self.result_backend = InmemoryResultBackend(
@@ -140,6 +141,7 @@ class InMemoryBroker(AsyncBroker):
             max_async_tasks=max_async_tasks,
             propagate_exceptions=propagate_exceptions,
         )
+        self.await_inplace = await_inplace
         self._running_tasks: "Set[asyncio.Task[Any]]" = set()
 
     async def kick(self, message: BrokerMessage) -> None:
@@ -156,7 +158,12 @@ class InMemoryBroker(AsyncBroker):
         if target_task is None:
             raise TaskiqError("Unknown task.")
 
-        task = asyncio.create_task(self.receiver.callback(message=message.message))
+        receiver_cb = self.receiver.callback(message=message.message)
+        if self.await_inplace:
+            await receiver_cb
+            return
+
+        task = asyncio.create_task(receiver_cb)
         self._running_tasks.add(task)
         task.add_done_callback(self._running_tasks.discard)
 
@@ -170,6 +177,17 @@ class InMemoryBroker(AsyncBroker):
         :raises RuntimeError: if this method is called.
         """
         raise RuntimeError("Inmemory brokers cannot listen.")
+
+    async def wait_all(self) -> None:
+        """
+        Wait for all currently running tasks to complete.
+
+        Useful when used in testing and you need to await all sent tasks
+        before asserting results.
+        """
+        to_await = list(self._running_tasks)
+        for task in to_await:
+            await task
 
     async def startup(self) -> None:
         """Runs startup events for client and worker side."""
