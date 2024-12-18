@@ -58,4 +58,5 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.py_version == '3.9'
         with:
           fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
