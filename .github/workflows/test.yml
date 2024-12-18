@@ -30,15 +30,11 @@ jobs:
       - name: Run lint check
         run: poetry run pre-commit run -a ${{ matrix.cmd }}
   pytest:
-    permissions:
-      checks: write
-      pull-requests: write
-      contents: write
     strategy:
       matrix:
-        py_version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        py_version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
         pydantic_ver: ["<2", ">=2.5,<3"]
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: "${{ matrix.os }}"
     steps:
       - uses: actions/checkout@v2
