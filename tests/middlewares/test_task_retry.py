@@ -34,7 +34,10 @@ async def test_wait_result() -> None:
 
 
 @pytest.mark.anyio
-@pytest.mark.skipif(platform.system().lower() == "darwin")
+@pytest.mark.skipif(
+    platform.system().lower() == "darwin",
+    reason="Not supported on macOS",
+)
 async def test_wait_result_error() -> None:
     """Tests wait_result."""
     broker = InMemoryBroker().with_middlewares(
