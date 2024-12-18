@@ -3,9 +3,6 @@ name: Testing taskiq
 on:
   pull_request:
   push:
-    branches:
-      - develop
-      - master
 
 jobs:
   lint:
