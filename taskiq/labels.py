@@ -18,7 +18,7 @@ _LABEL_PARSERS: Dict[LabelType, Callable[[str], Any]] = {
     LabelType.INT: int,
     LabelType.STR: str,
     LabelType.FLOAT: float,
-    LabelType.BOOL: lambda x: x.lower() == "true",
+    LabelType.BOOL: lambda x: str(x).lower() == "true",
     LabelType.BYTES: base64.b64decode,
     LabelType.ANY: lambda x: x,
 }
