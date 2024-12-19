@@ -1,5 +1,4 @@
 import asyncio
-import time
 
 import pytest
 
@@ -16,18 +15,18 @@ async def test_wait_result() -> None:
     runs = 0
 
     @broker.task(retry_on_error=True)
-    def run_task() -> str:
+    async def run_task() -> str:
         nonlocal runs
 
         if runs == 0:
             runs += 1
             raise Exception("Retry")
 
-        time.sleep(0.2)
         return "hello world!"
 
     task = await run_task.kiq()
     resp = await task.wait_result(0.1, timeout=1)
+    assert runs == 1
 
     assert resp.return_value == "hello world!"
 
@@ -39,24 +38,28 @@ async def test_wait_result_error() -> None:
         SimpleRetryMiddleware(no_result_on_retry=False),
     )
     runs = 0
+    lock = asyncio.Lock()
 
     @broker.task(retry_on_error=True)
-    def run_task() -> str:
-        nonlocal runs
+    async def run_task() -> str:
+        nonlocal runs, lock
+
+        await lock.acquire()
 
         if runs == 0:
             runs += 1
             raise ValueError("Retry")
 
-        time.sleep(0.2)
         return "hello world!"
 
     task = await run_task.kiq()
     resp = await task.wait_result(0.1, timeout=1)
-    with pytest.raises(ValueError):
-        resp.raise_for_error()
+    assert resp.is_err
+    assert runs == 1
 
-    await asyncio.sleep(0.2)
+    broker.result_backend.results.pop(task.task_id)  # type: ignore
+    lock.release()
+
     resp = await task.wait_result(timeout=1)
     assert resp.return_value == "hello world!"
 
@@ -67,19 +70,21 @@ async def test_wait_result_no_result() -> None:
     broker = InMemoryBroker().with_middlewares(
         SimpleRetryMiddleware(no_result_on_retry=False),
     )
-    done = False
+    done = asyncio.Event()
     runs = 0
+    lock = asyncio.Lock()
 
     @broker.task(retry_on_error=True)
-    def run_task() -> str:
-        nonlocal runs, done
+    async def run_task() -> str:
+        nonlocal runs, done, lock
+
+        await lock.acquire()
 
         if runs == 0:
             runs += 1
             raise ValueError("Retry")
 
-        time.sleep(0.2)
-        done = True
+        done.set()
         raise NoResultError
 
     task = await run_task.kiq()
@@ -87,12 +92,12 @@ async def test_wait_result_no_result() -> None:
     with pytest.raises(ValueError):
         resp.raise_for_error()
 
-    await asyncio.sleep(0.2)
-    resp = await task.wait_result(timeout=1)
-    with pytest.raises(ValueError):
-        resp.raise_for_error()
+    broker.result_backend.results.pop(task.task_id)  # type: ignore
+    lock.release()
 
-    assert done
+    assert await asyncio.wait_for(done.wait(), timeout=1)
+    with pytest.raises(KeyError):
+        await broker.result_backend.get_result(task.task_id)
 
 
 @pytest.mark.anyio
