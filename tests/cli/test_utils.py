@@ -1,3 +1,4 @@
+from contextlib import suppress
 from pathlib import Path
 from unittest.mock import patch
 
@@ -66,7 +67,5 @@ def test_import_tasks_non_py_list_pattern() -> None:
             mock.assert_called_with(modules)
         finally:
             for path in pathes:
-                try:
+                with suppress(FileNotFoundError):
                     path.unlink()
-                except FileNotFoundError:
-                    pass
