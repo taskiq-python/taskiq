@@ -378,7 +378,10 @@ def exception_to_python(
     if not isinstance(cls, type) or not issubclass(cls, BaseException):
         fake_exc_type = exc_type if exc_module is None else f"{exc_module}.{exc_type}"
         raise taskiq.exceptions.SecurityError(
-            f"Expected an exception class, got {fake_exc_type} with payload {exc_msg}",
+            description=(
+                f"Expected an exception class, "
+                f"got {fake_exc_type} with payload {exc_msg}"
+            ),
         )
 
     # XXX: Without verifying `cls` is actually an exception class,

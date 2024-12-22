@@ -1,3 +1,5 @@
+from typing import Optional
+
 from izulu import root
 
 
@@ -5,14 +7,14 @@ class TaskiqError(root.Error):
     """Base exception for all errors."""
 
     __template__ = "Exception occurred: {description}"
-    description: str
+    description: Optional[str] = None
 
 
 class TaskiqResultTimeoutError(TaskiqError):
     """Waiting for task results has timed out."""
 
     __template__ = "Waiting for task results has timed out, timeout={timeout}"
-    timeout: float
+    timeout: Optional[float] = None
 
 
 class BrokerError(TaskiqError):
@@ -54,7 +56,8 @@ class ResultIsReadyError(ResultBackendError):
 class SecurityError(TaskiqError):
     """Security related exception."""
 
-    __template__ = "Base exception for all security errors"
+    __template__ = "Security exception occurred: {description}"
+    description: str
 
 
 class NoResultError(TaskiqError):
