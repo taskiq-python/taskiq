@@ -1,5 +1,6 @@
 from izulu import root
 
+
 class TaskiqError(root.Error):
     """Base exception for all errors."""
 
