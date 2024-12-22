@@ -156,7 +156,7 @@ class InMemoryBroker(AsyncBroker):
         """
         target_task = self.find_task(message.task_name)
         if target_task is None:
-            raise TaskiqError("Unknown task.")
+            raise TaskiqError(description="Unknown task.")
 
         receiver_cb = self.receiver.callback(message=message.message)
         if self.await_inplace:

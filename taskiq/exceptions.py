@@ -4,7 +4,8 @@ from izulu import root
 class TaskiqError(root.Error):
     """Base exception for all errors."""
 
-    __template__ = "Base exception for all errors"
+    __template__ = "Exception occurred: {description}"
+    description: str
 
 
 class TaskiqResultTimeoutError(TaskiqError):

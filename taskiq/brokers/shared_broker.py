@@ -57,8 +57,10 @@ class AsyncSharedBroker(AsyncBroker):
         :raises TaskiqError: if called.
         """
         raise TaskiqError(
-            "You cannot use kiq directly on shared task "
-            "without setting the default_broker.",
+            description=(
+                "You cannot use kiq directly on shared task "
+                "without setting the default_broker."
+            ),
         )
 
     async def listen(self) -> AsyncGenerator[bytes, None]:  # type: ignore
@@ -69,7 +71,7 @@ class AsyncSharedBroker(AsyncBroker):
 
         :raises TaskiqError: if called.
         """
-        raise TaskiqError("Shared broker cannot listen")
+        raise TaskiqError(description="Shared broker cannot listen")
 
     def _register_task(
         self,
