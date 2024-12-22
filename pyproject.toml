@@ -47,6 +47,7 @@ pytz = "*"
 orjson = { version = "^3", optional = true }
 msgpack = { version = "^1.0.7", optional = true }
 cbor2 = { version = "^5", optional = true }
+izulu = "^0.5.3"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"

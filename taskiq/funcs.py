@@ -47,7 +47,7 @@ async def gather(
 
     while task_ids:
         if 0 < timeout < time() - start_time:
-            raise TaskiqResultTimeoutError("Timed out")
+            raise TaskiqResultTimeoutError("Timed out", timeout=timeout)
         check_tasks = []
         for task in tasks:
             check_tasks.append(loop.create_task(check_task(task)))
