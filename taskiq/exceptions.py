@@ -23,10 +23,36 @@ class BrokerError(TaskiqError):
     __template__ = "Base exception for all broker errors"
 
 
+class ListenError(TaskiqError):
+    """Error if the broker is unable to listen to the queue."""
+
+
+class SharedBrokerListenError(ListenError):
+    """Error when someone tries to listen to the queue with shared broker."""
+
+    __template__ = "Shared broker cannot listen"
+
+
 class SendTaskError(BrokerError):
     """Error if the broker was unable to send the task to the queue."""
 
     __template__ = "Cannot send task to the queue"
+
+
+class SharedBrokerSendTaskError(SendTaskError):
+    """Error when someone tries to send task with shared broker."""
+
+    __template__ = (
+        "You cannot use kiq directly on shared task "
+        "without setting the default_broker."
+    )
+
+
+class UnknownTaskError(SendTaskError):
+    """Error if task is unknown."""
+
+    __template__ = "Cannot send unknown task to the queue, task name - {task_name}"
+    task_name: str
 
 
 class ResultBackendError(TaskiqError):
