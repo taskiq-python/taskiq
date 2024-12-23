@@ -6,8 +6,7 @@ from izulu import root
 class TaskiqError(root.Error):
     """Base exception for all errors."""
 
-    __template__ = "Exception occurred: {description}"
-    description: Optional[str] = None
+    __template__ = "Exception occurred"
 
 
 class TaskiqResultTimeoutError(TaskiqError):
@@ -88,6 +87,8 @@ class SecurityError(TaskiqError):
 
 class NoResultError(TaskiqError):
     """Error if user does not want to set result."""
+
+    __template__ = "User doesn't want to set result"
 
 
 class TaskRejectedError(TaskiqError):
