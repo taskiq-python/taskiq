@@ -94,7 +94,7 @@ def import_tasks(
                         # remove all suffixes
                         prefix = path.name.partition(".")[0]
                         discovered_modules.add(
-                            str(path.with_name(prefix)).replace(os.path.sep, ".")
+                            str(path.with_name(prefix)).replace(os.path.sep, "."),
                         )
                     # ignore other files
                 else:
