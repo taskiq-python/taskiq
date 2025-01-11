@@ -2,10 +2,10 @@ import asyncio
 import sys
 from datetime import datetime, timedelta
 from logging import basicConfig, getLevelName, getLogger
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
+import pycron
 import pytz
-from pycron import is_now
 
 from taskiq.abc.schedule_source import ScheduleSource
 from taskiq.cli.scheduler.args import SchedulerArgs
@@ -73,6 +73,35 @@ async def get_all_schedules(
     return dict(zip(scheduler.sources, schedules))
 
 
+class _CronParseError(Exception):
+    pass
+
+
+def is_cron_now(
+    value: str,
+    offset: Union[str, timedelta, None] = None,
+) -> bool:
+    """Determines whether a cron-like string is valid for the current date and time.
+
+    :param value: cron-like string.
+    :param offset: cron offset.
+    """
+    now = datetime.now(tz=pytz.UTC)
+    # If user specified cron offset we apply it.
+    # If it's timedelta, we simply add the delta to current time.
+    if offset and isinstance(offset, timedelta):
+        now += offset
+    # If timezone was specified as string we convert it timezone
+    # offset and then apply.
+    elif offset and isinstance(offset, str):
+        now = now.astimezone(pytz.timezone(offset))
+
+    try:
+        return pycron.is_now(value, now)
+    except ValueError as e:
+        raise _CronParseError(f"Cannot parse cron: '{value}'") from e
+
+
 def get_task_delay(task: ScheduledTask) -> Optional[int]:
     """
     Get delay of the task in seconds.
@@ -82,17 +111,7 @@ def get_task_delay(task: ScheduledTask) -> Optional[int]:
     """
     now = datetime.now(tz=pytz.UTC)
     if task.cron is not None:
-        # If user specified cron offset we apply it.
-        # If it's timedelta, we simply add the delta to current time.
-        if task.cron_offset and isinstance(task.cron_offset, timedelta):
-            now += task.cron_offset
-        # If timezone was specified as string we convert it timzone
-        # offset and then apply.
-        elif task.cron_offset and isinstance(task.cron_offset, str):
-            now = now.astimezone(pytz.timezone(task.cron_offset))
-        if is_now(task.cron, now):
-            return 0
-        return None
+        return 0 if is_cron_now(task.cron, task.cron_offset) else None
     if task.time is not None:
         task_time = to_tz_aware(task.time).replace(microsecond=0)
         if task_time <= now:
@@ -103,30 +122,18 @@ def get_task_delay(task: ScheduledTask) -> Optional[int]:
     return None
 
 
-async def delayed_send(
+async def send(
     scheduler: TaskiqScheduler,
     source: ScheduleSource,
     task: ScheduledTask,
-    delay: int,
 ) -> None:
     """
-    Send a task with a delay.
-
-    This function waits for some time and then
-    sends a task.
-
-    The main idea is that scheduler gathers
-    tasks every minute and some of them have
-    specfic time. To respect the time, we calculate
-    the delay and send the task after some delay.
+    Send a task.
 
     :param scheduler: current scheduler.
     :param source: source of the task.
     :param task: task to send.
-    :param delay: how long to wait.
     """
-    if delay > 0:
-        await asyncio.sleep(delay)
     logger.info("Sending task %s.", task.task_name)
     await scheduler.on_ready(source, task)
 
@@ -142,32 +149,53 @@ async def run_scheduler_loop(scheduler: TaskiqScheduler) -> None:
     """
     loop = asyncio.get_event_loop()
     running_schedules = set()
+
+    interval_tasks_last_run: "Dict[str, datetime]" = {}
+    now = datetime.now()
+    next_minute = now.replace(second=0, microsecond=0)
+    next_second = now.replace(microsecond=0) + timedelta(seconds=1)
+
+    await asyncio.sleep((next_second - now).total_seconds())
+
     while True:
-        # We use this method to correctly sleep for one minute.
+        # We use this method to correctly sleep.
+        now = datetime.now()
         scheduled_tasks = await get_all_schedules(scheduler)
         for source, task_list in scheduled_tasks.items():
             for task in task_list:
-                try:
-                    task_delay = get_task_delay(task)
-                except ValueError:
-                    logger.warning(
-                        "Cannot parse cron: %s for task: %s, schedule_id: %s",
-                        task.cron,
-                        task.task_name,
-                        task.schedule_id,
-                    )
-                    continue
-                if task_delay is not None:
-                    send_task = loop.create_task(
-                        delayed_send(scheduler, source, task, task_delay),
-                    )
+                to_send = False
+                if task.time is not None and now >= task.time:
+                    to_send = True
+                elif task.interval is not None:
+                    last_call = interval_tasks_last_run.get(task.task_name)
+                    if (
+                        last_call is not None
+                        and round((now - last_call).total_seconds()) < task.interval
+                    ):
+                        to_send = False
+                    else:
+                        to_send = True
+                        interval_tasks_last_run[task.task_name] = now
+                elif now > next_minute and task.cron is not None:
+                    try:
+                        to_send = is_cron_now(task.cron, task.cron_offset)
+                    except _CronParseError:
+                        logger.warning(
+                            "Cannot parse cron: %s for task: %s, schedule_id: %s",
+                            task.cron,
+                            task.task_name,
+                            task.schedule_id,
+                        )
+
+                if to_send:
+                    send_task = loop.create_task(send(scheduler, source, task))
                     running_schedules.add(send_task)
                     send_task.add_done_callback(running_schedules.discard)
-        next_minute = datetime.now().replace(second=0, microsecond=0) + timedelta(
-            minutes=1,
-        )
-        delay = next_minute - datetime.now()
-        await asyncio.sleep(delay.total_seconds())
+
+        now = datetime.now()
+        next_second = now.replace(microsecond=0) + timedelta(seconds=1)
+        next_minute = now.replace(second=0, microsecond=0) + timedelta(minutes=1)
+        await asyncio.sleep((next_second - now).total_seconds())
 
 
 async def run_scheduler(args: SchedulerArgs) -> None:
