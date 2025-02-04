@@ -159,6 +159,7 @@ lint.ignore = [
     "ANN401",  # typing.Any are disallowed in `**kwargs
     "PLR0913", # Too many arguments for function call
     "D106",    # Missing docstring in public nested class
+    "D205",    # 1 blank line required between summary line and description
 ]
 exclude = [".venv/"]
 lint.mccabe = { max-complexity = 10 }

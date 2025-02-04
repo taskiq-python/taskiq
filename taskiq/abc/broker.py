@@ -77,6 +77,7 @@ class AsyncBroker(ABC):
         self,
         result_backend: "Optional[AsyncResultBackend[_T]]" = None,
         task_id_generator: Optional[Callable[[], str]] = None,
+        max_attempts_at_message: Optional[int] = None,
     ) -> None:
         if result_backend is None:
             result_backend = DummyResultBackend()
@@ -113,6 +114,7 @@ class AsyncBroker(ABC):
         self.state = TaskiqState()
         self.custom_dependency_context: Dict[Any, Any] = {}
         self.dependency_overrides: Dict[Any, Any] = {}
+        self.max_attempts_at_message = max_attempts_at_message
         # True only if broker runs in worker process.
         self.is_worker_process: bool = False
         # True only if broker runs in scheduler process.

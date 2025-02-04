@@ -42,3 +42,15 @@ class BrokerMessage(BaseModel):
     task_name: str
     message: bytes
     labels: Dict[str, Any]
+
+
+class WrappedMessage(BaseModel):
+    """Abstraction for an incoming message in a wrapper."""
+
+    data: bytes
+
+
+class DeliveryCountMessage(WrappedMessage):
+    """Message with a present delivery count."""
+
+    delivery_count: Optional[int] = None
