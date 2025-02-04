@@ -94,12 +94,15 @@ def get_task_delay(task: ScheduledTask) -> Optional[int]:
             return 0
         return None
     if task.time is not None:
-        task_time = to_tz_aware(task.time).replace(microsecond=0)
+        task_time = to_tz_aware(task.time)
         if task_time <= now:
             return 0
         one_min_ahead = (now + timedelta(minutes=1)).replace(second=1, microsecond=0)
         if task_time <= one_min_ahead:
-            return int((task_time - now).total_seconds())
+            delay = task_time - now
+            if delay.microseconds:
+                return int(delay.total_seconds()) + 1
+            return int(delay.total_seconds())
     return None
 
 

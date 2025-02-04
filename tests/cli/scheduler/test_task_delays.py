@@ -124,3 +124,21 @@ def test_time_delay() -> None:
         ),
     )
     assert delay is not None and delay == 15
+
+
+@freeze_time("2023-01-14 12:00:00.05")
+def test_time_delay_with_milliseconds() -> None:
+    time = datetime.datetime.now(tz=pytz.UTC) + datetime.timedelta(
+        seconds=15,
+        milliseconds=150,
+    )
+    delay = get_task_delay(
+        ScheduledTask(
+            task_name="",
+            labels={},
+            args=[],
+            kwargs={},
+            time=time,
+        ),
+    )
+    assert delay is not None and delay == 16
