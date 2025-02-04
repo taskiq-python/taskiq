@@ -353,7 +353,9 @@ class Receiver:
         """
         fetched_tasks: int = 0
         iterator = self.broker.listen()
-        current_message: asyncio.Task[bytes | AckableMessage] = asyncio.create_task(
+        current_message: asyncio.Task[
+            Union[bytes, AckableMessage]
+        ] = asyncio.create_task(
             iterator.__anext__(),  # type: ignore
         )
 
