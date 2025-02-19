@@ -7,7 +7,7 @@ from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.result_backend import AsyncResultBackend, TaskiqResult
 from taskiq.depends.progress_tracker import TaskProgress
 from taskiq.events import TaskiqEvents
-from taskiq.exceptions import TaskiqError
+from taskiq.exceptions import UnknownTaskError
 from taskiq.message import BrokerMessage
 from taskiq.receiver import Receiver
 from taskiq.utils import maybe_awaitable
@@ -156,7 +156,7 @@ class InMemoryBroker(AsyncBroker):
         """
         target_task = self.find_task(message.task_name)
         if target_task is None:
-            raise TaskiqError("Unknown task.")
+            raise UnknownTaskError(task_name=message.task_name)
 
         receiver_cb = self.receiver.callback(message=message.message)
         if self.await_inplace:
