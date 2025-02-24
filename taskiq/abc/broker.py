@@ -1,9 +1,6 @@
-import os
-import sys
 import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from functools import wraps
 from logging import getLogger
 from typing import (
     TYPE_CHECKING,
@@ -18,7 +15,6 @@ from typing import (
     Optional,
     TypeVar,
     Union,
-    overload,
 )
 from uuid import uuid4
 
@@ -35,7 +31,8 @@ from taskiq.message import BrokerMessage
 from taskiq.result_backends.dummy import DummyResultBackend
 from taskiq.serializers.json_serializer import JSONSerializer
 from taskiq.state import TaskiqState
-from taskiq.utils import maybe_awaitable, remove_suffix
+from taskiq.task_creator import BaseTaskCreator
+from taskiq.utils import maybe_awaitable
 from taskiq.warnings import TaskiqDeprecationWarning
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -97,6 +94,7 @@ class AsyncBroker(ABC):
                 TaskiqDeprecationWarning,
                 stacklevel=2,
             )
+        self.task: BaseTaskCreator = BaseTaskCreator(self)
         self.middlewares: "List[TaskiqMiddleware]" = []
         self.result_backend = result_backend
         self.decorator_class = AsyncTaskiqDecoratedTask
@@ -254,105 +252,6 @@ class AsyncBroker(ABC):
         :yield: incoming messages.
         :return: nothing.
         """
-
-    @overload
-    def task(
-        self,
-        task_name: Callable[_FuncParams, _ReturnType],
-        **labels: Any,
-    ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]:  # pragma: no cover
-        ...
-
-    @overload
-    def task(
-        self,
-        task_name: Optional[str] = None,
-        **labels: Any,
-    ) -> Callable[
-        [Callable[_FuncParams, _ReturnType]],
-        AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType],
-    ]:  # pragma: no cover
-        ...
-
-    def task(  # type: ignore[misc]
-        self,
-        task_name: Optional[str] = None,
-        **labels: Any,
-    ) -> Any:
-        """
-        Decorator that turns function into a task.
-
-        This decorator converts function to
-        a `TaskiqDecoratedTask` object.
-
-        This object can be called as a usual function,
-        because it uses decorated function in it's __call__
-        method.
-
-        !! You have to use it with parentheses in order to
-        get autocompletion. Like this:
-
-        >>> @task()
-        >>> def my_func():
-        >>>     ...
-
-        :param task_name: custom name of a task, defaults to decorated function's name.
-        :param labels: some addition labels for task.
-
-        :returns: decorator function or AsyncTaskiqDecoratedTask.
-        """
-
-        def make_decorated_task(
-            inner_labels: Dict[str, Union[str, int]],
-            inner_task_name: Optional[str] = None,
-        ) -> Callable[
-            [Callable[_FuncParams, _ReturnType]],
-            AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType],
-        ]:
-            def inner(
-                func: Callable[_FuncParams, _ReturnType],
-            ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]:
-                nonlocal inner_task_name
-                if inner_task_name is None:
-                    fmodule = func.__module__
-                    if fmodule == "__main__":  # pragma: no cover
-                        fmodule = ".".join(
-                            remove_suffix(sys.argv[0], ".py").split(
-                                os.path.sep,
-                            ),
-                        )
-                    fname = func.__name__
-                    if fname == "<lambda>":
-                        fname = f"lambda_{uuid4().hex}"
-                    inner_task_name = f"{fmodule}:{fname}"
-                wrapper = wraps(func)
-
-                decorated_task = wrapper(
-                    self.decorator_class(
-                        broker=self,
-                        original_func=func,
-                        labels=inner_labels,
-                        task_name=inner_task_name,
-                    ),
-                )
-
-                self._register_task(decorated_task.task_name, decorated_task)  # type: ignore
-
-                return decorated_task  # type: ignore
-
-            return inner
-
-        if callable(task_name):
-            # This is an edge case,
-            # when decorator called without parameters.
-            return make_decorated_task(
-                inner_labels=labels or {},
-            )(task_name)
-
-        return make_decorated_task(
-            inner_task_name=task_name,
-            inner_labels=labels or {},
-        )
 
     def register_task(
         self,
