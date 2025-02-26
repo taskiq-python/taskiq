@@ -9,9 +9,10 @@ from taskiq_dependencies import Depends
 
 from taskiq.abc.broker import AckableMessage, AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
+from taskiq.acks import AckableMessageWithDeliveryCount
 from taskiq.brokers.inmemory_broker import InMemoryBroker
 from taskiq.exceptions import NoResultError, TaskiqResultTimeoutError
-from taskiq.message import TaskiqMessage
+from taskiq.message import DeliveryCountMessage, TaskiqMessage
 from taskiq.receiver import Receiver
 from taskiq.result import TaskiqResult
 from tests.utils import AsyncQueueBroker
@@ -357,6 +358,127 @@ async def test_callback_unknown_task() -> None:
     )
 
     await receiver.callback(broker_message.message)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("delivery_count", [2, None])
+async def test_callback_max_attempts_at_message_not_exceeded(
+    delivery_count: Optional[int],
+) -> None:
+    """
+    Test that callback function calls the task if `max_attempts_at_message`
+    is not exceeded.
+    """
+    broker = InMemoryBroker()
+    called_times = 0
+
+    @broker.task
+    async def my_task() -> int:
+        nonlocal called_times
+        called_times += 1
+        return 1
+
+    receiver = get_receiver(broker)
+    receiver.max_attempts_at_message = 3
+
+    broker_message = broker.formatter.dumps(
+        TaskiqMessage(
+            task_id="task_id",
+            task_name=my_task.task_name,
+            labels={},
+            args=[],
+            kwargs={},
+        ),
+    )
+
+    await receiver.callback(
+        DeliveryCountMessage(
+            data=broker_message.message,
+            delivery_count=delivery_count,
+        ),
+    )
+    assert called_times == 1
+
+
+@pytest.mark.anyio
+async def test_callback_max_attempts_at_message_exceeded() -> None:
+    """
+    Test that callback function does not call the task if `max_attempts_at_message`
+    is exceeded.
+    """
+    broker = InMemoryBroker()
+    called_times = 0
+
+    @broker.task
+    async def my_task() -> int:
+        nonlocal called_times
+        called_times += 1
+        return 1
+
+    receiver = get_receiver(broker)
+    receiver.max_attempts_at_message = 3
+
+    broker_message = broker.formatter.dumps(
+        TaskiqMessage(
+            task_id="task_id",
+            task_name=my_task.task_name,
+            labels={},
+            args=[],
+            kwargs={},
+        ),
+    )
+
+    await receiver.callback(
+        DeliveryCountMessage(
+            data=broker_message.message,
+            delivery_count=3,
+        ),
+    )
+    assert called_times == 0
+
+
+@pytest.mark.anyio
+async def test_callback_max_attempts_at_message_exceeded_ackable() -> None:
+    """
+    Test that callback function does not call the task if `max_attempts_at_message`
+    is exceeded and acks the message.
+    """
+    broker = InMemoryBroker()
+    called_times = 0
+    acked = False
+
+    @broker.task
+    async def my_task() -> int:
+        nonlocal called_times
+        called_times += 1
+        return 1
+
+    async def ack_callback() -> None:
+        nonlocal acked
+        acked = True
+
+    receiver = get_receiver(broker)
+    receiver.max_attempts_at_message = 3
+
+    broker_message = broker.formatter.dumps(
+        TaskiqMessage(
+            task_id="task_id",
+            task_name=my_task.task_name,
+            labels={},
+            args=[],
+            kwargs={},
+        ),
+    )
+
+    await receiver.callback(
+        AckableMessageWithDeliveryCount(
+            data=broker_message.message,
+            delivery_count=3,
+            ack=ack_callback,
+        ),
+    )
+    assert called_times == 0
+    assert acked
 
 
 @pytest.mark.anyio

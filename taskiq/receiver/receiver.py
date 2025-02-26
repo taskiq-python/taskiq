@@ -13,7 +13,7 @@ from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.acks import AcknowledgeType
 from taskiq.context import Context
 from taskiq.exceptions import NoResultError
-from taskiq.message import TaskiqMessage
+from taskiq.message import DeliveryCountMessage, TaskiqMessage, WrappedMessage
 from taskiq.receiver.params_parser import parse_params
 from taskiq.result import TaskiqResult
 from taskiq.state import TaskiqState
@@ -58,6 +58,7 @@ class Receiver:
         on_exit: Optional[Callable[["Receiver"], None]] = None,
         max_tasks_to_execute: Optional[int] = None,
         wait_tasks_timeout: Optional[float] = None,
+        max_attempts_at_message: Optional[int] = None,
     ) -> None:
         self.broker = broker
         self.executor = executor
@@ -72,6 +73,7 @@ class Receiver:
         self.known_tasks: Set[str] = set()
         self.max_tasks_to_execute = max_tasks_to_execute
         self.wait_tasks_timeout = wait_tasks_timeout
+        self.max_attempts_at_message = max_attempts_at_message
         for task in self.broker.get_all_tasks().values():
             self._prepare_task(task.task_name, task.original_func)
         self.sem: "Optional[asyncio.Semaphore]" = None
@@ -86,7 +88,7 @@ class Receiver:
 
     async def callback(  # noqa: C901, PLR0912
         self,
-        message: Union[bytes, AckableMessage],
+        message: Union[bytes, WrappedMessage],
         raise_err: bool = False,
     ) -> None:
         """
@@ -101,7 +103,31 @@ class Receiver:
         :param raise_err: raise an error if cannot save result in
             result_backend.
         """
-        message_data = message.data if isinstance(message, AckableMessage) else message
+        message_data = message.data if isinstance(message, WrappedMessage) else message
+
+        delivery_count = (
+            message.delivery_count
+            if isinstance(message, DeliveryCountMessage)
+            else None
+        )
+        if (
+            delivery_count
+            and self.max_attempts_at_message
+            and delivery_count >= self.max_attempts_at_message
+        ):
+            logger.error(
+                "Permitted number of attempts at processing message %s "
+                "has been exhausted after %s attempts.",
+                message_data,
+                self.max_attempts_at_message,
+            )
+            if isinstance(
+                message,
+                AckableMessage,
+            ):
+                await maybe_awaitable(message.ack())
+            return
+
         try:
             taskiq_msg = self.broker.formatter.loads(message=message_data)
             taskiq_msg.parse_labels()

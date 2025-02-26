@@ -1,7 +1,7 @@
 import enum
 from typing import Awaitable, Callable, Union
 
-from pydantic import BaseModel
+from taskiq.message import DeliveryCountMessage, WrappedMessage
 
 
 @enum.unique
@@ -20,7 +20,7 @@ class AcknowledgeType(str, enum.Enum):
     WHEN_SAVED = "when_saved"
 
 
-class AckableMessage(BaseModel):
+class AckableMessage(WrappedMessage):
     """
     Message that can be acknowledged.
 
@@ -33,5 +33,8 @@ class AckableMessage(BaseModel):
     as a whole.
     """
 
-    data: bytes
     ack: Callable[[], Union[None, Awaitable[None]]]
+
+
+class AckableMessageWithDeliveryCount(AckableMessage, DeliveryCountMessage):
+    """Message that can be acknowledged and has a delivery count."""
