@@ -114,9 +114,9 @@ class AsyncBroker(ABC):
         self.custom_dependency_context: Dict[Any, Any] = {}
         self.dependency_overrides: Dict[Any, Any] = {}
         # True only if broker runs in worker process.
-        self.is_worker_process: bool = False
+        self.is_worker_process = False
         # True only if broker runs in scheduler process.
-        self.is_scheduler_process: bool = False
+        self.is_scheduler_process = False
 
     def find_task(self, task_name: str) -> Optional[AsyncTaskiqDecoratedTask[Any, Any]]:
         """
