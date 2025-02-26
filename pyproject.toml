@@ -28,7 +28,7 @@ classifiers = [
 keywords = ["taskiq", "tasks", "distributed", "async"]
 
 [tool.poetry.dependencies]
-python = "^3.8.1"
+python = "^3.9"
 typing-extensions = ">=3.10.0.0"
 pydantic = ">=1.0,<=3.0"
 importlib-metadata = "*"
