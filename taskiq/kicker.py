@@ -1,10 +1,11 @@
+from collections.abc import Coroutine
 from dataclasses import asdict, is_dataclass
 from datetime import datetime
 from logging import getLogger
+from types import CoroutineType
 from typing import (
     TYPE_CHECKING,
     Any,
-    Coroutine,
     Dict,
     Generic,
     Optional,
@@ -106,6 +107,14 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         """
         self.broker = broker
         return self
+
+    @overload
+    async def kiq(
+        self: "AsyncKicker[_FuncParams, CoroutineType[Any, Any, _T]]",
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> AsyncTaskiqTask[_T]:  # pragma: no cover
+        ...
 
     @overload
     async def kiq(

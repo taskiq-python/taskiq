@@ -1,4 +1,4 @@
-from typing import Any, Coroutine, List, Union
+from typing import List
 
 import pytest
 
@@ -17,7 +17,7 @@ class CancellingScheduleSource(ScheduleSource):
     def pre_send(
         self,
         task: "ScheduledTask",
-    ) -> Union[None, Coroutine[Any, Any, None]]:
+    ) -> None:
         """Raise cancelled error."""
         raise ScheduledTaskCancelledError
 

@@ -1,9 +1,10 @@
+from collections.abc import Coroutine
 from datetime import datetime
+from types import CoroutineType
 from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Coroutine,
     Dict,
     Generic,
     TypeVar,
@@ -63,6 +64,14 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         **kwargs: _FuncParams.kwargs,
     ) -> _ReturnType:
         return self.original_func(*args, **kwargs)
+
+    @overload
+    async def kiq(
+        self: "AsyncTaskiqDecoratedTask[_FuncParams, CoroutineType[Any, Any, _T]]",
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> AsyncTaskiqTask[_T]:
+        ...
 
     @overload
     async def kiq(

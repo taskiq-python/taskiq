@@ -28,7 +28,7 @@ classifiers = [
 keywords = ["taskiq", "tasks", "distributed", "async"]
 
 [tool.poetry.dependencies]
-python = "^3.8.1"
+python = "^3.9"
 typing-extensions = ">=3.10.0.0"
 pydantic = ">=1.0,<=3.0"
 importlib-metadata = "*"
@@ -51,7 +51,7 @@ msgpack = { version = "^1.0.7", optional = true }
 cbor2 = { version = "^5", optional = true }
 izulu = "0.5.4"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 pytest = "^7.1.2"
 ruff = "^0"
 black = { version = "^22.6.0", allow-prereleases = true }
@@ -157,8 +157,6 @@ lint.ignore = [
     "D401",    # First line should be in imperative mood
     "D104",    # Missing docstring in public package
     "D100",    # Missing docstring in public module
-    "ANN102",  # Missing type annotation for self in method
-    "ANN101",  # Missing type annotation for argument
     "ANN401",  # typing.Any are disallowed in `**kwargs
     "PLR0913", # Too many arguments for function call
     "D106",    # Missing docstring in public nested class
