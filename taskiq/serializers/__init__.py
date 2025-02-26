@@ -6,9 +6,9 @@ from .orjson_serializer import ORJSONSerializer
 from .pickle import PickleSerializer
 
 __all__ = [
-    "JSONSerializer",
-    "ORJSONSerializer",
-    "MSGPackSerializer",
     "CBORSerializer",
+    "JSONSerializer",
+    "MSGPackSerializer",
+    "ORJSONSerializer",
     "PickleSerializer",
 ]

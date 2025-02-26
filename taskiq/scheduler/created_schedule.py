@@ -1,4 +1,6 @@
-from typing import TYPE_CHECKING, Any, Coroutine, Generic, TypeVar, overload
+from collections.abc import Coroutine
+from types import CoroutineType
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload
 
 from taskiq.abc.schedule_source import ScheduleSource
 from taskiq.scheduler.scheduled_task import ScheduledTask
@@ -27,12 +29,20 @@ class CreatedSchedule(Generic[_ReturnType]):
 
     @overload
     async def kiq(
+        self: "CreatedSchedule[CoroutineType[Any,Any, _T]]",
+    ) -> AsyncTaskiqTask[_T]:
+        ...
+
+    @overload
+    async def kiq(
         self: "CreatedSchedule[Coroutine[Any,Any, _T]]",
     ) -> AsyncTaskiqTask[_T]:
         ...
 
     @overload
-    async def kiq(self: "CreatedSchedule[_ReturnType]") -> AsyncTaskiqTask[_ReturnType]:
+    async def kiq(
+        self: "CreatedSchedule[_ReturnType]",
+    ) -> AsyncTaskiqTask[_ReturnType]:
         ...
 
     async def kiq(self) -> Any:
