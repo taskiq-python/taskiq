@@ -14,7 +14,7 @@ from typing import (
     overload,
 )
 
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
 from typing_extensions import ParamSpec
 
 from taskiq.abc.middleware import TaskiqMiddleware
@@ -46,12 +46,14 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         task_name: str,
         broker: "AsyncBroker",
         labels: Dict[str, Any],
+        return_type: Optional[TypeAdapter[_ReturnType]] = None,
     ) -> None:
         self.task_name = task_name
         self.broker = broker
         self.labels = labels
         self.custom_task_id: Optional[str] = None
         self.custom_schedule_id: Optional[str] = None
+        self.return_type = return_type
 
     def with_labels(
         self,
@@ -169,6 +171,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         return AsyncTaskiqTask(
             task_id=message.task_id,
             result_backend=self.broker.result_backend,
+            return_type=self.return_type,  # type: ignore # (pyright issue)
         )
 
     async def schedule_by_cron(

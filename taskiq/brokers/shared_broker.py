@@ -30,6 +30,7 @@ class SharedDecoratedTask(AsyncTaskiqDecoratedTask[_Params, _ReturnType]):
             task_name=self.task_name,
             broker=broker,
             labels=self.labels,
+            return_type=self.return_type,
         )
 
 
