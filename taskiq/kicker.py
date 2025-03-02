@@ -9,12 +9,13 @@ from typing import (
     Dict,
     Generic,
     Optional,
+    Type,
     TypeVar,
     Union,
     overload,
 )
 
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel
 from typing_extensions import ParamSpec
 
 from taskiq.abc.middleware import TaskiqMiddleware
@@ -46,7 +47,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         task_name: str,
         broker: "AsyncBroker",
         labels: Dict[str, Any],
-        return_type: Optional[TypeAdapter[_ReturnType]] = None,
+        return_type: Optional[Type[_ReturnType]] = None,
     ) -> None:
         self.task_name = task_name
         self.broker = broker

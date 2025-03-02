@@ -1,11 +1,11 @@
 import asyncio
 from logging import getLogger
 from time import time
-from typing import TYPE_CHECKING, Any, Generic, Optional
+from typing import TYPE_CHECKING, Any, Generic, Optional, Type
 
-from pydantic import TypeAdapter
 from typing_extensions import TypeVar
 
+from taskiq.compat import parse_obj_as
 from taskiq.exceptions import (
     ResultGetError,
     ResultIsReadyError,
@@ -29,7 +29,7 @@ class AsyncTaskiqTask(Generic[_ReturnType]):
         self,
         task_id: str,
         result_backend: "AsyncResultBackend[_ReturnType]",
-        return_type: Optional[TypeAdapter[_ReturnType]] = None,
+        return_type: Optional[Type[_ReturnType]] = None,
     ) -> None:
         self.task_id = task_id
         self.result_backend = result_backend
@@ -65,7 +65,8 @@ class AsyncTaskiqTask(Generic[_ReturnType]):
             )
             if self.return_type is not None:
                 try:
-                    res.return_value = self.return_type.validate_python(
+                    res.return_value = parse_obj_as(
+                        self.return_type,
                         res.return_value,
                     )
                 except ValueError:

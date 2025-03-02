@@ -1,6 +1,6 @@
 # flake8: noqa
 from functools import lru_cache
-from typing import Any, Dict, Optional, Type, TypeVar, Union
+from typing import Any, Dict, Hashable, Optional, Type, TypeVar, Union
 
 import pydantic
 from importlib_metadata import version
@@ -12,13 +12,13 @@ Model = TypeVar("Model", bound="pydantic.BaseModel")
 IS_PYDANTIC2 = PYDANTIC_VER >= Version("2.0")
 
 if IS_PYDANTIC2:
-    T = TypeVar("T")
+    T = TypeVar("T", bound=Hashable)
 
     @lru_cache()
-    def create_type_adapter(annot: T) -> pydantic.TypeAdapter[T]:
+    def create_type_adapter(annot: Type[T]) -> pydantic.TypeAdapter[T]:
         return pydantic.TypeAdapter(annot)
 
-    def parse_obj_as(annot: T, obj: Any) -> T:
+    def parse_obj_as(annot: Type[T], obj: Any) -> T:
         return create_type_adapter(annot).validate_python(obj)
 
     def model_validate(

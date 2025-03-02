@@ -8,12 +8,12 @@ from typing import (
     Dict,
     Generic,
     Optional,
+    Type,
     TypeVar,
     Union,
     overload,
 )
 
-from pydantic import TypeAdapter
 from typing_extensions import ParamSpec
 
 from taskiq.kicker import AsyncKicker
@@ -52,7 +52,7 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         task_name: str,
         original_func: Callable[_FuncParams, _ReturnType],
         labels: Dict[str, Any],
-        return_type: Optional[TypeAdapter[_ReturnType]] = None,
+        return_type: Optional[Type[_ReturnType]] = None,
     ) -> None:
         self.broker = broker
         self.task_name = task_name

@@ -23,7 +23,6 @@ from typing import (
 )
 from uuid import uuid4
 
-from pydantic import TypeAdapter
 from typing_extensions import ParamSpec, Self, TypeAlias
 
 from taskiq.abc.middleware import TaskiqMiddleware
@@ -331,7 +330,7 @@ class AsyncBroker(ABC):
                 sign = get_type_hints(func)
                 return_type = None
                 if "return" in sign:
-                    return_type = TypeAdapter(sign["return"])
+                    return_type = sign["return"]
 
                 decorated_task = wrapper(
                     self.decorator_class(
@@ -339,7 +338,7 @@ class AsyncBroker(ABC):
                         original_func=func,
                         labels=inner_labels,
                         task_name=inner_task_name,
-                        return_type=return_type,
+                        return_type=return_type,  # type: ignore
                     ),
                 )
 
