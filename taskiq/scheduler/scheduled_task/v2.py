@@ -17,14 +17,18 @@ class ScheduledTask(BaseModel):
     cron: Optional[str] = None
     cron_offset: Optional[Union[str, timedelta]] = None
     time: Optional[datetime] = None
+    interval: Optional[int] = None
 
     @model_validator(mode="after")
     def __check(self) -> Self:
         """
-        This method validates, that either `cron` or `time` field is present.
+        Validate values.
 
-        :raises ValueError: if cron and time are none.
+        This method validates, that either
+        `cron`, `interval` or `time` field is present.
+
+        :raises ValueError: if cron, interval and time are none.
         """
-        if self.cron is None and self.time is None:
-            raise ValueError("Either cron or datetime must be present.")
+        if all(v is None for v in (self.cron, self.interval, self.time)):
+            raise ValueError("Either cron, interval or datetime must be present.")
         return self
