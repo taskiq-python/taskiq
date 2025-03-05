@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Union
 
 from pydantic import BaseModel
 
@@ -20,6 +20,7 @@ class TaskiqMessage(BaseModel):
     labels_types: Optional[Dict[str, int]] = None
     args: List[Any]
     kwargs: Dict[str, Any]
+    ack: Optional[Callable[[], Union[None, Awaitable[None]]]] = None
 
     def parse_labels(self) -> None:
         """
