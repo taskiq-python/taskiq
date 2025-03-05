@@ -6,8 +6,6 @@ from logging import getLogger
 from pathlib import Path
 from typing import Any, Generator, List, Sequence, Union
 
-from taskiq.utils import remove_suffix
-
 logger = getLogger("taskiq.worker")
 
 
@@ -91,9 +89,16 @@ def import_tasks(
         discovered_modules = set()
         for glob_pattern in pattern:
             for path in Path().glob(glob_pattern):
-                discovered_modules.add(
-                    remove_suffix(str(path), ".py").replace(os.path.sep, "."),
-                )
+                if path.is_file():
+                    if path.suffix in (".py", ".pyc", ".pyd", ".so"):
+                        # remove all suffixes
+                        prefix = path.name.partition(".")[0]
+                        discovered_modules.add(
+                            str(path.with_name(prefix)).replace(os.path.sep, "."),
+                        )
+                    # ignore other files
+                else:
+                    discovered_modules.add(str(path).replace(os.path.sep, "."))
 
         modules.extend(list(discovered_modules))
     import_from_modules(modules)
