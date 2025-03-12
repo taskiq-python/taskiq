@@ -101,7 +101,7 @@ async def app_shutdown():
 
 ```
 
-And that's it. Now you can use your taskiq tasks with functions and classes that depend on FastAPI dependenices. You can find bigger examples in the [examples repo](https://github.com/taskiq-python/examples/).
+And that's it. Now you can use your taskiq tasks with functions and classes that depend on FastAPI dependencies. You can find bigger examples in the [examples repo](https://github.com/taskiq-python/examples/).
 
 
 ## Testing

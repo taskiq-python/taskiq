@@ -29,6 +29,7 @@ class LabelScheduleSource(ScheduleSource):
         schedules = []
         for task_name, task in self.broker.get_all_tasks().items():
             if task.broker != self.broker:
+                # if task broker doesn't match self, something is probably wrong
                 continue
             for schedule in task.labels.get("schedule", []):
                 if "cron" not in schedule and "time" not in schedule:

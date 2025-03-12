@@ -41,7 +41,7 @@ def get_receiver(
 
 
 @pytest.mark.anyio
-async def test_run_task_successfull_async() -> None:
+async def test_run_task_successful_async() -> None:
     """Tests that run_task can run async tasks."""
 
     async def test_func(param: int) -> int:
@@ -332,7 +332,7 @@ async def test_callback_success_ackable_async() -> None:
 
 @pytest.mark.anyio
 async def test_callback_wrong_format() -> None:
-    """Test that wrong format of a message won't thow an error."""
+    """Test that wrong format of a message won't throw an error."""
     receiver = get_receiver()
 
     await receiver.callback(

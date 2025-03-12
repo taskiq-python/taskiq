@@ -14,7 +14,7 @@ actions:
 head:
   - - meta
     - name: "google-site-verification"
-      content: "hQCR5w2tmeuOvYIYXsOYU3u4kLNwT86lnqltANYlRQ0"
+      content: "hQCR5w2tmeuOvYIYXsYOU3u4kLNwT86lnqltANYlRQ0"
   - - meta
     - name: "msvalidate.01"
       content: "97DC185FE0A2F5B123861F0790FDFB26"

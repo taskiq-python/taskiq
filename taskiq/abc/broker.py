@@ -512,7 +512,7 @@ class AsyncBroker(ABC):
         task: AsyncTaskiqDecoratedTask[Any, Any],
     ) -> None:
         """
-        Mehtod is used to register tasks.
+        Method is used to register tasks.
 
         By default we register tasks in local task registry.
         But this behaviour can be changed in subclasses.

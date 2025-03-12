@@ -38,7 +38,7 @@ class DummyResultBackend(AsyncResultBackend[_ReturnType]):  # pragma: no cover
         This result doesn't care about passed parameters.
 
         :param task_id: task's id.
-        :param with_logs: wether to fetch logs.
+        :param with_logs: whether to fetch logs.
         :returns: TaskiqResult.
         """
         return TaskiqResult(

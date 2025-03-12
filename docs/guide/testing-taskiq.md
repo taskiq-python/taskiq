@@ -229,7 +229,7 @@ async def modify_path(some_path: Path = TaskiqDepends()):
 
 :::
 
-To test the task itself, it's not different to the example without dependencies, but we jsut need to pass all
+To test the task itself, it's not different to the example without dependencies, but we just need to pass all
 expected dependencies manually as function's arguments or key-word arguments.
 
 ```python
