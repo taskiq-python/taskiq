@@ -518,7 +518,8 @@ class AsyncBroker(ABC):
         By default we register tasks in local task registry.
         But this behaviour can be changed in subclasses.
 
-        This method may raise TaskRejectedError if task has already been registered to a different broker.
+        This method may raise TaskRejectedError if task has already been
+        registered to a different broker.
 
         :param task_name: Name of a task.
         :param task: Decorated task.
