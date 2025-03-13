@@ -29,6 +29,7 @@ from taskiq.abc.serializer import TaskiqSerializer
 from taskiq.acks import AckableMessage
 from taskiq.decor import AsyncTaskiqDecoratedTask
 from taskiq.events import TaskiqEvents
+from taskiq.exceptions import TaskRejectedError
 from taskiq.formatters.proxy_formatter import ProxyFormatter
 from taskiq.message import BrokerMessage
 from taskiq.result_backends.dummy import DummyResultBackend
@@ -517,7 +518,13 @@ class AsyncBroker(ABC):
         By default we register tasks in local task registry.
         But this behaviour can be changed in subclasses.
 
+        This method may raise TaskRejectedError if task has already been registered to a different broker.
+
         :param task_name: Name of a task.
         :param task: Decorated task.
         """
+        if task.broker != self:
+            raise TaskRejectedError(
+                f"Task already has a different broker ({task.broker})",
+            )
         self.local_task_registry[task_name] = task
