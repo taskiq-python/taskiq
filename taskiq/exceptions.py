@@ -101,3 +101,9 @@ class ScheduledTaskCancelledError(TaskiqError):
     """Scheduled task was cancelled and not sent to the queue."""
 
     __template__ = "Cannot send scheduled task to the queue."
+
+
+class TaskBrokerMismatchError(TaskRejectedError):
+    """Task has a different broker than the one it was registered to."""
+
+    __template__ = "Task already has a different broker ({broker})"
