@@ -44,12 +44,12 @@ async def shutdown_broker(broker: AsyncBroker, timeout: float) -> None:
     try:
         ret_val = await asyncio.wait_for(broker.shutdown(), timeout)  # type: ignore
         if ret_val is not None:
-            logger.info("Broker returned value on shutdown: '%s'", str(ret_val))
+            logger.info("Broker has returned value on shutdown: '%s'", str(ret_val))
     except asyncio.TimeoutError:
-        logger.warning("Cannot shutdown broker gracefully. Timed out.")
+        logger.warning("Broker.shutdown cannot be completed in %s seconds.", timeout)
     except Exception as exc:
         logger.warning(
-            "Exception found while terminating: %s",
+            "Exception found while shutting down broker: %s",
             exc,
             exc_info=True,
         )
@@ -151,8 +151,7 @@ def start_listen(args: WorkerArgs) -> None:
                 **receiver_kwargs,  # type: ignore
             )
             loop.run_until_complete(receiver.listen(shutdown_event))
-    except KeyboardInterrupt:
-        logger.warning("Worker process interrupted.")
+    finally:
         loop.run_until_complete(shutdown_broker(broker, args.shutdown_timeout))
 
 
