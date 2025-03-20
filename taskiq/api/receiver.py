@@ -1,5 +1,5 @@
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from logging import getLogger
 from typing import Optional, Type
 
@@ -13,13 +13,14 @@ logger = getLogger("taskiq.receiver")
 async def run_receiver_task(
     broker: AsyncBroker,
     receiver_cls: Type[Receiver] = Receiver,
-    sync_workers: int = 4,
+    sync_workers: Optional[int] = None,
     validate_params: bool = True,
     max_async_tasks: int = 100,
     max_prefetch: int = 0,
     propagate_exceptions: bool = True,
     run_startup: bool = False,
     ack_time: Optional[AcknowledgeType] = None,
+    use_process_pool: bool = False,
 ) -> None:
     """
     Function to run receiver programmatically.
@@ -46,6 +47,7 @@ async def run_receiver_task(
     :param propagate_exceptions: whether to propagate exceptions in generators or not.
     :param run_startup: whether to run startup function or not.
     :param ack_time: acknowledge type to use.
+    :param use_process_pool: whether to use process pool or threadpool.
     :raises asyncio.CancelledError: if the task was cancelled.
     """
     finish_event = asyncio.Event()
@@ -62,7 +64,12 @@ async def run_receiver_task(
         finish_event.set()
         raise asyncio.CancelledError
 
-    with ThreadPoolExecutor(max_workers=sync_workers) as executor:
+    executor: Executor
+    if use_process_pool:
+        executor = ProcessPoolExecutor(max_workers=sync_workers)
+    else:
+        executor = ThreadPoolExecutor(max_workers=sync_workers)
+    with executor as executor:
         broker.is_worker_process = True
         while True:
             try:
