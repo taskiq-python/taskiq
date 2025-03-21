@@ -246,7 +246,7 @@ class Receiver:
             # that happen while resolving dependencies.
             if dep_ctx:
                 kwargs = await dep_ctx.resolve_kwargs()
-            # We udpate kwargs with kwargs from network.
+            # We update kwargs with kwargs from network.
             kwargs.update(message.kwargs)
             is_coroutine = True
             # If the function is a coroutine, we await it.
@@ -379,7 +379,7 @@ class Receiver:
                     self.sem_prefetch.release()
                     continue
                 # We're done, so now we need to check
-                # wether task has returned an error.
+                # whether task has returned an error.
                 message = current_message.result()
                 current_message = asyncio.create_task(iterator.__anext__())  # type: ignore
                 fetched_tasks += 1
@@ -387,7 +387,7 @@ class Receiver:
             except (asyncio.CancelledError, StopAsyncIteration):
                 break
         # We don't want to fetch new messages if we are shutting down.
-        logger.info("Stoping prefetching messages...")
+        logger.info("Stopping prefetching messages...")
         current_message.cancel()
         await queue.put(QUEUE_DONE)
         self.sem_prefetch.release()
@@ -461,7 +461,7 @@ class Receiver:
 
         It's useful for dynamic dependency resolution,
         because sometimes the receiver can get
-        funcion that is defined in runtime. We need
+        function that is defined in runtime. We need
         to be aware of that.
 
         :param name: task name.

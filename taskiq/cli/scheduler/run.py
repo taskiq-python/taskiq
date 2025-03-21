@@ -120,7 +120,7 @@ async def delayed_send(
 
     The main idea is that scheduler gathers
     tasks every minute and some of them have
-    specfic time. To respect the time, we calculate
+    specific time. To respect the time, we calculate
     the delay and send the task after some delay.
 
     :param scheduler: current scheduler.

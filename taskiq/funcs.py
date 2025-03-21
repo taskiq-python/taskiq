@@ -24,7 +24,7 @@ async def gather(
 
     :param tasks: tasks to await.
     :param timeout: timeout of awaiting, defaults to -1
-    :param with_logs: wether you want to fetch logs, defaults to False
+    :param with_logs: whether you want to fetch logs, defaults to False
     :param periodicity: how often to ask for results, defaults to 0.1
     :raises TaskiqResultTimeoutError: if timeout is reached.
     :return: list of TaskiqResults.

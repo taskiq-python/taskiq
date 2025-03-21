@@ -29,6 +29,11 @@ class LabelScheduleSource(ScheduleSource):
         schedules = []
         for task_name, task in self.broker.get_all_tasks().items():
             if task.broker != self.broker:
+                # if task broker doesn't match self, something is probably wrong
+                logger.warning(
+                    f"Broker for {task_name} ({task.broker}) doesn't "
+                    f"match scheduler's broker ({self.broker})"
+                )
                 continue
             for schedule in task.labels.get("schedule", []):
                 if "cron" not in schedule and "time" not in schedule:
@@ -61,7 +66,14 @@ class LabelScheduleSource(ScheduleSource):
             return  # it's scheduled task with cron label, do not remove this trigger.
 
         for task_name, task in self.broker.get_all_tasks().items():
-            if task.broker != self.broker or scheduled_task.task_name != task_name:
+            if task.broker != self.broker:
+                # if task broker doesn't match self, something is probably wrong
+                logger.warning(
+                    f"Broker for {task_name} ({task.broker}) doesn't "
+                    f"match scheduler's broker ({self.broker})"
+                )
+                continue
+            if scheduled_task.task_name != task_name:
                 continue
 
             schedule_list = task.labels.get("schedule", []).copy()

@@ -21,7 +21,7 @@ class Context:
         """
         Requeue task.
 
-        This fuction creates a task with
+        This function creates a task with
         the same message and sends it using
         current broker.
 
