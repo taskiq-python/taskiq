@@ -7,6 +7,8 @@ from typing import (
     Callable,
     Dict,
     Generic,
+    Optional,
+    Type,
     TypeVar,
     Union,
     overload,
@@ -50,11 +52,13 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         task_name: str,
         original_func: Callable[_FuncParams, _ReturnType],
         labels: Dict[str, Any],
+        return_type: Optional[Type[_ReturnType]] = None,
     ) -> None:
         self.broker = broker
         self.task_name = task_name
         self.original_func = original_func
         self.labels = labels
+        self.return_type = return_type
 
     # Docs for this method are omitted in order to help
     # your IDE resolve correct docs for it.
@@ -172,6 +176,7 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
             task_name=self.task_name,
             broker=self.broker,
             labels=self.labels,
+            return_type=self.return_type,
         )
 
     def __repr__(self) -> str:
