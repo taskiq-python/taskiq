@@ -8,12 +8,12 @@ from typing import Any, Callable, Dict, List, Optional, Set, Union, get_type_hin
 import anyio
 from taskiq_dependencies import DependencyGraph
 
-from taskiq.abc.broker import AckableMessage, AsyncBroker
+from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
-from taskiq.acks import AcknowledgeType
+from taskiq.acks import AckableMessage, AcknowledgeType, NackableMessage
 from taskiq.context import Context
 from taskiq.exceptions import NoResultError
-from taskiq.message import TaskiqMessage
+from taskiq.message import MessageWithMetadata, TaskiqMessage, WrappedMessage
 from taskiq.receiver.params_parser import parse_params
 from taskiq.result import TaskiqResult
 from taskiq.state import TaskiqState
@@ -58,6 +58,7 @@ class Receiver:
         on_exit: Optional[Callable[["Receiver"], None]] = None,
         max_tasks_to_execute: Optional[int] = None,
         wait_tasks_timeout: Optional[float] = None,
+        max_attempts_at_message: Optional[int] = None,
     ) -> None:
         self.broker = broker
         self.executor = executor
@@ -72,6 +73,7 @@ class Receiver:
         self.known_tasks: Set[str] = set()
         self.max_tasks_to_execute = max_tasks_to_execute
         self.wait_tasks_timeout = wait_tasks_timeout
+        self.max_attempts_at_message = max_attempts_at_message
         for task in self.broker.get_all_tasks().values():
             self._prepare_task(task.task_name, task.original_func)
         self.sem: "Optional[asyncio.Semaphore]" = None
@@ -86,7 +88,7 @@ class Receiver:
 
     async def callback(  # noqa: C901, PLR0912
         self,
-        message: Union[bytes, AckableMessage],
+        message: Union[bytes, WrappedMessage],
         raise_err: bool = False,
     ) -> None:
         """
@@ -101,7 +103,33 @@ class Receiver:
         :param raise_err: raise an error if cannot save result in
             result_backend.
         """
-        message_data = message.data if isinstance(message, AckableMessage) else message
+        message_data = (
+            message.message if isinstance(message, WrappedMessage) else message
+        )
+        if isinstance(message, MessageWithMetadata):
+            message_metadata = message.metadata
+        else:
+            message_metadata = None
+
+        delivery_count = message_metadata.delivery_count if message_metadata else None
+        if (
+            delivery_count
+            and self.max_attempts_at_message
+            and delivery_count >= self.max_attempts_at_message
+        ):
+            logger.error(
+                "Permitted number of attempts at processing message %s "
+                "has been exhausted after %s attempts.",
+                message_data,
+                self.max_attempts_at_message,
+            )
+            match message:
+                case NackableMessage():
+                    await maybe_awaitable(message.nack())
+                case AckableMessage():
+                    await maybe_awaitable(message.ack())
+            return
+
         try:
             taskiq_msg = self.broker.formatter.loads(message=message_data)
             taskiq_msg.parse_labels()
@@ -331,7 +359,7 @@ class Receiver:
         if self.run_startup:
             await self.broker.startup()
         logger.info("Listening started.")
-        queue: "asyncio.Queue[Union[bytes, AckableMessage]]" = asyncio.Queue()
+        queue: "asyncio.Queue[Union[bytes, WrappedMessage]]" = asyncio.Queue()
 
         async with anyio.create_task_group() as gr:
             gr.start_soon(self.prefetcher, queue, finish_event)
@@ -342,7 +370,7 @@ class Receiver:
 
     async def prefetcher(
         self,
-        queue: "asyncio.Queue[Union[bytes, AckableMessage]]",
+        queue: "asyncio.Queue[Union[bytes, WrappedMessage]]",
         finish_event: asyncio.Event,
     ) -> None:
         """
@@ -354,7 +382,7 @@ class Receiver:
         fetched_tasks: int = 0
         iterator = self.broker.listen()
         current_message: asyncio.Task[
-            Union[bytes, AckableMessage]
+            Union[bytes, WrappedMessage]
         ] = asyncio.create_task(
             iterator.__anext__(),  # type: ignore
         )
@@ -394,7 +422,7 @@ class Receiver:
 
     async def runner(
         self,
-        queue: "asyncio.Queue[Union[bytes, AckableMessage]]",
+        queue: "asyncio.Queue[Union[bytes, WrappedMessage]]",
     ) -> None:
         """
         Run tasks.
