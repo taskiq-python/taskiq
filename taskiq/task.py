@@ -1,5 +1,4 @@
 import asyncio
-from logging import getLogger
 from time import time
 from typing import TYPE_CHECKING, Any, Generic, Optional
 
@@ -10,7 +9,6 @@ from taskiq.exceptions import (
     ResultIsReadyError,
     TaskiqResultTimeoutError,
 )
-from taskiq.result_backends.dummy import DummyResultBackend
 
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.result_backend import AsyncResultBackend
@@ -18,9 +16,6 @@ if TYPE_CHECKING:  # pragma: no cover
     from taskiq.result import TaskiqResult
 
 _ReturnType = TypeVar("_ReturnType")
-
-
-logger = getLogger("taskiq")
 
 
 class AsyncTaskiqTask(Generic[_ReturnType]):
@@ -88,9 +83,6 @@ class AsyncTaskiqTask(Generic[_ReturnType]):
             become ready in provided period of time.
         :return: task's return value.
         """
-        if isinstance(self.result_backend, DummyResultBackend):
-            logger.warning("No result backend configured. Returning dummy result...")
-
         start_time = time()
         while not await self.is_ready():
             await asyncio.sleep(check_interval)
