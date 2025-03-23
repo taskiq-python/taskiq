@@ -66,7 +66,7 @@ Calling the `startup` method is necessary. If you don't call it, you may get an 
 If you run this code, you will get this in your terminal:
 
 ```bash:no-line-numbers
-❯ python mybroker.py
+❯ python broker.py
 Task execution took: 7.3909759521484375e-06 seconds.
 Returned value: 2
 ```
