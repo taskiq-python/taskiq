@@ -1,3 +1,4 @@
+import sys
 from collections.abc import Coroutine
 from datetime import datetime
 from types import CoroutineType
@@ -54,6 +55,15 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         self.broker = broker
         self.task_name = task_name
         self.original_func = original_func
+        new_name = f"{original_func.__name__}__taskiq_original"
+        self.original_func.__name__ = new_name
+        self.original_func.__qualname__ = new_name
+        setattr(
+            sys.modules[original_func.__module__],
+            new_name,
+            original_func,
+        )
+
         self.labels = labels
 
     # Docs for this method are omitted in order to help
