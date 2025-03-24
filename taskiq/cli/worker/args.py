@@ -62,7 +62,7 @@ class WorkerArgs:
         parser.add_argument(
             "broker",
             help=(
-                "Where to search for broker. "
+                "Where to search for broker or broker factory function. "
                 "This string must be specified in "
                 "'module.module:variable' format."
             ),

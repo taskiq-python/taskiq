@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import sys
 from datetime import datetime, timedelta
 from logging import basicConfig, getLevelName, getLogger
@@ -192,8 +193,11 @@ async def run_scheduler(args: SchedulerArgs) -> None:
             ),
         )
     getLogger("taskiq").setLevel(level=getLevelName(args.log_level))
+
     if isinstance(args.scheduler, str):
         scheduler = import_object(args.scheduler)
+        if inspect.isfunction(scheduler):
+            scheduler = scheduler()
     else:
         scheduler = args.scheduler
     if not isinstance(scheduler, TaskiqScheduler):
@@ -201,6 +205,7 @@ async def run_scheduler(args: SchedulerArgs) -> None:
             "Imported scheduler is not a subclass of TaskiqScheduler.",
         )
         sys.exit(1)
+
     scheduler.broker.is_scheduler_process = True
     import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
     for source in scheduler.sources:
