@@ -184,7 +184,6 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         :param source: schedule source.
         :param cron: cron expression.
         :param args: function's args.
-        :param cron_offset: cron offset.
         :param kwargs: function's kwargs.
 
         :return: schedule id.

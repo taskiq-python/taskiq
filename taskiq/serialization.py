@@ -336,7 +336,7 @@ def exception_to_python(
     """Convert serialized exception to Python exception.
 
     :param exc: encoded exception
-    :raises SecurityError: exception isn't indead an exception
+    :raises SecurityError: exception isn't indeed an exception
     :return: decoded exception or None
     """
     if not exc:
