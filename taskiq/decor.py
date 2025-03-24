@@ -163,7 +163,7 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         """
         This function returns kicker object.
 
-        Kicker is a object that can modify kiq request
+        Kicker is an object that can modify kiq request
         before sending it.
 
         :return: AsyncKicker instance.

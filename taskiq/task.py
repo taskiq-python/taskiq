@@ -73,7 +73,7 @@ class AsyncTaskiqTask(Generic[_ReturnType]):
         ready. And if it is it returns the result.
 
         It may throw TaskiqResultTimeoutError if
-        task didn't became ready in provided
+        task didn't become ready in provided
         period of time.
 
         :param check_interval: How often checks are performed.
