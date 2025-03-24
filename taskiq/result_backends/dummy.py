@@ -1,3 +1,4 @@
+import warnings
 from typing import Any, TypeVar
 
 from taskiq.abc.result_backend import AsyncResultBackend
@@ -41,6 +42,11 @@ class DummyResultBackend(AsyncResultBackend[_ReturnType]):  # pragma: no cover
         :param with_logs: wether to fetch logs.
         :returns: TaskiqResult.
         """
+        warnings.warn(
+            "No result backend configured. Returning dummy result...",
+            stacklevel=2,
+        )
+
         return TaskiqResult(
             is_err=False,
             log=None,
