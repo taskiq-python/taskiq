@@ -137,7 +137,7 @@ def start_listen(args: WorkerArgs) -> None:
 
     executor: Executor
     if args.use_process_pool:
-        executor = ProcessPoolExecutor(max_workers=args.max_threadpool_threads)
+        executor = ProcessPoolExecutor(max_workers=args.max_process_pool_processes)
     else:
         executor = ThreadPoolExecutor(max_workers=args.max_threadpool_threads)
 

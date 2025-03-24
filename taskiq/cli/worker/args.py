@@ -32,6 +32,7 @@ class WorkerArgs:
     log_level: LogLevel = LogLevel.INFO
     workers: int = 2
     max_threadpool_threads: int = 10
+    max_process_pool_processes: Optional[int] = None
     no_parse: bool = False
     shutdown_timeout: float = 5
     reload: bool = False
@@ -223,7 +224,15 @@ class WorkerArgs:
         parser.add_argument(
             "--use-process-pool",
             action="store_true",
+            dest="use_process_pool",
             help="Use process pool instead of thread pool for sync tasks.",
+        )
+        parser.add_argument(
+            "--max-process-pool-processes",
+            type=int,
+            dest="max_process_pool_processes",
+            default=None,
+            help="Maximum number of processes in process pool.",
         )
 
         namespace = parser.parse_args(args)

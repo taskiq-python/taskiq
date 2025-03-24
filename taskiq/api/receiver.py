@@ -40,7 +40,8 @@ async def run_receiver_task(
 
     :param broker: current broker instance.
     :param receiver_cls: receiver class to use.
-    :param sync_workers: number of threads of a threadpool that runs sync tasks.
+    :param sync_workers: number of threads of a threadpool
+        or processes in processpool that runs sync tasks.
     :param validate_params: whether to validate params or not.
     :param max_async_tasks: maximum number of simultaneous async tasks.
     :param max_prefetch: maximum number of tasks to prefetch.
