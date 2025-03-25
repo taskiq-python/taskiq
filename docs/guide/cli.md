@@ -20,21 +20,19 @@ taskiq worker mybroker:broker_var my_project.module1 my_project.module2
 
 ### Sync function
 
-Taskiq can run sync function. But since it's asynchronous system, it runs it in separate thread or process.
-By default process pool is used. But if you are going to use taskiq for heavy computations, such as neural network
-model training or other calculations, you might want to use processpool instead.
+Taskiq can run synchronous functions. However, since it operates asynchronously, it executes them in a separate thread or process. By default, **ThreadPoolExecutor** is used. But if you're planning to use Taskiq for heavy computations, such as neural network model training or other CPU-intensive tasks, you may want to use **ProcessPoolExecutor** instead.
 
-More precisely about the difference you can read in [python docs about executors](https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Executor).
+For more details on the differences between these two options, refer to the [Python docs on executors](https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Executor).
 
 As a rule of thumb:
-* If you're using sync functions for IO then use `threadpool`;
-* If you're using sync functions for CPU bound workloads then use processpool.
+* If you're using sync functions for IO then use `ThreadPoolExecutor`;
+* If you're using sync functions for CPU bound workloads then use `ProcessPoolExecutor`.
 
-By default taskiq uses threadpool. If you want to change this behavior, use these parameters:
+By default taskiq uses **threadpool**. Here are some worker CLI options that can adjust its behavior:
 
-* `--use-process-pool` to switch to processpools;
+* `--use-process-pool` to switch to `ProcessPoolExecutor`;
 * `--max-process-pool-processes` to manually specify worker processes;
-* `--max-threadpool-threads` to configure maximum threads for threadpool if it's being used;
+* `--max-threadpool-threads` to configure maximum threads for `ThreadPoolExecutor` if it's the one being used;
 
 ### Auto importing
 
