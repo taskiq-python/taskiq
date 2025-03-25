@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Optional
 
 from izulu import root
 
@@ -42,8 +42,7 @@ class SharedBrokerSendTaskError(SendTaskError):
     """Error when someone tries to send task with shared broker."""
 
     __template__ = (
-        "You cannot use kiq directly on shared task "
-        "without setting the default_broker."
+        "You cannot use kiq directly on shared task without setting the default_broker."
     )
 
 
@@ -107,3 +106,4 @@ class TaskBrokerMismatchError(TaskRejectedError):
     """Task has a different broker than the one it was registered to."""
 
     __template__ = "Task already has a different broker ({broker})"
+    broker: Any
