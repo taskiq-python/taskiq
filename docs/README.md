@@ -21,17 +21,20 @@ head:
   - - meta
     - name: "yandex-verification"
       content: "9b105f7c58cbc920"
-features:
-    - title: Production ready
-      details: Taskiq has proven that it can run in heavy production systems with high load.
-    - title: Fully asynchronous
-      details: Taskiq can run both sync and async functions. You don't have to worry about it.
-    - title: Easily extensible
-      details: Taskiq has a lot of replaceable components. It's super easy to implement
-        your own broker or middleware.
-    - title: Strongly typed
-      details: Taskiq provides correct autocompletion for most of its functionality.
-footer: MIT Licensed | Copyright© 2022-2023
+highlights:
+    - features:
+        - title: Production ready
+          details: Taskiq has proven that it can run in heavy production systems with high load.
+        - title: Fully asynchronous
+          details: Taskiq can run both sync and async functions. You don't have to worry about it.
+        - title: Easily extensible
+          details: Taskiq has a lot of replaceable components. It's super easy to implement
+            your own broker or middleware.
+        - title: Strongly typed
+          details: Taskiq provides correct autocompletion for most of its functionality.
+
+copyright: false
+footer: MIT Licensed | Copyright© 2022-present
 ---
 
 ## What is taskiq in a nutshell
