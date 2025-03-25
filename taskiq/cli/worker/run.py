@@ -5,7 +5,7 @@ import os
 import signal
 import sys
 from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
-from multiprocessing import set_start_method
+from multiprocessing import set_start_method, get_start_method
 from sys import platform
 from typing import Any, Optional, Type
 
@@ -86,7 +86,11 @@ def start_listen(args: WorkerArgs) -> None:
     """
     shutdown_event = asyncio.Event()
     hardkill_counter = 0
-
+    if args.configure_logging and get_start_method() == "spawn":
+        logging.basicConfig(
+            level=logging.getLevelName(args.log_level),
+            format=args.log_format,
+        )
     def interrupt_handler(signum: int, _frame: Any) -> None:
         """
         Signal handler.
@@ -186,8 +190,7 @@ def run_worker(args: WorkerArgs) -> Optional[int]:
     if args.configure_logging:
         logging.basicConfig(
             level=logging.getLevelName(args.log_level),
-            format="[%(asctime)s][%(name)s][%(levelname)-7s]"
-            "[%(processName)s] %(message)s",
+            format=args.log_format,
         )
     logging.getLogger("taskiq").setLevel(level=logging.getLevelName(args.log_level))
     logging.getLogger("watchdog.observers.inotify_buffer").setLevel(level=logging.INFO)
