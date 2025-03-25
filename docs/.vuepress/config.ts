@@ -31,24 +31,23 @@ export default defineUserConfig({
 
     pure: true,
 
+    markdown: {
+      tabs: true,
+      mermaid: true
+    },
+
     plugins: {
       readingTime: false,
       copyCode: {
         showInMobile: true,
       },
 
-      mdEnhance: {
-        tabs: true,
-        mermaid: true,
-      },
-
       sitemap: {
         changefreq: "daily",
         sitemapFilename: "sitemap.xml",
       },
-      searchPro: {
-        indexContent: true,
-        autoSuggestions: false,
+      search: {
+        maxSuggestions: 10,
       }
     },
   })
