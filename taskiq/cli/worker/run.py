@@ -4,7 +4,7 @@ import logging
 import os
 import signal
 import sys
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from multiprocessing import set_start_method
 from sys import platform
 from typing import Any, Optional, Type
@@ -143,9 +143,15 @@ def start_listen(args: WorkerArgs) -> None:
     receiver_type = get_receiver_type(args)
     receiver_kwargs = dict(args.receiver_arg)
 
+    executor: Executor
+    if args.use_process_pool:
+        executor = ProcessPoolExecutor(max_workers=args.max_process_pool_processes)
+    else:
+        executor = ThreadPoolExecutor(max_workers=args.max_threadpool_threads)
+
     try:
         logger.debug("Initialize receiver.")
-        with ThreadPoolExecutor(args.max_threadpool_threads) as pool:
+        with executor as pool:
             receiver = receiver_type(
                 broker=broker,
                 executor=pool,

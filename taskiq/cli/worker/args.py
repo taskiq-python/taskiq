@@ -32,6 +32,7 @@ class WorkerArgs:
     log_level: LogLevel = LogLevel.INFO
     workers: int = 2
     max_threadpool_threads: int = 10
+    max_process_pool_processes: Optional[int] = None
     no_parse: bool = False
     shutdown_timeout: float = 5
     reload: bool = False
@@ -46,6 +47,7 @@ class WorkerArgs:
     max_tasks_per_child: Optional[int] = None
     wait_tasks_timeout: Optional[float] = None
     hardkill_count: int = 3
+    use_process_pool: bool = False
 
     @classmethod
     def from_cli(
@@ -210,8 +212,7 @@ class WorkerArgs:
             "--wait-tasks-timeout",
             type=float,
             default=None,
-            help="Maximum time to wait for all current tasks "
-            "to finish before exiting.",
+            help="Maximum time to wait for all current tasks to finish before exiting.",
         )
         parser.add_argument(
             "--hardkill-count",
@@ -219,6 +220,19 @@ class WorkerArgs:
             default=3,
             help="Number of termination signals to the main "
             "process before performing a hardkill.",
+        )
+        parser.add_argument(
+            "--use-process-pool",
+            action="store_true",
+            dest="use_process_pool",
+            help="Use process pool instead of thread pool for sync tasks.",
+        )
+        parser.add_argument(
+            "--max-process-pool-processes",
+            type=int,
+            dest="max_process_pool_processes",
+            default=None,
+            help="Maximum number of processes in process pool.",
         )
 
         namespace = parser.parse_args(args)

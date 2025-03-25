@@ -83,7 +83,7 @@ class ReloadOneAction(ProcessActionBase):
             target=worker_func,
             kwargs={"args": args},
             name=f"worker-{self.worker_num}",
-            daemon=True,
+            daemon=False,
         )
         new_process.start()
         logger.info(f"Process {new_process.name} restarted with pid {new_process.pid}")
@@ -193,7 +193,7 @@ class ProcessManager:
                 target=self.worker_function,
                 kwargs={"args": self.args},
                 name=f"worker-{process}",
-                daemon=True,
+                daemon=False,
             )
             work_proc.start()
             logger.info(
