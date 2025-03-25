@@ -28,7 +28,7 @@ class FileWatcher:  # pragma: no cover
         """
         React to event.
 
-        This function checks wether we need to
+        This function checks whether we need to
         react to event and calls callback if we do.
 
         :param event: incoming fs event.

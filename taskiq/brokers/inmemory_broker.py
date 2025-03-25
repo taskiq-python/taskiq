@@ -50,7 +50,7 @@ class InmemoryResultBackend(AsyncResultBackend[_ReturnType]):
 
     async def is_result_ready(self, task_id: str) -> bool:
         """
-        Checks wether result is ready.
+        Checks whether result is ready.
 
         Readiness means that result with this task_id is
         present in results dict.

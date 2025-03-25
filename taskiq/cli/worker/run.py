@@ -75,7 +75,7 @@ def start_listen(args: WorkerArgs) -> None:
     This function starts actual listening process.
 
     It imports broker and all tasks.
-    Since tasks auto registeres themselves in a broker,
+    Since tasks auto registers themselves in a broker,
     we don't need to do anything else other than importing.
 
 

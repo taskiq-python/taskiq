@@ -34,9 +34,9 @@ The format of the schedule label is the following:
 @broker.task(
     schedule=[
         {
-            "cron": "* * * * *", # type: str, either cron or time shoule be specified.
-            "cron_offset": None # type: str | timedelta | None, can be ommited.
-            "time": None  # type: datetime | None, either cron or time shoule be specified.
+            "cron": "* * * * *", # type: str, either cron or time should be specified.
+            "cron_offset": None # type: str | timedelta | None, can be omitted.
+            "time": None  # type: datetime | None, either cron or time should be specified.
             "args": [], # type List[Any] | None, can be omitted.
             "kwargs": {}, # type: Dict[str, Any] | None, can be omitted.
             "labels": {}, # type: Dict[str, Any] | None, can be omitted.

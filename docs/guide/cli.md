@@ -112,7 +112,7 @@ The number of signals before a hard kill can be configured with the `--hardkill-
 - `--log-level` is used to set a log level (default `INFO`).
 * `--max-async-tasks` - maximum number of simultaneously running async tasks.
 * `--max-prefetch` - number of tasks to be prefetched before execution. (Useful for systems with high message rates, but brokers should support acknowledgements).
-* `--max-threadpool-threads` - number of threads for sync function exection.
+* `--max-threadpool-threads` - number of threads for sync function execution.
 * `--no-propagate-errors` - if this parameter is enabled, exceptions won't be thrown in generator dependencies.
 * `--receiver` - python path to custom receiver class.
 * `--receiver_arg` - custom args for receiver.

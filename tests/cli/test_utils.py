@@ -48,11 +48,11 @@ def test_import_tasks_no_discover() -> None:
 def test_import_tasks_non_py_list_pattern() -> None:
     modules = ["taskiq.tasks"]
     with patch("taskiq.cli.utils.import_from_modules", autospec=True) as mock:
-        pathes = (
+        paths = (
             Path("tests/test1.so"),
             Path("tests/cli/test2.cpython-313-darwin.so"),
         )
-        for path in pathes:
+        for path in paths:
             path.touch()
 
         try:
@@ -66,6 +66,6 @@ def test_import_tasks_non_py_list_pattern() -> None:
             }
             mock.assert_called_with(modules)
         finally:
-            for path in pathes:
+            for path in paths:
                 with suppress(FileNotFoundError):
                     path.unlink()
