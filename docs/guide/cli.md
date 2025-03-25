@@ -32,7 +32,7 @@ By default taskiq uses **threadpool**. Here are some worker CLI options that can
 
 * `--use-process-pool` to switch to `ProcessPoolExecutor`;
 * `--max-process-pool-processes` to manually specify worker processes;
-* `--max-threadpool-threads` to configure maximum threads for `ThreadPoolExecutor` if it's the one being used;
+* `--max-threadpool-threads` to configure maximum threads for `ThreadPoolExecutor` if it's the one being used.
 
 ### Auto importing
 
