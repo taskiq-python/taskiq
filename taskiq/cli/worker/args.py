@@ -31,7 +31,7 @@ class WorkerArgs:
     configure_logging: bool = True
     log_level: LogLevel = LogLevel.INFO
     workers: int = 2
-    max_threadpool_threads: int = 10
+    max_threadpool_threads: Optional[int] = None
     max_process_pool_processes: Optional[int] = None
     no_parse: bool = False
     shutdown_timeout: float = 5
@@ -147,6 +147,7 @@ class WorkerArgs:
         parser.add_argument(
             "--max-threadpool-threads",
             type=int,
+            default=None,
             help="Maximum number of threads for executing sync functions.",
         )
         parser.add_argument(

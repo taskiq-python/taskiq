@@ -18,6 +18,24 @@ Like this:
 taskiq worker mybroker:broker_var my_project.module1 my_project.module2
 ```
 
+### Sync function
+
+Taskiq can run sync function. But since it's asynchronous system, it runs it in separate thread or process.
+By default process pool is used. But if you are going to use taskiq for heavy computations, such as neural network
+model training or other calculations, you might want to use processpool instead.
+
+More precisely about the difference you can read in [python docs about executors](https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Executor).
+
+As a rule of thumb:
+* If you're using sync functions for IO then use `threadpool`;
+* If you're using sync functions for CPU bound workloads then use processpool.
+
+By default taskiq uses threadpool. If you want to change this behavior, use these parameters:
+
+* `--use-process-pool` to switch to processpools;
+* `--max-process-pool-processes` to manually specify worker processes;
+* `--max-threadpool-threads` to configure maximum threads for threadpool if it's being used;
+
 ### Auto importing
 
 Enumerating all modules with tasks is not an option sometimes.
