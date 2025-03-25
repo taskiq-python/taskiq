@@ -30,7 +30,9 @@ class WorkerArgs:
     fs_discover: bool = False
     configure_logging: bool = True
     log_level: LogLevel = LogLevel.INFO
-    log_format: str = "[%(asctime)s][%(name)s][%(levelname)-7s][%(processName)s] %(message)s"
+    log_format: str = (
+        "[%(asctime)s][%(name)s][%(levelname)-7s][%(processName)s] %(message)s"
+    )
     workers: int = 2
     max_threadpool_threads: Optional[int] = None
     max_process_pool_processes: Optional[int] = None
@@ -121,7 +123,8 @@ class WorkerArgs:
         )
         parser.add_argument(
             "--log-format",
-            default="[%(asctime)s][%(name)s][%(levelname)-7s][%(processName)s] %(message)s",
+            default="[%(asctime)s][%(name)s][%(levelname)-7s]"
+            "[%(processName)s] %(message)s",
             help="worker log format",
         )
         parser.add_argument(

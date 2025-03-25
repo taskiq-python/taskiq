@@ -5,7 +5,7 @@ import os
 import signal
 import sys
 from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
-from multiprocessing import set_start_method, get_start_method
+from multiprocessing import get_start_method, set_start_method
 from sys import platform
 from typing import Any, Optional, Type
 
@@ -91,6 +91,7 @@ def start_listen(args: WorkerArgs) -> None:
             level=logging.getLevelName(args.log_level),
             format=args.log_format,
         )
+
     def interrupt_handler(signum: int, _frame: Any) -> None:
         """
         Signal handler.
