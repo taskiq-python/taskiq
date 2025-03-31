@@ -174,7 +174,7 @@ async def run_scheduler_loop(scheduler: TaskiqScheduler) -> None:
                     continue
                 if task_delay is not None:
                     send_task = loop.create_task(
-                        delayed_send(scheduler, source, task, 1),
+                        delayed_send(scheduler, source, task, task_delay),
                     )
                     running_schedules.add(send_task)
                     send_task.add_done_callback(running_schedules.discard)
