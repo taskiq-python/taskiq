@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 
+from taskiq.acks import AckableMessage, NackableMessage
 from taskiq.labels import parse_label
 
 
@@ -42,3 +43,42 @@ class BrokerMessage(BaseModel):
     task_name: str
     message: bytes
     labels: Dict[str, Any]
+
+
+class MessageMetadata(BaseModel):
+    """Incoming message metadata."""
+
+    delivery_count: Optional[int] = None
+
+
+class WrappedMessage(BaseModel):  # noqa: D101
+    message: bytes
+
+
+class MessageWithMetadata(BaseModel):  # noqa: D101
+    metadata: MessageMetadata
+
+
+class WrappedMessageWithMetadata(WrappedMessage, MessageWithMetadata):  # noqa: D101
+    ...
+
+
+class AckableWrappedMessage(WrappedMessage, AckableMessage):  # noqa: D101
+    ...
+
+
+class AckableWrappedMessageWithMetadata(  # noqa: D101
+    WrappedMessage,
+    AckableMessage,
+    MessageWithMetadata,
+):
+    ...
+
+
+class AckableNackableWrappedMessageWithMetadata(  # noqa: D101
+    WrappedMessage,
+    AckableMessage,
+    NackableMessage,
+    MessageWithMetadata,
+):
+    ...
