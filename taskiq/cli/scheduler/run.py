@@ -129,9 +129,19 @@ async def delayed_send(
     :param task: task to send.
     :param delay: how long to wait.
     """
+    logger.debug(
+        "Waiting %d seconds before sending task %s with schedule_id %s.",
+        delay,
+        task.task_name,
+        task.schedule_id,
+    )
     if delay > 0:
         await asyncio.sleep(delay)
-    logger.info("Sending task %s.", task.task_name)
+    logger.info(
+        "Sending task %s with schedule_id %s.",
+        task.task_name,
+        task.schedule_id,
+    )
     await scheduler.on_ready(source, task)
 
 
@@ -150,12 +160,13 @@ async def run_scheduler_loop(scheduler: TaskiqScheduler) -> None:
         # We use this method to correctly sleep for one minute.
         scheduled_tasks = await get_all_schedules(scheduler)
         for source, task_list in scheduled_tasks.items():
+            logger.debug("Got %d schedules from source %s.", len(task_list), source)
             for task in task_list:
                 try:
                     task_delay = get_task_delay(task)
                 except ValueError:
                     logger.warning(
-                        "Cannot parse cron: %s for task: %s, schedule_id: %s",
+                        "Cannot parse cron: %s for task: %s, schedule_id: %s.",
                         task.cron,
                         task.task_name,
                         task.schedule_id,
@@ -171,6 +182,10 @@ async def run_scheduler_loop(scheduler: TaskiqScheduler) -> None:
             minutes=1,
         )
         delay = next_minute - datetime.now()
+        logger.debug(
+            "Sleeping for %.2f seconds before getting schedules.",
+            delay.total_seconds(),
+        )
         await asyncio.sleep(delay.total_seconds())
 
 
