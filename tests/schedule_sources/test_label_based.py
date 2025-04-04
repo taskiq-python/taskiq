@@ -19,10 +19,7 @@ from taskiq.scheduler.scheduled_task import ScheduledTask
 async def test_label_discovery(schedule_label: List[Dict[str, Any]]) -> None:
     broker = InMemoryBroker()
 
-    @broker.task(
-        task_name="test_task",
-        schedule=schedule_label,
-    )
+    @broker.task.name("test_task").labels(schedule=schedule_label)
     def task() -> None:
         pass
 
@@ -45,8 +42,7 @@ async def test_label_discovery(schedule_label: List[Dict[str, Any]]) -> None:
 async def test_label_discovery_no_cron() -> None:
     broker = InMemoryBroker()
 
-    @broker.task(
-        task_name="test_task",
+    @broker.task.name("test_task").labels(
         schedule=[{"args": ["* * * * *"]}],
     )
     def task() -> None:

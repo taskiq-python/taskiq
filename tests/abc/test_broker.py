@@ -40,7 +40,7 @@ def test_decorator_with_name_success() -> None:
     """Test that task_name is successfully set."""
     tbrok = _TestBroker()
 
-    @tbrok.task(task_name="my_task")
+    @tbrok.task.name("my_task")
     async def test_func() -> None:
         """Some test function."""
 
@@ -52,7 +52,7 @@ def test_decorator_with_labels_success() -> None:
     """Tests that labels are assigned for task as is."""
     tbrok = _TestBroker()
 
-    @tbrok.task(label1=1, label2=2)
+    @tbrok.task.labels(label1=1, label2=2)
     async def test_func() -> None:
         """Some test function."""
 

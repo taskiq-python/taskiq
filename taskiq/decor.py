@@ -1,3 +1,4 @@
+import copy
 import sys
 from collections.abc import Coroutine
 from datetime import datetime
@@ -8,6 +9,7 @@ from typing import (
     Callable,
     Dict,
     Generic,
+    Optional,
     TypeVar,
     Union,
     overload,
@@ -15,6 +17,7 @@ from typing import (
 
 from typing_extensions import ParamSpec
 
+from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.kicker import AsyncKicker
 from taskiq.scheduler.created_schedule import CreatedSchedule
 from taskiq.task import AsyncTaskiqTask
@@ -51,11 +54,15 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         task_name: str,
         original_func: Callable[_FuncParams, _ReturnType],
         labels: Dict[str, Any],
+        extra_middlewares: Optional[list[TaskiqMiddleware]] = None,
     ) -> None:
         self.broker = broker
         self.task_name = task_name
         self.original_func = original_func
         self.labels = labels
+        self.middlewares = copy.copy(broker.middlewares)
+        if extra_middlewares:
+            self.middlewares.extend(extra_middlewares)
 
         # This is a hack to make ProcessPoolExecutor work
         # with decorated functions.

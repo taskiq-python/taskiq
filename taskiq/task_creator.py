@@ -15,6 +15,7 @@ from uuid import uuid4
 
 from typing_extensions import ParamSpec, Self
 
+from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.decor import AsyncTaskiqDecoratedTask
 from taskiq.utils import remove_suffix
 
@@ -37,6 +38,7 @@ class BaseTaskCreator:
         self._broker = broker
         self._task_name: Optional[str] = None
         self._labels: Dict[str, Any] = {}
+        self._middlewares: list[TaskiqMiddleware] = []
 
     def name(self, name: str) -> Self:
         """Assign custom name to the task."""
@@ -46,6 +48,11 @@ class BaseTaskCreator:
     def labels(self, **labels: Any) -> Self:
         """Assign custom labels to the task."""
         self._labels = labels
+        return self
+
+    def middlewares(self, *middlewares: TaskiqMiddleware) -> Self:
+        """Assign custom middlewares to the task."""
+        self._middlewares = list(middlewares)
         return self
 
     def make_task(
@@ -59,7 +66,20 @@ class BaseTaskCreator:
             original_func=func,
             labels=self._labels,
             task_name=task_name,
+            extra_middlewares=self._middlewares,
         )
+
+    def __resolve_name(self, func: Callable[..., Any]) -> str:
+        """Resolve name of the function."""
+        fmodule = func.__module__
+        if fmodule == "__main__":  # pragma: no cover
+            fmodule = ".".join(
+                remove_suffix(sys.argv[0], ".py").split(os.path.sep),
+            )
+        fname = func.__name__
+        if fname == "<lambda>":
+            fname = f"lambda_{uuid4().hex}"
+        return f"{fmodule}:{fname}"
 
     @overload
     def __call__(
@@ -131,15 +151,7 @@ class BaseTaskCreator:
             ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]:
                 inner_task_name = self._task_name
                 if inner_task_name is None:
-                    fmodule = func.__module__
-                    if fmodule == "__main__":  # pragma: no cover
-                        fmodule = ".".join(
-                            remove_suffix(sys.argv[0], ".py").split(os.path.sep),
-                        )
-                    fname = func.__name__
-                    if fname == "<lambda>":
-                        fname = f"lambda_{uuid4().hex}"
-                    inner_task_name = f"{fmodule}:{fname}"
+                    inner_task_name = self.__resolve_name(func)
 
                 wrapper = wraps(func)
                 decorated_task = wrapper(

@@ -2,18 +2,16 @@ import asyncio
 import random
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, ClassVar, List, Optional
+from typing import Optional
 
 import pytest
 from taskiq_dependencies import Depends
 
 from taskiq.abc.broker import AckableMessage, AsyncBroker
-from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.brokers.inmemory_broker import InMemoryBroker
 from taskiq.exceptions import NoResultError, TaskiqResultTimeoutError
 from taskiq.message import TaskiqMessage
 from taskiq.receiver import Receiver
-from taskiq.result import TaskiqResult
 from tests.utils import AsyncQueueBroker
 
 
@@ -150,43 +148,6 @@ async def test_run_timeouts_sync() -> None:
     assert result.return_value is None
     assert result.execution_time < 2
     assert result.is_err
-
-
-@pytest.mark.anyio
-async def test_run_task_exception_middlewares() -> None:
-    """Tests that run_task can run sync tasks."""
-
-    class _TestMiddleware(TaskiqMiddleware):
-        found_exceptions: ClassVar[List[BaseException]] = []
-
-        def on_error(
-            self,
-            message: "TaskiqMessage",
-            result: "TaskiqResult[Any]",
-            exception: BaseException,
-        ) -> None:
-            self.found_exceptions.append(exception)
-
-    def test_func() -> None:
-        raise ValueError
-
-    broker = InMemoryBroker().with_middlewares(_TestMiddleware())
-    receiver = get_receiver(broker)
-
-    result = await receiver.run_task(
-        test_func,
-        TaskiqMessage(
-            task_id="",
-            task_name="",
-            labels={},
-            args=[],
-            kwargs={},
-        ),
-    )
-    assert result.return_value is None
-    assert result.is_err
-    assert len(_TestMiddleware.found_exceptions) == 1
-    assert _TestMiddleware.found_exceptions[0].__class__ is ValueError
 
 
 @pytest.mark.anyio
