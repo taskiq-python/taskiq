@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 
 import pytest
@@ -18,16 +18,13 @@ from taskiq.scheduler.scheduler import TaskiqScheduler
     "schedule_label",
     [
         pytest.param([{"cron": "* * * * *"}], id="cron"),
-        pytest.param([{"time": datetime.utcnow()}], id="time"),
+        pytest.param([{"time": datetime.now(timezone.utc)}], id="time"),
     ],
 )
 async def test_label_discovery(schedule_label: List[Dict[str, Any]]) -> None:
     broker = InMemoryBroker()
 
-    @broker.task(
-        task_name="test_task",
-        schedule=schedule_label,
-    )
+    @broker.task.name("test_task").labels(schedule=schedule_label)
     def task() -> None:
         pass
 
@@ -49,8 +46,7 @@ async def test_label_discovery(schedule_label: List[Dict[str, Any]]) -> None:
 async def test_label_discovery_no_cron() -> None:
     broker = InMemoryBroker()
 
-    @broker.task(
-        task_name="test_task",
+    @broker.task.name("test_task").labels(
         schedule=[{"args": ["* * * * *"]}],
     )
     def task() -> None:
@@ -74,11 +70,10 @@ async def test_task_scheduled_at_time_runs_only_once(mock_sleep: None) -> None:
     # freeze time to 00:00, so task won't be scheduled by `cron`, only by `time`
     with freeze_time("00:00:00", tick=True):
 
-        @broker.task(
-            task_name="test_task",
+        @broker.task.name("test_task").labels(
             schedule=[
-                {"time": datetime.utcnow(), "args": [1]},
-                {"time": datetime.utcnow() + timedelta(days=1), "args": [2]},
+                {"time": datetime.now(timezone.utc), "args": [1]},
+                {"time": datetime.now(timezone.utc) + timedelta(days=1), "args": [2]},
                 {"cron": "1 * * * *", "args": [3]},
             ],
         )

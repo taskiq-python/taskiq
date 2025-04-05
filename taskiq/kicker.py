@@ -153,7 +153,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         logger.debug(
             f"Kicking {self.task_name} with args={args} and kwargs={kwargs}.",
         )
-        message = self._prepare_message(*args, **kwargs)
+        message = self.get_message(*args, **kwargs)
         for middleware in self.broker.middlewares:
             if middleware.__class__.pre_send != TaskiqMiddleware.pre_send:
                 message = await maybe_awaitable(middleware.pre_send(message))
@@ -191,7 +191,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         schedule_id = self.custom_schedule_id
         if schedule_id is None:
             schedule_id = self.broker.id_generator()
-        message = self._prepare_message(*args, **kwargs)
+        message = self.get_message(*args, **kwargs)
         cron_offset = None
         if isinstance(cron, CronSpec):
             cron_str = cron.to_cron()
@@ -228,7 +228,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         schedule_id = self.custom_schedule_id
         if schedule_id is None:
             schedule_id = self.broker.id_generator()
-        message = self._prepare_message(*args, **kwargs)
+        message = self.get_message(*args, **kwargs)
         scheduled = ScheduledTask(
             schedule_id=schedule_id,
             task_name=message.task_name,
@@ -261,10 +261,10 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
             arg = asdict(arg)
         return arg
 
-    def _prepare_message(
+    def get_message(
         self,
-        *args: Any,
-        **kwargs: Any,
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
     ) -> TaskiqMessage:
         """
         Create a message from args and kwargs.

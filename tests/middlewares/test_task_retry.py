@@ -14,7 +14,7 @@ async def test_wait_result() -> None:
     )
     runs = 0
 
-    @broker.task(retry_on_error=True)
+    @broker.task.labels(retry_on_error=True)
     async def run_task() -> str:
         nonlocal runs
 
@@ -40,7 +40,7 @@ async def test_wait_result_error() -> None:
     runs = 0
     lock = asyncio.Lock()
 
-    @broker.task(retry_on_error=True)
+    @broker.task.labels(retry_on_error=True)
     async def run_task() -> str:
         nonlocal runs, lock
 
@@ -74,7 +74,7 @@ async def test_wait_result_no_result() -> None:
     runs = 0
     lock = asyncio.Lock()
 
-    @broker.task(retry_on_error=True)
+    @broker.task.labels(retry_on_error=True)
     async def run_task() -> str:
         nonlocal runs, done, lock
 
@@ -111,7 +111,7 @@ async def test_max_retries() -> None:
     )
     runs = 0
 
-    @broker.task(max_retries=10)
+    @broker.task.labels(max_retries=10)
     def run_task() -> str:
         nonlocal runs
 
@@ -137,7 +137,7 @@ async def test_no_retry() -> None:
     )
     runs = 0
 
-    @broker.task(retry_on_error=False, max_retries=10)
+    @broker.task.labels(retry_on_error=False, max_retries=10)
     def run_task() -> str:
         nonlocal runs
 
