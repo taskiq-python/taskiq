@@ -1,9 +1,11 @@
 import asyncio
+from logging import getLogger
 from time import time
-from typing import TYPE_CHECKING, Any, Generic, Optional
+from typing import TYPE_CHECKING, Any, Generic, Optional, Type
 
 from typing_extensions import TypeVar
 
+from taskiq.compat import parse_obj_as
 from taskiq.exceptions import (
     ResultGetError,
     ResultIsReadyError,
@@ -15,6 +17,8 @@ if TYPE_CHECKING:  # pragma: no cover
     from taskiq.depends.progress_tracker import TaskProgress
     from taskiq.result import TaskiqResult
 
+logger = getLogger("taskiq.task")
+
 _ReturnType = TypeVar("_ReturnType")
 
 
@@ -25,9 +29,11 @@ class AsyncTaskiqTask(Generic[_ReturnType]):
         self,
         task_id: str,
         result_backend: "AsyncResultBackend[_ReturnType]",
+        return_type: Optional[Type[_ReturnType]] = None,
     ) -> None:
         self.task_id = task_id
         self.result_backend = result_backend
+        self.return_type = return_type
 
     async def is_ready(self) -> bool:
         """
@@ -53,10 +59,19 @@ class AsyncTaskiqTask(Generic[_ReturnType]):
         :return: task's return value.
         """
         try:
-            return await self.result_backend.get_result(
+            res = await self.result_backend.get_result(
                 self.task_id,
                 with_logs=with_logs,
             )
+            if self.return_type is not None:
+                try:
+                    res.return_value = parse_obj_as(
+                        self.return_type,
+                        res.return_value,
+                    )
+                except ValueError:
+                    logger.warning("Cannot parse return type into %s", self.return_type)
+            return res
         except Exception as exc:
             raise ResultGetError from exc
 

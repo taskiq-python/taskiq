@@ -18,6 +18,7 @@ from typing import (
     Optional,
     TypeVar,
     Union,
+    get_type_hints,
     overload,
 )
 from uuid import uuid4
@@ -327,12 +328,18 @@ class AsyncBroker(ABC):
                     inner_task_name = f"{fmodule}:{fname}"
                 wrapper = wraps(func)
 
+                sign = get_type_hints(func)
+                return_type = None
+                if "return" in sign:
+                    return_type = sign["return"]
+
                 decorated_task = wrapper(
                     self.decorator_class(
                         broker=self,
                         original_func=func,
                         labels=inner_labels,
                         task_name=inner_task_name,
+                        return_type=return_type,  # type: ignore
                     ),
                 )
 
