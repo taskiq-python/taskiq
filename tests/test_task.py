@@ -1,8 +1,8 @@
 import uuid
-from dataclasses import dataclass
 from typing import Dict, TypeVar
 
 import pytest
+from pydantic import BaseModel
 
 from taskiq import serializers
 from taskiq.abc import AsyncResultBackend
@@ -52,8 +52,7 @@ class SerializingBackend(AsyncResultBackend[_ReturnType]):
 )
 @pytest.mark.anyio
 async def test_res_parsing_success(serializer: TaskiqSerializer) -> None:
-    @dataclass
-    class MyResult:
+    class MyResult(BaseModel):
         name: str
         age: int
 
