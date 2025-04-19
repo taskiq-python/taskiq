@@ -17,6 +17,7 @@ class SchedulerArgs:
     fs_discover: bool = False
     tasks_pattern: Sequence[str] = ("**/tasks.py",)
     skip_first_run: bool = False
+    update_interval: Optional[int] = None
 
     @classmethod
     def from_cli(cls, args: Optional[Sequence[str]] = None) -> "SchedulerArgs":
@@ -78,6 +79,15 @@ class SchedulerArgs:
             help=(
                 "Skip first run of scheduler. "
                 "This option skips running tasks immediately after scheduler start."
+            ),
+        )
+        parser.add_argument(
+            "--update-interval",
+            type=int,
+            default=None,
+            help=(
+                "Interval in seconds to check for new tasks. "
+                "If not specified, scheduler will run once a minute."
             ),
         )
 

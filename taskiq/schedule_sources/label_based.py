@@ -1,5 +1,6 @@
+import uuid
 from logging import getLogger
-from typing import List
+from typing import Dict, List
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.schedule_source import ScheduleSource
@@ -13,20 +14,26 @@ class LabelScheduleSource(ScheduleSource):
 
     def __init__(self, broker: AsyncBroker) -> None:
         self.broker = broker
+        self.schedules: Dict[str, ScheduledTask] = {}
 
-    async def get_schedules(self) -> List["ScheduledTask"]:
+    async def startup(self) -> None:
         """
-        Collect schedules for all tasks.
+        Startup the schedule source.
 
-        this function checks labels for all
-        tasks available to the broker.
-
+        This function iterates over all tasks
+        available to the broker and collects
+        schedules from their labels.
         If task has a schedule label,
-        it will be parsed and returned.
+        it will be parsed and added to the
+        scheduler list.
 
-        :return: list of schedules.
+        Every time schedule is added, the random
+        schedule id is generated. Please be aware that
+        they are different for every startup.
+
+        :return: None
         """
-        schedules = []
+        self.schedules.clear()
         for task_name, task in self.broker.get_all_tasks().items():
             if task.broker != self.broker:
                 # if task broker doesn't match self, something is probably wrong
@@ -40,20 +47,36 @@ class LabelScheduleSource(ScheduleSource):
                     continue
                 labels = schedule.get("labels", {})
                 labels.update(task.labels)
-                schedules.append(
-                    ScheduledTask(
-                        task_name=task_name,
-                        labels=labels,
-                        args=schedule.get("args", []),
-                        kwargs=schedule.get("kwargs", {}),
-                        cron=schedule.get("cron"),
-                        time=schedule.get("time"),
-                        cron_offset=schedule.get("cron_offset"),
-                    ),
-                )
-        return schedules
+                schedule_id = uuid.uuid4().hex
 
-    def post_send(self, scheduled_task: ScheduledTask) -> None:
+                self.schedules[schedule_id] = ScheduledTask(
+                    task_name=task_name,
+                    labels=labels,
+                    schedule_id=schedule_id,
+                    args=schedule.get("args", []),
+                    kwargs=schedule.get("kwargs", {}),
+                    cron=schedule.get("cron"),
+                    time=schedule.get("time"),
+                    cron_offset=schedule.get("cron_offset"),
+                )
+
+        return await super().startup()
+
+    async def get_schedules(self) -> List["ScheduledTask"]:
+        """
+        Collect schedules for all tasks.
+
+        this function checks labels for all
+        tasks available to the broker.
+
+        If task has a schedule label,
+        it will be parsed and returned.
+
+        :return: list of schedules.
+        """
+        return list(self.schedules.values())
+
+    def post_send(self, task: "ScheduledTask") -> None:
         """
         Remove `time` schedule from task's scheduler list.
 
@@ -62,22 +85,7 @@ class LabelScheduleSource(ScheduleSource):
 
         :param scheduled_task: task that just have sent
         """
-        if scheduled_task.cron or not scheduled_task.time:
+        if task.cron or not task.time:
             return  # it's scheduled task with cron label, do not remove this trigger.
 
-        for task_name, task in self.broker.get_all_tasks().items():
-            if task.broker != self.broker:
-                # if task broker doesn't match self, something is probably wrong
-                logger.warning(
-                    f"Broker for {task_name} `{task.broker}` doesn't "
-                    f"match scheduler's broker `{self.broker}`",
-                )
-                continue
-            if scheduled_task.task_name != task_name:
-                continue
-
-            schedule_list = task.labels.get("schedule", []).copy()
-            for idx, schedule in enumerate(schedule_list):
-                if schedule.get("time") == scheduled_task.time:
-                    task.labels.get("schedule", []).pop(idx)
-                    return
+        self.schedules.pop(task.schedule_id, None)

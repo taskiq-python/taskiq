@@ -56,10 +56,10 @@ async def test_get_schedules_success() -> None:
     schedules = await get_all_schedules(
         TaskiqScheduler(InMemoryBroker(), sources),
     )
-    assert schedules == {
-        sources[0]: schedules1,
-        sources[1]: schedules2,
-    }
+    assert schedules == [
+        (sources[0], schedules1),
+        (sources[1], schedules2),
+    ]
 
 
 @pytest.mark.anyio
@@ -81,7 +81,7 @@ async def test_get_schedules_error() -> None:
     schedules = await get_all_schedules(
         TaskiqScheduler(InMemoryBroker(), [source1, source2]),
     )
-    assert schedules == {
-        source1: source1.schedules,
-        source2: [],
-    }
+    assert schedules == [
+        (source1, source1.schedules),
+        (source2, []),
+    ]
