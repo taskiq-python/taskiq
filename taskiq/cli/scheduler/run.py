@@ -154,6 +154,7 @@ async def run_scheduler_loop(  # noqa: C901
     and runs tasks when needed.
 
     :param scheduler: current scheduler.
+    :param interval: interval to check for schedule updates.
     """
     loop = asyncio.get_event_loop()
     running_schedules: Dict[str, asyncio.Task[Any]] = {}
