@@ -3,7 +3,7 @@ import inspect
 import sys
 from datetime import datetime, timedelta
 from logging import basicConfig, getLevelName, getLogger
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 import pytz
 from pycron import is_now
@@ -98,12 +98,10 @@ def get_task_delay(task: ScheduledTask) -> Optional[int]:
         task_time = to_tz_aware(task.time)
         if task_time <= now:
             return 0
-        one_min_ahead = (now + timedelta(minutes=1)).replace(second=1, microsecond=0)
-        if task_time <= one_min_ahead:
-            delay = task_time - now
-            if delay.microseconds:
-                return int(delay.total_seconds()) + 1
-            return int(delay.total_seconds())
+        delay = task_time - now
+        if delay.microseconds:
+            return int(delay.total_seconds()) + 1
+        return int(delay.total_seconds())
     return None
 
 
@@ -145,7 +143,10 @@ async def delayed_send(
     await scheduler.on_ready(source, task)
 
 
-async def run_scheduler_loop(scheduler: TaskiqScheduler) -> None:
+async def run_scheduler_loop(  # noqa: C901
+    scheduler: TaskiqScheduler,
+    interval: Optional[timedelta] = None,
+) -> None:
     """
     Runs scheduler loop.
 
@@ -155,9 +156,18 @@ async def run_scheduler_loop(scheduler: TaskiqScheduler) -> None:
     :param scheduler: current scheduler.
     """
     loop = asyncio.get_event_loop()
-    running_schedules = set()
+    running_schedules: Dict[str, asyncio.Task[Any]] = {}
+    ran_cron_jobs: Set[str] = set()
+    current_minute = datetime.now(tz=pytz.UTC).minute
     while True:
-        # We use this method to correctly sleep for one minute.
+        now = datetime.now(tz=pytz.UTC)
+        if now.minute != current_minute:
+            current_minute = now.minute
+            ran_cron_jobs.clear()
+        if interval is not None:
+            next_run = now + interval
+        else:
+            next_run = (now + timedelta(minutes=1)).replace(second=1, microsecond=0)
         scheduled_tasks = await get_all_schedules(scheduler)
         for source, task_list in scheduled_tasks.items():
             logger.debug("Got %d schedules from source %s.", len(task_list), source)
@@ -172,16 +182,37 @@ async def run_scheduler_loop(scheduler: TaskiqScheduler) -> None:
                         task.schedule_id,
                     )
                     continue
-                if task_delay is not None:
-                    send_task = loop.create_task(
-                        delayed_send(scheduler, source, task, task_delay),
-                    )
-                    running_schedules.add(send_task)
-                    send_task.add_done_callback(running_schedules.discard)
-        next_minute = datetime.now().replace(second=0, microsecond=0) + timedelta(
-            minutes=1,
-        )
-        delay = next_minute - datetime.now()
+                # If task delay is None, we don't need to run it.
+                if task_delay is None:
+                    continue
+                # If task is delayed for more than next_run,
+                # we don't need to run it, because we will
+                # run it in the next iteration.
+                if now + timedelta(seconds=task_delay) >= next_run:
+                    continue
+                # If task is already running, we don't need to run it again.
+                if task.schedule_id in running_schedules and task_delay < 1:
+                    continue
+                # If task is cron job, we need to check if
+                # we already ran it this minute.
+                if task.cron is not None:
+                    if task.schedule_id in ran_cron_jobs:
+                        continue
+                    ran_cron_jobs.add(task.schedule_id)
+                send_task = loop.create_task(
+                    delayed_send(scheduler, source, task, task_delay),
+                    # We need to set the name of the task
+                    # to be able to discard its reference
+                    # after it is done.
+                    name=f"schedule_{task.schedule_id}",
+                )
+                running_schedules[task.schedule_id] = send_task
+                send_task.add_done_callback(
+                    lambda task_future: running_schedules.pop(
+                        task_future.get_name().removeprefix("schedule_"),
+                    ),
+                )
+        delay = next_run - datetime.now(tz=pytz.UTC)
         logger.debug(
             "Sleeping for %.2f seconds before getting schedules.",
             delay.total_seconds(),
@@ -226,6 +257,10 @@ async def run_scheduler(args: SchedulerArgs) -> None:
     for source in scheduler.sources:
         await source.startup()
 
+    interval = None
+    if args.update_interval:
+        interval = timedelta(seconds=args.update_interval)
+
     logger.info("Starting scheduler.")
     await scheduler.startup()
     logger.info("Startup completed.")
@@ -239,7 +274,7 @@ async def run_scheduler(args: SchedulerArgs) -> None:
         await asyncio.sleep(delay.total_seconds())
         logger.info("First run skipped. The scheduler is now running.")
     try:
-        await run_scheduler_loop(scheduler)
+        await run_scheduler_loop(scheduler, interval)
     except asyncio.CancelledError:
         logger.warning("Shutting down scheduler.")
         await scheduler.shutdown()

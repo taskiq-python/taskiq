@@ -9,7 +9,7 @@ from taskiq.scheduler.scheduled_task import ScheduledTask
 
 
 def test_should_run_success() -> None:
-    hour = datetime.datetime.utcnow().hour
+    hour = datetime.datetime.now(datetime.timezone.utc).hour
     delay = get_task_delay(
         ScheduledTask(
             task_name="",
@@ -97,18 +97,26 @@ def test_time_utc_with_local_zone() -> None:
     assert delay is not None and delay >= 0
 
 
+@freeze_time("2023-01-14 12:00:00")
 def test_time_localtime_without_zone() -> None:
     time = datetime.datetime.now(tz=pytz.FixedOffset(240)).replace(tzinfo=None)
+    time_to_run = time - datetime.timedelta(seconds=1)
+
     delay = get_task_delay(
         ScheduledTask(
             task_name="",
             labels={},
             args=[],
             kwargs={},
-            time=time - datetime.timedelta(seconds=1),
+            time=time_to_run,
         ),
     )
-    assert delay is None
+
+    expected_delay = time_to_run.replace(tzinfo=pytz.UTC) - datetime.datetime.now(
+        pytz.UTC,
+    )
+
+    assert delay == int(expected_delay.total_seconds())
 
 
 @freeze_time("2023-01-14 12:00:00")

@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Any, Dict, List
 
 import pytest
+import pytz
 
 from taskiq.brokers.inmemory_broker import InMemoryBroker
 from taskiq.schedule_sources.label_based import LabelScheduleSource
@@ -13,7 +14,7 @@ from taskiq.scheduler.scheduled_task import ScheduledTask
     "schedule_label",
     [
         pytest.param([{"cron": "* * * * *"}], id="cron"),
-        pytest.param([{"time": datetime.utcnow()}], id="time"),
+        pytest.param([{"time": datetime.now(pytz.UTC)}], id="time"),
     ],
 )
 async def test_label_discovery(schedule_label: List[Dict[str, Any]]) -> None:
@@ -27,6 +28,7 @@ async def test_label_discovery(schedule_label: List[Dict[str, Any]]) -> None:
         pass
 
     source = LabelScheduleSource(broker)
+    await source.startup()
     schedules = await source.get_schedules()
     assert schedules == [
         ScheduledTask(
@@ -53,5 +55,6 @@ async def test_label_discovery_no_cron() -> None:
         pass
 
     source = LabelScheduleSource(broker)
+    await source.startup()
     schedules = await source.get_schedules()
     assert schedules == []
