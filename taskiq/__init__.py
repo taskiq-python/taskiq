@@ -25,8 +25,11 @@ from taskiq.exceptions import (
 )
 from taskiq.funcs import gather
 from taskiq.message import BrokerMessage, TaskiqMessage
-from taskiq.middlewares.prometheus_middleware import PrometheusMiddleware
-from taskiq.middlewares.retry_middleware import SimpleRetryMiddleware
+from taskiq.middlewares import (
+    PrometheusMiddleware,
+    SimpleRetryMiddleware,
+    SmartRetryMiddleware,
+)
 from taskiq.result import TaskiqResult
 from taskiq.scheduler.scheduled_task import ScheduledTask
 from taskiq.scheduler.scheduler import TaskiqScheduler
@@ -34,6 +37,7 @@ from taskiq.state import TaskiqState
 from taskiq.task import AsyncTaskiqTask
 
 __version__ = version("taskiq")
+
 __all__ = [
     "AckableMessage",
     "AsyncBroker",
@@ -52,6 +56,7 @@ __all__ = [
     "SecurityError",
     "SendTaskError",
     "SimpleRetryMiddleware",
+    "SmartRetryMiddleware",
     "TaskiqDepends",
     "TaskiqError",
     "TaskiqEvents",

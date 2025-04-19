@@ -5,7 +5,7 @@ from mock import AsyncMock
 
 from taskiq.formatters.json_formatter import JSONFormatter
 from taskiq.message import TaskiqMessage
-from taskiq.middlewares.retry_middleware import SimpleRetryMiddleware
+from taskiq.middlewares.simple_retry_middleware import SimpleRetryMiddleware
 from taskiq.result import TaskiqResult
 
 
