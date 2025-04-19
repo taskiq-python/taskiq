@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import random
 from logging import getLogger
+from types import NoneType
 from typing import Any
 
 from taskiq import ScheduleSource
@@ -61,6 +62,11 @@ class SmartRetryMiddleware(TaskiqMiddleware):
         self.max_delay_exponent = max_delay_exponent
         self.schedule_source = schedule_source
 
+        if not isinstance(schedule_source, (ScheduleSource, NoneType)):
+            raise TypeError(
+                "schedule_source must be an instance of ScheduleSource or None",
+            )
+
     def is_retry_on_error(self, message: TaskiqMessage) -> bool:
         """
         Check if retry is enabled for this task.
@@ -103,7 +109,9 @@ class SmartRetryMiddleware(TaskiqMiddleware):
         delay: float,
     ) -> None:
         """Execute the task with a delay."""
-        if isinstance(self.schedule_source, ScheduleSource):
+        if self.schedule_source is None:
+            await kicker.with_labels(delay=delay).kiq(*message.args, **message.kwargs)
+        else:
             target_time = datetime.datetime.now(datetime.UTC) + datetime.timedelta(
                 seconds=delay,
             )
@@ -113,8 +121,6 @@ class SmartRetryMiddleware(TaskiqMiddleware):
                 *message.args,
                 **message.kwargs,
             )
-        else:
-            await kicker.with_labels(delay=delay).kiq(*message.args, **message.kwargs)
 
     async def on_error(
         self,
