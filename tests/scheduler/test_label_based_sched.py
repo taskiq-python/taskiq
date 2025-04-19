@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
 import pytest
+import pytz
 from freezegun import freeze_time
 
 from taskiq.brokers.inmemory_broker import InMemoryBroker
@@ -18,7 +19,7 @@ from taskiq.scheduler.scheduler import TaskiqScheduler
     "schedule_label",
     [
         pytest.param([{"cron": "* * * * *"}], id="cron"),
-        pytest.param([{"time": datetime.utcnow()}], id="time"),
+        pytest.param([{"time": datetime.now(pytz.UTC)}], id="time"),
     ],
 )
 async def test_label_discovery(schedule_label: List[Dict[str, Any]]) -> None:
@@ -31,7 +32,9 @@ async def test_label_discovery(schedule_label: List[Dict[str, Any]]) -> None:
     def task() -> None:
         pass
 
-    schedules = await LabelScheduleSource(broker).get_schedules()
+    source = LabelScheduleSource(broker)
+    await source.startup()
+    schedules = await source.get_schedules()
     assert schedules == [
         ScheduledTask(
             schedule_id=schedules[0].schedule_id,
@@ -57,6 +60,7 @@ async def test_label_discovery_no_cron() -> None:
         pass
 
     source = LabelScheduleSource(broker)
+    await source.startup()
     schedules = await source.get_schedules()
     assert schedules == []
 
@@ -69,6 +73,8 @@ async def test_task_scheduled_at_time_runs_only_once(mock_sleep: None) -> None:
         broker=broker,
         sources=[LabelScheduleSource(broker)],
     )
+    for source in scheduler.sources:
+        await source.startup()
 
     # NOTE:
     # freeze time to 00:00, so task won't be scheduled by `cron`, only by `time`
@@ -77,8 +83,8 @@ async def test_task_scheduled_at_time_runs_only_once(mock_sleep: None) -> None:
         @broker.task(
             task_name="test_task",
             schedule=[
-                {"time": datetime.utcnow(), "args": [1]},
-                {"time": datetime.utcnow() + timedelta(days=1), "args": [2]},
+                {"time": datetime.now(pytz.UTC), "args": [1]},
+                {"time": datetime.now(pytz.UTC) + timedelta(days=1), "args": [2]},
                 {"cron": "1 * * * *", "args": [3]},
             ],
         )

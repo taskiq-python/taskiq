@@ -1,3 +1,6 @@
+from datetime import timedelta
+from typing import Optional
+
 from taskiq.cli.scheduler.run import run_scheduler_loop
 from taskiq.scheduler.scheduler import TaskiqScheduler
 
@@ -5,6 +8,7 @@ from taskiq.scheduler.scheduler import TaskiqScheduler
 async def run_scheduler_task(
     scheduler: TaskiqScheduler,
     run_startup: bool = False,
+    interval: Optional[timedelta] = None,
 ) -> None:
     """
     Run scheduler task.
@@ -20,4 +24,4 @@ async def run_scheduler_task(
     if run_startup:
         await scheduler.startup()
     while True:
-        await run_scheduler_loop(scheduler)
+        await run_scheduler_loop(scheduler, interval)
