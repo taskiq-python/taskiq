@@ -3,7 +3,7 @@ import inspect
 import sys
 from datetime import datetime, timedelta
 from logging import basicConfig, getLevelName, getLogger
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import pytz
 from pycron import is_now
@@ -55,7 +55,7 @@ async def get_schedules(source: ScheduleSource) -> List[ScheduledTask]:
 
 async def get_all_schedules(
     scheduler: TaskiqScheduler,
-) -> Dict[ScheduleSource, List[ScheduledTask]]:
+) -> List[Tuple[ScheduleSource, List[ScheduledTask]]]:
     """
     Task to update all schedules.
 
@@ -71,7 +71,7 @@ async def get_all_schedules(
     schedules = await asyncio.gather(
         *[get_schedules(source) for source in scheduler.sources],
     )
-    return dict(zip(scheduler.sources, schedules))
+    return list(zip(scheduler.sources, schedules))
 
 
 def get_task_delay(task: ScheduledTask) -> Optional[int]:
@@ -162,15 +162,22 @@ async def run_scheduler_loop(  # noqa: C901
     current_minute = datetime.now(tz=pytz.UTC).minute
     while True:
         now = datetime.now(tz=pytz.UTC)
+        # If minute changed, we need to clear
+        # ran_cron_jobs set and update current minute.
         if now.minute != current_minute:
             current_minute = now.minute
             ran_cron_jobs.clear()
+        # If interval is not None, we need to
+        # calculate next run time using it.
         if interval is not None:
             next_run = now + interval
+        # otherwise we need assume that
+        # we will run it at the start of the next minute.
+        # as crontab does.
         else:
             next_run = (now + timedelta(minutes=1)).replace(second=1, microsecond=0)
         scheduled_tasks = await get_all_schedules(scheduler)
-        for source, task_list in scheduled_tasks.items():
+        for source, task_list in scheduled_tasks:
             logger.debug("Got %d schedules from source %s.", len(task_list), source)
             for task in task_list:
                 try:
