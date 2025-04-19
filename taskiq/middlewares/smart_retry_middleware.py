@@ -3,7 +3,6 @@ from __future__ import annotations
 import datetime
 import random
 from logging import getLogger
-from types import NoneType
 from typing import Any
 
 from taskiq import ScheduleSource
@@ -62,7 +61,7 @@ class SmartRetryMiddleware(TaskiqMiddleware):
         self.max_delay_exponent = max_delay_exponent
         self.schedule_source = schedule_source
 
-        if not isinstance(schedule_source, (ScheduleSource, NoneType)):
+        if not isinstance(schedule_source, (ScheduleSource, type(None))):
             raise TypeError(
                 "schedule_source must be an instance of ScheduleSource or None",
             )
