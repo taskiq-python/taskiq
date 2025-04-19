@@ -1,9 +1,7 @@
-from __future__ import annotations
-
 import datetime
 import random
 from logging import getLogger
-from typing import Any
+from typing import Any, Optional
 
 from taskiq import ScheduleSource
 from taskiq.abc.middleware import TaskiqMiddleware
@@ -36,7 +34,7 @@ class SmartRetryMiddleware(TaskiqMiddleware):
         use_jitter: bool = False,
         use_delay_exponent: bool = False,
         max_delay_exponent: float = 60,
-        schedule_source: ScheduleSource | None = None,
+        schedule_source: Optional[ScheduleSource] = None,
     ) -> None:
         """
         Initialize retry middleware.
