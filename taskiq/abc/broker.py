@@ -27,12 +27,11 @@ from typing_extensions import ParamSpec, Self, TypeAlias
 
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.abc.serializer import TaskiqSerializer
-from taskiq.acks import AckableMessage
 from taskiq.decor import AsyncTaskiqDecoratedTask
 from taskiq.events import TaskiqEvents
 from taskiq.exceptions import TaskBrokerMismatchError
 from taskiq.formatters.proxy_formatter import ProxyFormatter
-from taskiq.message import BrokerMessage
+from taskiq.message import BrokerMessage, WrappedMessage
 from taskiq.result_backends.dummy import DummyResultBackend
 from taskiq.serializers.json_serializer import JSONSerializer
 from taskiq.state import TaskiqState
@@ -79,6 +78,7 @@ class AsyncBroker(ABC):
         self,
         result_backend: "Optional[AsyncResultBackend[_T]]" = None,
         task_id_generator: Optional[Callable[[], str]] = None,
+        max_attempts_at_message: Optional[int] = None,
     ) -> None:
         if result_backend is None:
             result_backend = DummyResultBackend()
@@ -115,6 +115,7 @@ class AsyncBroker(ABC):
         self.state = TaskiqState()
         self.custom_dependency_context: Dict[Any, Any] = {}
         self.dependency_overrides: Dict[Any, Any] = {}
+        self.max_attempts_at_message = max_attempts_at_message
         # True only if broker runs in worker process.
         self.is_worker_process = False
         # True only if broker runs in scheduler process.
@@ -239,18 +240,20 @@ class AsyncBroker(ABC):
         """
 
     @abstractmethod
-    def listen(self) -> AsyncGenerator[Union[bytes, AckableMessage], None]:
+    def listen(self) -> AsyncGenerator[Union[bytes, WrappedMessage], None]:
         """
         This function listens to new messages and yields them.
 
         This it the main point for workers.
         This function is used to get new tasks from the network.
 
-        If your broker support acknowledgement, then you
-        should wrap your message in AckableMessage dataclass.
+        If your broker support acknowledgements (or negative acknowledgements),
+        then the returned message should implement the AckableMessage
+        (or NackableMessage) interface by implementing the `ack` (or
+        `nack`) callback.
 
-        If your messages was wrapped in AckableMessage dataclass,
-        taskiq will call ack when finish processing message.
+        If your message has an `ack` callbacks it will be called after the
+        message is processed.
 
         :yield: incoming messages.
         :return: nothing.

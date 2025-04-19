@@ -167,6 +167,7 @@ def start_listen(args: WorkerArgs) -> None:
                 ack_type=args.ack_type,
                 max_tasks_to_execute=args.max_tasks_per_child,
                 wait_tasks_timeout=args.wait_tasks_timeout,
+                max_attempts_at_message=broker.max_attempts_at_message,
                 **receiver_kwargs,  # type: ignore
             )
             loop.run_until_complete(receiver.listen(shutdown_event))

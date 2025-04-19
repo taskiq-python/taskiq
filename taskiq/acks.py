@@ -33,5 +33,15 @@ class AckableMessage(BaseModel):
     as a whole.
     """
 
-    data: bytes
     ack: Callable[[], Union[None, Awaitable[None]]]
+
+
+class NackableMessage(BaseModel):
+    """
+    Message that can be negatively acknowledged.
+
+    Message that can be negatively acknowledged, e.g.
+    sent to a dead-letter queue, etc.
+    """
+
+    nack: Callable[[], Union[None, Awaitable[None]]]
