@@ -6,6 +6,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from multiprocessing import Event, Process, Queue, current_process
 from multiprocessing.synchronize import Event as EventType
+from pathlib import Path
 from time import sleep
 from typing import Any, Callable, List, Optional
 
@@ -163,15 +164,19 @@ class ProcessManager:
         self.action_queue: "Queue[ProcessActionBase]" = Queue(-1)
         self.args = args
         if args.reload and observer is not None:
-            observer.schedule(
-                FileWatcher(
-                    callback=schedule_workers_reload,
-                    use_gitignore=not args.no_gitignore,
-                    action_queue=self.action_queue,
-                ),
-                path=".",
-                recursive=True,
-            )
+            watch_paths = args.reload_dirs if args.reload_dirs else ["."]
+            for path_to_watch in watch_paths:
+                logger.info(f"Watching directory: {path_to_watch}")
+                observer.schedule(
+                    FileWatcher(
+                        callback=schedule_workers_reload,
+                        path=Path(path_to_watch),
+                        use_gitignore=not args.no_gitignore,
+                        action_queue=self.action_queue,
+                    ),
+                    path=path_to_watch,
+                    recursive=True,
+                )
 
         shutdown_handler = get_signal_handler(self.action_queue, ShutdownAction())
         signal.signal(signal.SIGINT, shutdown_handler)
