@@ -166,7 +166,7 @@ class ProcessManager:
         if args.reload and observer is not None:
             watch_paths = args.reload_dirs if args.reload_dirs else ["."]
             for path_to_watch in watch_paths:
-                logger.info(f"Watching directory: {path_to_watch}")
+                logger.debug(f"Watching directory: {path_to_watch}")
                 observer.schedule(
                     FileWatcher(
                         callback=schedule_workers_reload,
