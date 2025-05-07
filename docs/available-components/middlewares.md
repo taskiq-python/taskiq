@@ -44,7 +44,7 @@ The `SmartRetryMiddleware` automatically retries tasks with flexible delay setti
 * **Delay Before Retry**: Define a fixed delay or use additional strategies.
 * **Jitter**: Adds random delay variations to distribute retries evenly and prevent simultaneous task execution.
 * **Exponential Backoff**: Increases the delay for each subsequent retry, useful for gradually recovering system performance.
-* **Custom Schedule Source (`schedule_source`)**: Enables using a custom schedule source, such as an external queue or service, to manage delayed task execution.
+* **Custom Schedule Source (`schedule_source`)**: Enables using a custom schedule source to manage delayed task execution.
 
 ### Middleware Integration
 
