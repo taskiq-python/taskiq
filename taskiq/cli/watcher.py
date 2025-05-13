@@ -14,12 +14,13 @@ class FileWatcher:  # pragma: no cover
     def __init__(
         self,
         callback: Callable[..., None],
+        path: Path,
         use_gitignore: bool = True,
         **callback_kwargs: Any,
     ) -> None:
         self.callback = callback
         self.gitignore = None
-        gpath = Path("./.gitignore")
+        gpath = path / ".gitignore"
         if use_gitignore and gpath.exists():
             self.gitignore = parse_gitignore(gpath)
         self.callback_kwargs = callback_kwargs
