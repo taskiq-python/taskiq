@@ -159,9 +159,12 @@ async def run_scheduler_loop(  # noqa: C901
     loop = asyncio.get_event_loop()
     running_schedules: Dict[str, asyncio.Task[Any]] = {}
     ran_cron_jobs: Set[str] = set()
+    interval_tasks_last_run: Dict[str, datetime] = {}
     current_minute = datetime.now(tz=pytz.UTC).minute
+    next_run: datetime = datetime.now(tz=pytz.UTC)
     while True:
         now = datetime.now(tz=pytz.UTC)
+        interval_next_run: datetime | None = None
         # If minute changed, we need to clear
         # ran_cron_jobs set and update current minute.
         if now.minute != current_minute:
@@ -174,39 +177,62 @@ async def run_scheduler_loop(  # noqa: C901
         # otherwise we need assume that
         # we will run it at the start of the next minute.
         # as crontab does.
-        else:
+        elif next_run.minute == current_minute:
             next_run = (now + timedelta(minutes=1)).replace(second=1, microsecond=0)
         scheduled_tasks = await get_all_schedules(scheduler)
         for source, task_list in scheduled_tasks:
             logger.debug("Got %d schedules from source %s.", len(task_list), source)
             for task in task_list:
-                try:
-                    task_delay = get_task_delay(task)
-                except ValueError:
-                    logger.warning(
-                        "Cannot parse cron: %s for task: %s, schedule_id: %s.",
-                        task.cron,
-                        task.task_name,
-                        task.schedule_id,
-                    )
-                    continue
-                # If task delay is None, we don't need to run it.
-                if task_delay is None:
-                    continue
-                # If task is delayed for more than next_run,
-                # we don't need to run it, because we will
-                # run it in the next iteration.
-                if now + timedelta(seconds=task_delay) >= next_run:
-                    continue
-                # If task is already running, we don't need to run it again.
-                if task.schedule_id in running_schedules and task_delay < 1:
-                    continue
-                # If task is cron job, we need to check if
-                # we already ran it this minute.
-                if task.cron is not None:
-                    if task.schedule_id in ran_cron_jobs:
+                if task.interval:
+                    need_to_run = False
+                    # If the task in not in interval_tasks_last_run we run it or
+                    # if the task last run plus his interval in greater than now
+                    if not interval_tasks_last_run.get(task.schedule_id, None) or (
+                        interval_tasks_last_run[task.schedule_id]
+                        + timedelta(seconds=task.interval)
+                        < now
+                    ):
+                        task_delay = 0
+                        interval_tasks_last_run[task.schedule_id] = now
+                        need_to_run = True
+                    # We calculate the minimum task interval next run
+                    task_next_run = interval_tasks_last_run[
+                        task.schedule_id
+                    ] + timedelta(seconds=task.interval)
+                    if not interval_next_run or task_next_run < interval_next_run:
+                        interval_next_run = task_next_run
+                    # If the interval task don't need to run
+                    if not need_to_run:
                         continue
-                    ran_cron_jobs.add(task.schedule_id)
+                else:
+                    try:
+                        task_delay = get_task_delay(task)
+                    except ValueError:
+                        logger.warning(
+                            "Cannot parse cron: %s for task: %s, schedule_id: %s.",
+                            task.cron,
+                            task.task_name,
+                            task.schedule_id,
+                        )
+                        continue
+                    # If task delay is None, we don't need to run it.
+                    if task_delay is None:
+                        continue
+                    # If task is delayed for more than next_run,
+                    # we don't need to run it, because we will
+                    # run it in the next iteration.
+                    if now + timedelta(seconds=task_delay) >= next_run:
+                        continue
+                    # If task is already running, we don't need to run it again.
+                    if task.schedule_id in running_schedules and task_delay < 1:
+                        continue
+                    # If task is cron job, we need to check if
+                    # we already ran it this minute.
+                    if task.cron is not None:
+                        if task.schedule_id in ran_cron_jobs:
+                            continue
+                        ran_cron_jobs.add(task.schedule_id)
+
                 send_task = loop.create_task(
                     delayed_send(scheduler, source, task, task_delay),
                     # We need to set the name of the task
@@ -220,7 +246,12 @@ async def run_scheduler_loop(  # noqa: C901
                         task_future.get_name().removeprefix("schedule_"),
                     ),
                 )
-        delay = next_run - datetime.now(tz=pytz.UTC)
+        # We set the delay with the lowest value between next_run and interval_next_run
+        delay = (
+            interval_next_run
+            if interval_next_run and interval_next_run < next_run
+            else next_run
+        ) - now
         logger.debug(
             "Sleeping for %.2f seconds before getting schedules.",
             delay.total_seconds(),
