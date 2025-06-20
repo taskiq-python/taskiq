@@ -85,14 +85,18 @@ def get_task_delay(task: ScheduledTask) -> Optional[int]:
     if task.cron is not None:
         # If user specified cron offset we apply it.
         # If it's timedelta, we simply add the delta to current time.
+        additional_seconds = 0
         if task.cron_offset and isinstance(task.cron_offset, timedelta):
             now += task.cron_offset
+            additional_seconds += int(task.cron_offset.total_seconds() % 60) + (
+                1 if task.cron_offset.microseconds else 0
+            )
         # If timezone was specified as string we convert it timzone
         # offset and then apply.
         elif task.cron_offset and isinstance(task.cron_offset, str):
             now = now.astimezone(pytz.timezone(task.cron_offset))
         if is_now(task.cron, now):
-            return 0
+            return additional_seconds
         return None
     if task.time is not None:
         task_time = to_tz_aware(task.time)

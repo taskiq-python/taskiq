@@ -150,3 +150,35 @@ def test_time_delay_with_milliseconds() -> None:
         ),
     )
     assert delay is not None and delay == 16
+
+
+@freeze_time("2025-05-22 12:00:00")
+def test_cron_offset_delay_with_seconds() -> None:
+    seconds_offset = 2
+    delay = get_task_delay(
+        ScheduledTask(
+            task_name="",
+            labels={},
+            args=[],
+            kwargs={},
+            cron="* 12 * * *",
+            cron_offset=datetime.timedelta(seconds=seconds_offset),
+        ),
+    )
+    assert delay is not None and delay == seconds_offset
+
+
+@freeze_time("2025-05-22 12:00:00")
+def test_cron_offset_delay_with_seconds_and_milliseconds() -> None:
+    seconds_offset = 2
+    delay = get_task_delay(
+        ScheduledTask(
+            task_name="",
+            labels={},
+            args=[],
+            kwargs={},
+            cron="* 12 * * *",
+            cron_offset=datetime.timedelta(seconds=seconds_offset, milliseconds=1),
+        ),
+    )
+    assert delay is not None and delay == seconds_offset + 1
