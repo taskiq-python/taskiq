@@ -109,7 +109,9 @@ class SmartRetryMiddleware(TaskiqMiddleware):
         if self.schedule_source is None:
             await kicker.with_labels(delay=delay).kiq(*message.args, **message.kwargs)
         else:
-            target_time = datetime.datetime.now(datetime.UTC) + datetime.timedelta(
+            target_time = datetime.datetime.now(
+                datetime.timezone.utc,
+            ) + datetime.timedelta(
                 seconds=delay,
             )
             await kicker.schedule_by_time(

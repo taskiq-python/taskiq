@@ -40,7 +40,7 @@ def test_should_run_cron_str_offset() -> None:
 
 def test_should_run_cron_td_offset() -> None:
     offset = 2
-    hour = (datetime.datetime.utcnow().hour + offset) % 24
+    hour = (datetime.datetime.now(datetime.timezone.utc).hour + offset) % 24
     delay = get_task_delay(
         ScheduledTask(
             task_name="",
@@ -55,7 +55,7 @@ def test_should_run_cron_td_offset() -> None:
 
 
 def test_time_utc_without_zone() -> None:
-    time = datetime.datetime.utcnow()
+    time = datetime.datetime.now()
     delay = get_task_delay(
         ScheduledTask(
             task_name="",

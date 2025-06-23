@@ -1,4 +1,5 @@
 """Distributed task manager."""
+
 from importlib.metadata import version
 
 from taskiq_dependencies import Depends as TaskiqDepends
