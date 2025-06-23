@@ -82,7 +82,6 @@ if IS_PYDANTIC2:
         def _validate_error(cls, value: Any) -> Optional[BaseException]:
             return exception_to_python(value)
 
-
 else:
     from pydantic.generics import GenericModel, validator
 
