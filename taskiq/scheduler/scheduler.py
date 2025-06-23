@@ -46,11 +46,15 @@ class TaskiqScheduler:
         except ScheduledTaskCancelledError:
             logger.info("Scheduled task %s has been cancelled.", task.task_name)
         else:
-            await AsyncKicker(task.task_name, self.broker, task.labels).with_labels(
-                schedule_id=task.schedule_id,
-            ).kiq(
-                *task.args,
-                **task.kwargs,
+            await (
+                AsyncKicker(task.task_name, self.broker, task.labels)
+                .with_labels(
+                    schedule_id=task.schedule_id,
+                )
+                .kiq(
+                    *task.args,
+                    **task.kwargs,
+                )
             )
             await maybe_awaitable(source.post_send(task))
 

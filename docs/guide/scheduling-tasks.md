@@ -111,7 +111,7 @@ Now we can use this source to add new schedules in runtime. Here's an example:
     await my_task.schedule_by_time(
         redis_source,
         # It's better to use UTC time, or add tzinfo to datetime.
-        datetime.datetime.utcnow() + datetime.timedelta(minutes=1, seconds=5),
+        datetime.datetime.now(datetime.UTC) + datetime.timedelta(minutes=1, seconds=5),
         # You can pass args and kwargs here as usual
         11,
         arg2="arg2",
@@ -137,7 +137,7 @@ If you want to pass additional labels, you can call these methods on the `Kicker
         .with_labels(label1="value")
         .schedule_by_time(
             redis_source,
-            datetime.datetime.utcnow() + datetime.timedelta(seconds=10),
+            datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=10),
             11,
             arg2="arg2",
         )
@@ -155,7 +155,7 @@ Each of these methods return you an instance of the `CreatedSchedule` class. Thi
 ```python
     schedule = await my_task.schedule_by_time(
         redis_source,
-        datetime.datetime.utcnow() + datetime.timedelta(minutes=1, seconds=5),
+        datetime.datetime.now(datetime.UTC) + datetime.timedelta(minutes=1, seconds=5),
         11,
         arg2="arg2",
     )

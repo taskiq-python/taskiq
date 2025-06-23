@@ -8,7 +8,7 @@ from taskiq import serializers
 from taskiq.abc import AsyncResultBackend
 from taskiq.abc.serializer import TaskiqSerializer
 from taskiq.compat import model_dump, model_validate
-from taskiq.result.v1 import TaskiqResult
+from taskiq.result import TaskiqResult
 from taskiq.task import AsyncTaskiqTask
 
 _ReturnType = TypeVar("_ReturnType")

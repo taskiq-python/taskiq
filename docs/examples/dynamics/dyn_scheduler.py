@@ -23,7 +23,8 @@ async def main() -> None:
         schedule=[
             {
                 # Here we also can specify cron instead of time.
-                "time": datetime.datetime.utcnow() + datetime.timedelta(seconds=2),
+                "time": datetime.datetime.now(datetime.timezone.utc)
+                + datetime.timedelta(seconds=2),
                 "args": [22],
             },
         ],
