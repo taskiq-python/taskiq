@@ -83,7 +83,8 @@ if IS_PYDANTIC2:
             return exception_to_python(value)
 
 else:
-    from pydantic.generics import GenericModel, validator
+    from pydantic import validator
+    from pydantic.generics import GenericModel
 
     class TaskiqResult(GenericModel, Generic[_ReturnType]):  # type: ignore[no-redef]
         """Result of a remote task invocation."""
