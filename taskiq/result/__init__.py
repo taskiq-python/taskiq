@@ -1,10 +1,4 @@
-from taskiq.compat import IS_PYDANTIC2
-
-if IS_PYDANTIC2:
-    from .v2 import TaskiqResult
-else:
-    from .v1 import TaskiqResult  # type: ignore
-
+from .result import TaskiqResult
 
 __all__ = [
     "TaskiqResult",
