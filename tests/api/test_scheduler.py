@@ -1,6 +1,6 @@
 import asyncio
 import contextlib
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -16,7 +16,7 @@ async def test_successful() -> None:
     scheduler = TaskiqScheduler(broker, sources=[LabelScheduleSource(broker)])
     scheduler_task = asyncio.create_task(run_scheduler_task(scheduler))
 
-    @broker.task(schedule=[{"time": datetime.now(UTC) - timedelta(seconds=1)}])
+    @broker.task(schedule=[{"time": datetime.now(timezone.utc) - timedelta(seconds=1)}])
     def _() -> None:
         ...
 
@@ -31,7 +31,7 @@ async def test_cancelation() -> None:
     broker = AsyncQueueBroker()
     scheduler = TaskiqScheduler(broker, sources=[LabelScheduleSource(broker)])
 
-    @broker.task(schedule=[{"time": datetime.now(UTC)}])
+    @broker.task(schedule=[{"time": datetime.now(timezone.utc)}])
     def _() -> None:
         ...
 

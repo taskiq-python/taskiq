@@ -1,7 +1,7 @@
 import asyncio
 import inspect
 import sys
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from logging import basicConfig, getLevelName, getLogger
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -273,10 +273,13 @@ async def run_scheduler(args: SchedulerArgs) -> None:
     await scheduler.startup()
     logger.info("Startup completed.")
     if args.skip_first_run:
-        next_minute = datetime.now(UTC).replace(second=0, microsecond=0) + timedelta(
+        next_minute = datetime.now(timezone.utc).replace(
+            second=0,
+            microsecond=0,
+        ) + timedelta(
             minutes=1,
         )
-        delay = next_minute - datetime.now(UTC)
+        delay = next_minute - datetime.now(timezone.utc)
         delay_secs = int(delay.total_seconds())
         logger.info(f"Skipping first run. Waiting {delay_secs} seconds.")
         await asyncio.sleep(delay.total_seconds())
