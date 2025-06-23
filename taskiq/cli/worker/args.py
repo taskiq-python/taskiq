@@ -39,6 +39,7 @@ class WorkerArgs:
     no_parse: bool = False
     shutdown_timeout: float = 5
     reload: bool = False
+    reload_dirs: List[str] = field(default_factory=list)
     no_gitignore: bool = False
     max_async_tasks: int = 100
     receiver: str = "taskiq.receiver:Receiver"
@@ -171,6 +172,16 @@ class WorkerArgs:
             action="store_true",
             help="Reload workers if file is changed. "
             "`reload` extra is required for this option.",
+        )
+        parser.add_argument(
+            "--reload-dir",
+            action="append",
+            dest="reload_dirs",
+            default=[],
+            help=(
+                "Specify a directory to watch for changes. Can be specified "
+                "multiple times. Defaults to the current working directory."
+            ),
         )
         parser.add_argument(
             "--do-not-use-gitignore",
