@@ -74,7 +74,7 @@ After the preparations are done, we need to modify the broker's file in your pro
 
 @[code python](../examples/testing/main_file.py)
 
-As you can see, we added an `if` statement. If the expression is true, we replace our broker with an imemory broker.
+As you can see, we added an `if` statement. If the expression is true, we replace our broker with an inmemory broker.
 The main point here is to not have an actual connection during testing. It's useful because inmemory broker has
 the same interface as a real broker, but it doesn't send tasks actually.
 
