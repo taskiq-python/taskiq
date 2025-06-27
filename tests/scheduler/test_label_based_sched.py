@@ -20,6 +20,7 @@ from taskiq.scheduler.scheduler import TaskiqScheduler
     [
         pytest.param([{"cron": "* * * * *"}], id="cron"),
         pytest.param([{"time": datetime.now(pytz.UTC)}], id="time"),
+        pytest.param([{"interval": "10"}], id="interval"),
     ],
 )
 async def test_label_discovery(schedule_label: List[Dict[str, Any]]) -> None:
@@ -40,6 +41,7 @@ async def test_label_discovery(schedule_label: List[Dict[str, Any]]) -> None:
             schedule_id=schedules[0].schedule_id,
             cron=schedule_label[0].get("cron"),
             time=schedule_label[0].get("time"),
+            interval=schedule_label[0].get("interval"),
             task_name="test_task",
             labels={"schedule": schedule_label},
             args=[],
