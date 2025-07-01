@@ -161,7 +161,7 @@ async def test_retry_of_custom_exc_types_of_simple_middleware() -> None:
             no_result_on_retry=True,
             default_retry_label=True,
             types_of_exceptions=(KeyError, ValueError),
-        )
+        ),
     )
     runs = 0
 
@@ -171,7 +171,7 @@ async def test_retry_of_custom_exc_types_of_simple_middleware() -> None:
 
         runs += 1
 
-        raise ValueError()
+        raise ValueError(runs)
 
     task = await run_task.kiq()
     resp = await task.wait_result(timeout=1)
@@ -186,7 +186,7 @@ async def test_retry_of_custom_exc_types_of_simple_middleware() -> None:
             no_result_on_retry=True,
             default_retry_label=True,
             types_of_exceptions=(KeyError,),
-        )
+        ),
     )
     runs = 0
 
@@ -196,7 +196,7 @@ async def test_retry_of_custom_exc_types_of_simple_middleware() -> None:
 
         runs += 1
 
-        raise ValueError()
+        raise ValueError(runs)
 
     task = await run_task2.kiq()
     resp = await task.wait_result(timeout=1)
@@ -214,7 +214,7 @@ async def test_retry_of_custom_exc_types_of_smart_middleware() -> None:
             no_result_on_retry=True,
             default_retry_label=True,
             types_of_exceptions=(KeyError, ValueError),
-        )
+        ),
     )
     runs = 0
 
@@ -224,7 +224,7 @@ async def test_retry_of_custom_exc_types_of_smart_middleware() -> None:
 
         runs += 1
 
-        raise ValueError()
+        raise ValueError(runs)
 
     task = await run_task.kiq()
     resp = await task.wait_result(timeout=1)
@@ -239,7 +239,7 @@ async def test_retry_of_custom_exc_types_of_smart_middleware() -> None:
             no_result_on_retry=True,
             default_retry_label=True,
             types_of_exceptions=(KeyError,),
-        )
+        ),
     )
     runs = 0
 
@@ -249,7 +249,7 @@ async def test_retry_of_custom_exc_types_of_smart_middleware() -> None:
 
         runs += 1
 
-        raise ValueError()
+        raise ValueError(runs)
 
     task = await run_task2.kiq()
     resp = await task.wait_result(timeout=1)
