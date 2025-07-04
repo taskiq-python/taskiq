@@ -11,6 +11,7 @@ async def test_proxy_dumps() -> None:
     msg = TaskiqMessage(
         task_id="task-id",
         task_name="task.name",
+        queue="taksiq",
         labels={"label1": 1, "label2": "text"},
         args=[1, "a"],
         kwargs={"p1": "v1"},
@@ -18,6 +19,7 @@ async def test_proxy_dumps() -> None:
     expected = BrokerMessage(
         task_id="task-id",
         task_name="task.name",
+        queue="taskiq",
         message=(
             b'{"task_id": "task-id", "task_name": "task.name", '
             b'"labels": {"label1": 1, "label2": "text"}, '
@@ -41,6 +43,7 @@ async def test_proxy_loads() -> None:
     expected = TaskiqMessage(
         task_id="task-id",
         task_name="task.name",
+        queue="taskiq",
         labels={"label1": 1, "label2": "text"},
         args=[1, "a"],
         kwargs={"p1": "v1"},

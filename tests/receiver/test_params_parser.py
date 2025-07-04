@@ -25,6 +25,7 @@ def test_primitive_args_success() -> None:
         task_name="test",
         labels={},
         labels_types={},
+        queue="taskiq",
         args=["1", "2"],
         kwargs={},
     )
@@ -47,6 +48,7 @@ def test_dataclasses_args_success() -> None:
         task_name="test",
         labels={},
         labels_types={},
+        queue="taskiq",
         args=[{"a": "10", "b": "20"}],
         kwargs={},
     )
@@ -68,6 +70,7 @@ def test_pydantic_args_success() -> None:
         task_name="test",
         labels={},
         labels_types={},
+        queue="taskiq",
         args=[{"a": "10", "b": "20"}],
         kwargs={},
     )
@@ -85,6 +88,7 @@ def test_primitive_args_failure(caplog: pytest.LogCaptureFixture) -> None:
         task_name="test",
         labels={},
         labels_types={},
+        queue="taskiq",
         args=["f3", "2"],
         kwargs={},
     )
@@ -108,6 +112,7 @@ def test_dataclasses_args_failure(caplog: pytest.LogCaptureFixture) -> None:
         task_name="test",
         labels={},
         labels_types={},
+        queue="taskiq",
         args=[{"a": "10", "b": "f3"}],
         kwargs={},
     )
@@ -130,6 +135,7 @@ def test_pyndantic_args_failure(caplog: pytest.LogCaptureFixture) -> None:
         task_name="test",
         labels={},
         labels_types={},
+        queue="taskiq",
         args=[{"a": "10", "b": "f3"}],
         kwargs={},
     )
@@ -149,6 +155,7 @@ def test_kwargs_primitives_success() -> None:
         task_name="test",
         labels={},
         labels_types={},
+        queue="taskiq",
         args=[1],
         kwargs={"b": "2"},
     )
@@ -171,6 +178,7 @@ def test_kwargs_dataclasses_success() -> None:
         task_name="test",
         labels={},
         labels_types={},
+        queue="taskiq",
         args=[],
         kwargs={"a": {"a": "10", "b": "20"}},
     )
@@ -192,6 +200,7 @@ def test_kwargs_pyndantic_success() -> None:
         task_name="test",
         labels={},
         labels_types={},
+        queue="taskiq",
         args=[],
         kwargs={"a": {"a": "10", "b": "20"}},
     )
@@ -209,6 +218,7 @@ def test_kwargs_primitives_failure(caplog: pytest.LogCaptureFixture) -> None:
         task_name="test",
         labels={},
         labels_types={},
+        queue="taskiq",
         args=[],
         kwargs={"a": "1", "b": "f3"},
     )
@@ -232,6 +242,7 @@ def test_kwargs_dataclasses_failure(caplog: pytest.LogCaptureFixture) -> None:
         task_name="test",
         labels={},
         labels_types={},
+        queue="taskiq",
         args=[],
         kwargs={"a": {"a": "10", "b": "f3"}},
     )
@@ -254,6 +265,7 @@ def test_kwargs_pyndantic_failure(caplog: pytest.LogCaptureFixture) -> None:
         task_name="test",
         labels={},
         labels_types={},
+        queue="taskiq",
         args=[],
         kwargs={"a": {"a": "10", "b": "f3"}},
     )

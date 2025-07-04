@@ -55,6 +55,7 @@ async def test_run_task_successful_async() -> None:
             task_id="",
             task_name="",
             labels={},
+            queue="taksiq",
             args=[1],
             kwargs={},
         ),
@@ -77,6 +78,7 @@ async def test_run_task_successful_sync() -> None:
         TaskiqMessage(
             task_id="",
             task_name="",
+            queue="taksiq",
             labels={},
             args=[1],
             kwargs={},
@@ -99,6 +101,7 @@ async def test_run_task_exception() -> None:
         TaskiqMessage(
             task_id="",
             task_name="",
+            queue="taksiq",
             labels={},
             args=[],
             kwargs={},
@@ -120,6 +123,7 @@ async def test_run_timeouts() -> None:
         TaskiqMessage(
             task_id="",
             task_name="",
+            queue="taksiq",
             labels={"timeout": "0.3"},
             args=[],
             kwargs={},
@@ -142,6 +146,7 @@ async def test_run_timeouts_sync() -> None:
         TaskiqMessage(
             task_id="",
             task_name="",
+            queue="taksiq",
             labels={"timeout": "0.3"},
             args=[],
             kwargs={},
@@ -178,6 +183,7 @@ async def test_run_task_exception_middlewares() -> None:
         TaskiqMessage(
             task_id="",
             task_name="",
+            queue="taksiq",
             labels={},
             args=[],
             kwargs={},
@@ -207,6 +213,7 @@ async def test_callback_success() -> None:
         TaskiqMessage(
             task_id="task_id",
             task_name=my_task.task_name,
+            queue="taksiq",
             labels={},
             args=[],
             kwargs={},
@@ -242,6 +249,7 @@ async def test_callback_no_dep_info() -> None:
         TaskiqMessage(
             task_id="task_id",
             task_name=my_task.task_name,
+            queue="taksiq",
             labels={},
             args=[],
             kwargs={},
@@ -275,6 +283,7 @@ async def test_callback_success_ackable() -> None:
         TaskiqMessage(
             task_id="task_id",
             task_name=my_task.task_name,
+            queue="taksiq",
             labels={},
             args=[],
             kwargs={},
@@ -314,6 +323,7 @@ async def test_callback_success_ackable_async() -> None:
         TaskiqMessage(
             task_id="task_id",
             task_name=my_task.task_name,
+            queue="taksiq",
             labels={},
             args=[],
             kwargs={},
@@ -350,6 +360,7 @@ async def test_callback_unknown_task() -> None:
         TaskiqMessage(
             task_id="task_id",
             task_name="unknown",
+            queue="taksiq",
             labels={},
             args=[],
             kwargs={},
@@ -387,6 +398,7 @@ async def test_custom_ctx() -> None:
         TaskiqMessage(
             task_id="",
             task_name=test_func.task_name,
+            queue="taksiq",
             labels={},
             args=[],
             kwargs={},

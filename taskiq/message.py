@@ -16,6 +16,7 @@ class TaskiqMessage(BaseModel):
 
     task_id: str
     task_name: str
+    queue: str
     labels: Dict[str, Any]
     labels_types: Optional[Dict[str, int]] = None
     args: List[Any]
@@ -40,5 +41,6 @@ class BrokerMessage(BaseModel):
 
     task_id: str
     task_name: str
+    queue: str
     message: bytes
     labels: Dict[str, Any]

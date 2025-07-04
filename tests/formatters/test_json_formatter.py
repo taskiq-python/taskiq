@@ -12,6 +12,7 @@ async def test_json_dumps() -> None:
     msg = TaskiqMessage(
         task_id="task-id",
         task_name="task.name",
+        queue="taksiq",
         labels={"label1": 1, "label2": "text"},
         args=[1, "a"],
         kwargs={"p1": "v1"},
@@ -19,6 +20,7 @@ async def test_json_dumps() -> None:
     expected = BrokerMessage(
         task_id="task-id",
         task_name="task.name",
+        queue="taksiq",
         message=(
             b'{"task_id":"task-id","task_name":"task.name",'
             b'"labels":{"label1":1,"label2":"text"},'
@@ -46,6 +48,7 @@ async def test_json_loads() -> None:
         task_id="task-id",
         task_name="task.name",
         labels={"label1": 1, "label2": "text"},
+        queue="taksiq",
         args=[1, "a"],
         kwargs={"p1": "v1"},
     )
