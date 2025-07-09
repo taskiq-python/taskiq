@@ -1,8 +1,9 @@
 import asyncio
+import contextvars
 import random
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, ClassVar, List, Optional
+from typing import Any, ClassVar, Generator, List, Optional
 
 import pytest
 from taskiq_dependencies import Depends
@@ -472,3 +473,64 @@ async def test_error_result() -> None:
     assert resp.return_value is None
     assert not broker._running_tasks
     assert isinstance(resp.error, ValueError)
+
+
+EXPECTED_CTX_VALUE = 42
+
+
+@pytest.fixture()
+def ctxvar() -> Generator[contextvars.ContextVar[int], None, None]:
+    _ctx_variable: contextvars.ContextVar[int] = contextvars.ContextVar(
+        "taskiq_test_ctx_var",
+    )
+    token = _ctx_variable.set(EXPECTED_CTX_VALUE)
+    yield _ctx_variable
+    _ctx_variable.reset(token)
+
+
+@pytest.mark.anyio
+async def test_run_task_successful_sync_preserve_contextvars(
+    ctxvar: contextvars.ContextVar[int],
+) -> None:
+    """Running sync tasks should preserve context vars."""
+
+    def test_func() -> int:
+        return ctxvar.get()
+
+    receiver = get_receiver()
+
+    result = await receiver.run_task(
+        test_func,
+        TaskiqMessage(
+            task_id="",
+            task_name="",
+            labels={},
+            args=[],
+            kwargs={},
+        ),
+    )
+    assert result.return_value == EXPECTED_CTX_VALUE
+
+
+@pytest.mark.anyio
+async def test_run_task_successful_async_preserve_contextvars(
+    ctxvar: contextvars.ContextVar[int],
+) -> None:
+    """Running async tasks should preserve context vars."""
+
+    async def test_func() -> int:
+        return ctxvar.get()
+
+    receiver = get_receiver()
+
+    result = await receiver.run_task(
+        test_func,
+        TaskiqMessage(
+            task_id="",
+            task_name="",
+            labels={},
+            args=[],
+            kwargs={},
+        ),
+    )
+    assert result.return_value == EXPECTED_CTX_VALUE
