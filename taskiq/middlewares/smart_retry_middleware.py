@@ -1,7 +1,7 @@
 import datetime
 import random
 from logging import getLogger
-from typing import Any, Optional, Iterable
+from typing import Any, Iterable, Optional
 
 from taskiq import ScheduleSource
 from taskiq.abc.middleware import TaskiqMiddleware
@@ -142,7 +142,7 @@ class SmartRetryMiddleware(TaskiqMiddleware):
         :param exception: Caught exception.
         """
         if self.types_of_exceptions is not None and not isinstance(
-            exception, tuple(self.types_of_exceptions)
+            exception, tuple(self.types_of_exceptions),
         ):
             return
 

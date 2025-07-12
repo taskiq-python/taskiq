@@ -45,7 +45,7 @@ class SimpleRetryMiddleware(TaskiqMiddleware):
         :param exception: found exception.
         """
         if self.types_of_exceptions is not None and not isinstance(
-            exception, tuple(self.types_of_exceptions)
+            exception, tuple(self.types_of_exceptions),
         ):
             return
 
