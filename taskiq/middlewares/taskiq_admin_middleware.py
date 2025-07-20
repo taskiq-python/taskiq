@@ -1,7 +1,8 @@
 import asyncio
 from datetime import UTC, datetime
 from logging import getLogger
-from typing import Any
+from types import CoroutineType
+from typing import Any, Coroutine, Self, Union
 from urllib.parse import urljoin
 
 import aiohttp
@@ -37,7 +38,7 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
         api_token: str,
         timeout: int = 5,
         taskiq_broker_name: str | None = None,
-    ):
+    ) -> None:
         super().__init__()
         self.url = url
         self.timeout = timeout
@@ -50,22 +51,28 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
     def _now_iso() -> str:
         return datetime.now(UTC).replace(tzinfo=None).isoformat()
 
-    async def startup(self):
-        self._client = aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=self.timeout),
-        )
-
-    async def shutdown(self):
-        if self._pending:
-            await asyncio.gather(*self._pending, return_exceptions=True)
-        if self._client is not None:
-            await self._client.close()
-
-    def _spawn_request(self, endpoint: str, payload: dict[str, Any]) -> None:
-        async def _send() -> None:
-            session = self._client or aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=self.timeout)
+    def _get_session(self: Self) -> aiohttp.ClientSession:
+        """Create and cache session."""
+        if self._client is None or self._client.closed:
+            self._client = aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=self.timeout),
             )
+
+        return self._client
+
+    def _spawn_request(
+        self: Self,
+        endpoint: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """Fire and forget helper.
+
+        start an async POST to the admin API, keep the resulting Task in _pending
+        so it can be awaited/cleaned during graceful shutdown.
+        """
+
+        async def _send() -> None:
+            session = self._get_session()
 
             async with session.post(
                 urljoin(self.url, endpoint),
@@ -80,7 +87,18 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
         self._pending.add(task)
         task.add_done_callback(self._pending.discard)
 
-    async def post_send(self, message):
+    def post_send(
+        self: Self,
+        message: TaskiqMessage,
+    ) -> Union[None, Coroutine[Any, Any, None], "CoroutineType[Any, Any, None]"]:
+        """
+        This hook is executed right after the task is sent.
+
+        This is a client-side hook. It executes right
+        after the messages is kicked in broker.
+
+        :param message: kicked message.
+        """
         self._spawn_request(
             f"/api/tasks/{message.task_id}/queued",
             {
@@ -93,7 +111,23 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
         )
         return super().post_send(message)
 
-    async def pre_execute(self, message: TaskiqMessage):
+    def pre_execute(
+        self,
+        message: TaskiqMessage,
+    ) -> Union[
+        "TaskiqMessage",
+        "Coroutine[Any, Any, TaskiqMessage]",
+        "CoroutineType[Any, Any, TaskiqMessage]",
+    ]:
+        """
+        This hook is called before executing task.
+
+        This is a worker-side hook, which means it
+        executes in the worker process.
+
+        :param message: incoming parsed taskiq message.
+        :return: modified message.
+        """
         self._spawn_request(
             f"/api/tasks/{message.task_id}/started",
             {
@@ -106,7 +140,20 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
         )
         return super().pre_execute(message)
 
-    async def post_execute(self, message: TaskiqMessage, result: TaskiqResult[Any]):
+    def post_execute(
+        self,
+        message: TaskiqMessage,
+        result: TaskiqResult[Any],
+    ) -> Union[None, Coroutine[Any, Any, None], "CoroutineType[Any, Any, None]"]:
+        """
+        This hook executes after task is complete.
+
+        This is a worker-side hook. It's called
+        in worker process.
+
+        :param message: incoming message.
+        :param result: result of execution for current task.
+        """
         self._spawn_request(
             f"/api/tasks/{message.task_id}/executed",
             {
