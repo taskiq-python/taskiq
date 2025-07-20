@@ -1,7 +1,7 @@
 import datetime
 import random
 from logging import getLogger
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
 from taskiq import ScheduleSource
 from taskiq.abc.middleware import TaskiqMiddleware
@@ -35,6 +35,7 @@ class SmartRetryMiddleware(TaskiqMiddleware):
         use_delay_exponent: bool = False,
         max_delay_exponent: float = 60,
         schedule_source: Optional[ScheduleSource] = None,
+        types_of_exceptions: Optional[Iterable[type[BaseException]]] = None,
     ) -> None:
         """
         Initialize retry middleware.
@@ -48,6 +49,7 @@ class SmartRetryMiddleware(TaskiqMiddleware):
         :param max_delay_exponent: Maximum allowed delay when using backoff.
         :param schedule_source: Schedule source to use for scheduling.
             If None, the default broker will be used.
+        :param types_of_exceptions: Types of exceptions to retry from.
         """
         super().__init__()
         self.default_retry_count = default_retry_count
@@ -58,6 +60,7 @@ class SmartRetryMiddleware(TaskiqMiddleware):
         self.use_delay_exponent = use_delay_exponent
         self.max_delay_exponent = max_delay_exponent
         self.schedule_source = schedule_source
+        self.types_of_exceptions = types_of_exceptions
 
         if not isinstance(schedule_source, (ScheduleSource, type(None))):
             raise TypeError(
@@ -138,6 +141,12 @@ class SmartRetryMiddleware(TaskiqMiddleware):
         :param result: Execution result.
         :param exception: Caught exception.
         """
+        if self.types_of_exceptions is not None and not isinstance(
+            exception,
+            tuple(self.types_of_exceptions),
+        ):
+            return
+
         if isinstance(exception, NoResultError):
             return
 

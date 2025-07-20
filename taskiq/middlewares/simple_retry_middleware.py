@@ -1,5 +1,5 @@
 from logging import getLogger
-from typing import Any
+from typing import Any, Iterable, Optional
 
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.exceptions import NoResultError
@@ -18,10 +18,12 @@ class SimpleRetryMiddleware(TaskiqMiddleware):
         default_retry_count: int = 3,
         default_retry_label: bool = False,
         no_result_on_retry: bool = True,
+        types_of_exceptions: Optional[Iterable[type[BaseException]]] = None,
     ) -> None:
         self.default_retry_count = default_retry_count
         self.default_retry_label = default_retry_label
         self.no_result_on_retry = no_result_on_retry
+        self.types_of_exceptions = types_of_exceptions
 
     async def on_error(
         self,
@@ -42,6 +44,12 @@ class SimpleRetryMiddleware(TaskiqMiddleware):
         :param result: execution result.
         :param exception: found exception.
         """
+        if self.types_of_exceptions is not None and not isinstance(
+            exception,
+            tuple(self.types_of_exceptions),
+        ):
+            return
+
         # Valid exception
         if isinstance(exception, NoResultError):
             return
