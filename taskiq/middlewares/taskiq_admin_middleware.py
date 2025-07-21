@@ -2,7 +2,7 @@ import asyncio
 from datetime import UTC, datetime
 from logging import getLogger
 from types import CoroutineType
-from typing import Any, Coroutine, Self, Union
+from typing import Any, Coroutine, Union
 from urllib.parse import urljoin
 
 import aiohttp
@@ -51,7 +51,7 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
     def _now_iso() -> str:
         return datetime.now(UTC).replace(tzinfo=None).isoformat()
 
-    def _get_session(self: Self) -> aiohttp.ClientSession:
+    def _get_client(self) -> aiohttp.ClientSession:
         """Create and cache session."""
         if self._client is None or self._client.closed:
             self._client = aiohttp.ClientSession(
@@ -60,8 +60,26 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
 
         return self._client
 
-    def _spawn_request(
-        self: Self,
+    async def startup(self) -> None:
+        """
+        Startup method to initialize aiohttp.ClientSession.
+
+        :returns nothing.
+        """
+        self._client = self._get_client()
+
+    async def shutdown(self) -> None:
+        """Shutdown method to run all pending requests and close the session.
+
+        :returns nothing.
+        """
+        if self._pending:
+            await asyncio.gather(*self._pending, return_exceptions=True)
+        if self._client is not None:
+            await self._client.close()
+
+    async def _spawn_request(
+        self,
         endpoint: str,
         payload: dict[str, Any],
     ) -> None:
@@ -72,9 +90,9 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
         """
 
         async def _send() -> None:
-            session = self._get_session()
+            client = self._get_client()
 
-            async with session.post(
+            async with client.post(
                 urljoin(self.url, endpoint),
                 headers={"access-token": self.api_token},
                 json=payload,
@@ -87,8 +105,8 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
         self._pending.add(task)
         task.add_done_callback(self._pending.discard)
 
-    def post_send(
-        self: Self,
+    async def post_send(
+        self,
         message: TaskiqMessage,
     ) -> Union[None, Coroutine[Any, Any, None], "CoroutineType[Any, Any, None]"]:
         """
@@ -99,7 +117,7 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
 
         :param message: kicked message.
         """
-        self._spawn_request(
+        await self._spawn_request(
             f"/api/tasks/{message.task_id}/queued",
             {
                 "args": message.args,
@@ -111,7 +129,7 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
         )
         return super().post_send(message)
 
-    def pre_execute(
+    async def pre_execute(
         self,
         message: TaskiqMessage,
     ) -> Union[
@@ -128,7 +146,7 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
         :param message: incoming parsed taskiq message.
         :return: modified message.
         """
-        self._spawn_request(
+        await self._spawn_request(
             f"/api/tasks/{message.task_id}/started",
             {
                 "args": message.args,
@@ -140,7 +158,7 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
         )
         return super().pre_execute(message)
 
-    def post_execute(
+    async def post_execute(
         self,
         message: TaskiqMessage,
         result: TaskiqResult[Any],
@@ -154,7 +172,7 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
         :param message: incoming message.
         :param result: result of execution for current task.
         """
-        self._spawn_request(
+        await self._spawn_request(
             f"/api/tasks/{message.task_id}/executed",
             {
                 "finishedAt": self._now_iso(),
