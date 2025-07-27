@@ -49,6 +49,8 @@ pytz = "*"
 orjson = { version = "^3", optional = true }
 msgpack = { version = "^1.0.7", optional = true }
 cbor2 = { version = "^5", optional = true }
+# For health checks
+aiohttp = { version = "^3.8", optional = true }
 izulu = "0.50.0"
 
 [tool.poetry.group.dev.dependencies]
@@ -77,6 +79,7 @@ reload = ["watchdog", "gitignore-parser"]
 orjson = ["orjson"]
 msgpack = ["msgpack"]
 cbor = ["cbor2"]
+health = ["aiohttp"]
 
 [tool.poetry.scripts]
 taskiq = "taskiq.__main__:main"
