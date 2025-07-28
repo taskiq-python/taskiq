@@ -26,6 +26,7 @@ class WorkerArgs:
 
     broker: str
     modules: List[str]
+    app_dir: Optional[str] = None
     tasks_pattern: Sequence[str] = ("**/tasks.py",)
     fs_discover: bool = False
     configure_logging: bool = True
@@ -71,6 +72,16 @@ class WorkerArgs:
                 "Where to search for broker or broker factory function. "
                 "This string must be specified in "
                 "'module.module:variable' format."
+            ),
+        )
+        parser.add_argument(
+            "--app-dir",
+            "-d",
+            default=None,
+            help=(
+                "Path to application directory. "
+                "This path will be used to import tasks modules. "
+                "If not specified, current working directory will be used."
             ),
         )
         parser.add_argument(
