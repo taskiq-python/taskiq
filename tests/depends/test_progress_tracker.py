@@ -51,7 +51,7 @@ def get_message(
         task_id=task_id or task.broker.id_generator(),
         task_name=task.task_name,
         labels=labels,
-        queue="taksiq",
+        queue="taskiq",
         args=list(args),
         kwargs=kwargs,
     )

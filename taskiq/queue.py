@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 
-DEFAULT_QUEUE = "taksiq"
+DEFAULT_QUEUE = "taskiq"
 
 
 @dataclasses.dataclass(frozen=True, init=False, eq=True)

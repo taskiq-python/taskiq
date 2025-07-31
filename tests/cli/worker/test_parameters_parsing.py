@@ -25,7 +25,7 @@ def test_parse_params_no_signature() -> None:
         task_id="",
         task_name="",
         labels={},
-        queue="taksiq",
+        queue="taskiq",
         args=[1, 2],
         kwargs={"a": 1},
     )
@@ -50,7 +50,7 @@ def test_parse_params_classes(test_class: Type[Any]) -> None:
         task_id="",
         task_name="",
         labels={},
-        queue="taksiq",
+        queue="taskiq",
         args=[{"field": "test_val"}],
         kwargs={},
     )
@@ -68,7 +68,7 @@ def test_parse_params_classes(test_class: Type[Any]) -> None:
         task_id="",
         task_name="",
         labels={},
-        queue="taksiq",
+        queue="taskiq",
         args=[],
         kwargs={"param": {"field": "test_val"}},
     )
@@ -94,7 +94,7 @@ def test_parse_params_wrong_data(test_class: Type[Any]) -> None:
         task_id="",
         task_name="",
         labels={},
-        queue="taksiq",
+        queue="taskiq",
         args=[{"unknown": "unknown"}],
         kwargs={},
     )
@@ -111,7 +111,7 @@ def test_parse_params_wrong_data(test_class: Type[Any]) -> None:
         task_id="",
         task_name="",
         labels={},
-        queue="taksiq",
+        queue="taskiq",
         args=[],
         kwargs={"param": {"unknown": "unknown"}},
     )
@@ -135,7 +135,7 @@ def test_parse_params_nones(test_class: Type[Any]) -> None:
     msg_with_args = TaskiqMessage(
         task_id="",
         task_name="",
-        queue="taksiq",
+        queue="taskiq",
         labels={},
         args=[None],
         kwargs={},
@@ -148,7 +148,7 @@ def test_parse_params_nones(test_class: Type[Any]) -> None:
     msg_with_kwargs = TaskiqMessage(
         task_id="",
         task_name="",
-        queue="taksiq",
+        queue="taskiq",
         labels={},
         args=[],
         kwargs={"param": None},
