@@ -64,7 +64,7 @@ def get_receiver_type(args: WorkerArgs) -> Type[Receiver]:
     :raises ValueError: if receiver is not a Receiver type.
     :return: Receiver type.
     """
-    receiver_type = import_object(args.receiver)
+    receiver_type = import_object(args.receiver, app_dir=args.app_dir)
     if not (isinstance(receiver_type, type) and issubclass(receiver_type, Receiver)):
         raise ValueError("Unknown receiver type. Please use Receiver class.")
     return receiver_type
@@ -133,7 +133,7 @@ def start_listen(args: WorkerArgs) -> None:
     # We must set this field before importing tasks,
     # so broker will remember all tasks it's related to.
 
-    broker = import_object(args.broker)
+    broker = import_object(args.broker, app_dir=args.app_dir)
     if inspect.isfunction(broker):
         broker = broker()
     if not isinstance(broker, AsyncBroker):
