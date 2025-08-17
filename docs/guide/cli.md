@@ -164,3 +164,5 @@ Path to scheduler is the only required argument.
 - `--no-configure-logging` - use this parameter if your application configures custom logging.
 - `--log-level` is used to set a log level (default `INFO`).
 - `--skip-first-run` - skip first run of scheduler. This option skips running tasks immediately after scheduler start.
+- `--update-interval` - interval in seconds to check for new tasks from sources (default `60`).
+- `--loop-interval` - interval in seconds to check tasks to send (default `1`).
