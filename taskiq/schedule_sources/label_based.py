@@ -43,7 +43,7 @@ class LabelScheduleSource(ScheduleSource):
                 )
                 continue
             for schedule in task.labels.get("schedule", []):
-                if "cron" not in schedule and "time" not in schedule:
+                if not {"cron", "interval", "time"} & schedule.keys():
                     continue
                 labels = schedule.get("labels", {})
                 labels.update(task.labels)
@@ -58,6 +58,7 @@ class LabelScheduleSource(ScheduleSource):
                     cron=schedule.get("cron"),
                     time=schedule.get("time"),
                     cron_offset=schedule.get("cron_offset"),
+                    interval=schedule.get("interval"),
                 )
 
         return await super().startup()

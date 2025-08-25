@@ -37,7 +37,8 @@ class TaskiqScheduler:
         """
         This method is called when task is ready to be enqueued.
 
-        It's triggered on proper time depending on `task.cron` or `task.time` attribute.
+        It's triggered on proper time depending on `task.cron`, `task.interval`
+        or `task.time` attribute.
         :param source: source that triggered this event.
         :param task: task to send
         """

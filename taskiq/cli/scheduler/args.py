@@ -18,6 +18,7 @@ class SchedulerArgs:
     tasks_pattern: Sequence[str] = ("**/tasks.py",)
     skip_first_run: bool = False
     update_interval: Optional[int] = None
+    loop_interval: Optional[int] = None
 
     @classmethod
     def from_cli(cls, args: Optional[Sequence[str]] = None) -> "SchedulerArgs":
@@ -88,6 +89,15 @@ class SchedulerArgs:
             help=(
                 "Interval in seconds to check for new tasks. "
                 "If not specified, scheduler will run once a minute."
+            ),
+        )
+        parser.add_argument(
+            "--loop-interval",
+            type=int,
+            default=None,
+            help=(
+                "Interval in seconds to check tasks to send. "
+                "If not specified, scheduler will run once a second."
             ),
         )
 
