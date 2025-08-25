@@ -82,7 +82,8 @@ await my_task.kicker().with_broker(broker).kiq()
 
 ## Custom brokers
 
-These brokers are not parts of the core taskiq lib. You can install them as a separate packages.
+These brokers are not parts of the core Taskiq lib. But they are maintained by Taskiq developers.
+You can install them as a separate packages.
 
 You can read more about parameters and abilities of these brokers in README.md of each repo.
 
@@ -109,4 +110,34 @@ Project link: [taskiq-nats](https://github.com/taskiq-python/taskiq-nats).
 
 ```bash
 pip install taskiq-nats
+```
+
+## Third-party brokers
+
+These brokers are not part of the core Taskiq library. They are maintained by other open‑source contributors. You can install them as a separate packages.
+
+You can read more about parameters and abilities of these brokers in README.md of each repo.
+
+### PostgreSQL broker
+
+Project link: [taskiq-postgresql](https://github.com/z22092/taskiq-postgresql).
+
+```bash
+pip install taskiq-postgresql
+```
+
+### SQS broker
+
+Project link: [taskiq-aio-sqs](https://github.com/vonsteer/taskiq-aio-sqs).
+
+```bash
+pip install taskiq-aio-sqs
+```
+
+### YDB broker
+
+Project link: [taskiq-ydb](https://github.com/danfimov/taskiq-ydb).
+
+```bash
+pip install taskiq-ydb
 ```
