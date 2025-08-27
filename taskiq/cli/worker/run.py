@@ -9,6 +9,14 @@ from multiprocessing import get_start_method, set_start_method
 from sys import platform
 from typing import Any, Optional, Type
 
+try:
+    from taskiq.health.middleware import HeartbeatMiddleware
+
+    health_available = True
+except ImportError:
+    HeartbeatMiddleware = None  # type: ignore[assignment, misc]
+    health_available = False
+
 from taskiq.abc.broker import AsyncBroker
 from taskiq.cli.utils import import_object, import_tasks
 from taskiq.cli.worker.args import WorkerArgs
@@ -70,7 +78,11 @@ def get_receiver_type(args: WorkerArgs) -> Type[Receiver]:
     return receiver_type
 
 
-def start_listen(args: WorkerArgs) -> None:
+def start_listen(  # noqa: PLR0915
+    args: WorkerArgs,
+    worker_id: Optional[int] = None,
+    heartbeat_array: Optional[Any] = None,
+) -> None:
     """
     This function starts actual listening process.
 
@@ -78,9 +90,9 @@ def start_listen(args: WorkerArgs) -> None:
     Since tasks auto registers themselves in a broker,
     we don't need to do anything else other than importing.
 
-
     :param args: CLI arguments.
-    :param event: Event for notification.
+    :param worker_id: Optional worker ID for health check tracking.
+    :param heartbeat_array: Optional heartbeat array for health monitoring.
     :raises ValueError: if broker is not an AsyncBroker instance.
     :raises ValueError: if receiver is not a Receiver type.
     """
@@ -103,7 +115,7 @@ def start_listen(args: WorkerArgs) -> None:
         :param _frame: current execution frame.
         :raises KeyboardInterrupt: if termination hasn't begun.
         """
-        logger.debug(f"Got signal {signum}.")
+        logger.debug("Got signal %d.", signum)
         nonlocal shutdown_event
         nonlocal hardkill_counter
         # Soft kill is a signal to start shutdown.
@@ -144,6 +156,17 @@ def start_listen(args: WorkerArgs) -> None:
 
     broker.is_worker_process = True
     import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
+
+    # Add heartbeat middleware if health checks enabled
+    if (
+        heartbeat_array is not None
+        and worker_id is not None
+        and health_available
+        and args.health_check_enable
+    ):
+        heartbeat_middleware = HeartbeatMiddleware(heartbeat_array, worker_id)
+        broker.add_middlewares(heartbeat_middleware)
+        logger.debug("Added heartbeat middleware for worker %d", worker_id)
 
     receiver_type = get_receiver_type(args)
     receiver_kwargs = dict(args.receiver_arg)
