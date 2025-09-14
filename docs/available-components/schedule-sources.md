@@ -52,7 +52,7 @@ Parameters:
 
 - `cron` - crontab string when to run the task.
 - `cron_offset` - timezone offset for cron values. Explained [here](../guide/scheduling-tasks.md#working-with-timezones)
-- `interval` - Interval to run periodic tasks.
+- `interval` - Interval to run periodic tasks. Must be at least 1 second and cannot have fractional seconds.
 - `time` - specific time when send the task.
 - `args` - args to use, when invoking the task.
 - `kwargs` - key-word arguments to use when invoking the task.

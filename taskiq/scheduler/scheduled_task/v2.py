@@ -25,9 +25,35 @@ class ScheduledTask(BaseModel):
 
         This method validates,
         that either `cron`, `interval` or `time` field is present.
+        For interval tasks, validates that interval is at least 1 second
+        and has no fractional seconds.
 
-        :raises ValueError: if cron, interval and time are none.
+        :raises ValueError: if cron, interval and time are none, or interval is invalid.
         """
         if self.cron is None and self.time is None and self.interval is None:
             raise ValueError("Either cron, interval, or datetime must be present.")
+
+        # Validate interval constraints
+        if self.interval is not None:
+            if isinstance(self.interval, int):
+                if self.interval < 1:
+                    raise ValueError(
+                        f"Interval must be at least 1 second, "
+                        f"got {self.interval} seconds",
+                    )
+            else:
+                # For timedelta, check that it's at least 1 second
+                # and has no fractional seconds
+                total_seconds = self.interval.total_seconds()
+                if total_seconds != int(total_seconds):
+                    raise ValueError(
+                        f"Fractional intervals are not supported, "
+                        f"got {total_seconds} seconds",
+                    )
+                if total_seconds < 1:
+                    raise ValueError(
+                        f"Interval must be at least 1 second, "
+                        f"got {total_seconds} seconds",
+                    )
+
         return self

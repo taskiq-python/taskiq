@@ -132,7 +132,17 @@ def is_interval_task_now(
     now: datetime,
     last_run: Optional[datetime] = None,
 ) -> bool:
-    """Checks whether the interval task should start now."""
+    """
+    Checks whether the interval task should start now.
+
+    Interval tasks must have a minimum interval of 1 second.
+    Fractional intervals (e.g., 0.5 seconds) are not supported.
+
+    :param interval_value: Interval as int (seconds) or timedelta
+    :param now: Current datetime
+    :param last_run: Last run datetime, None for first run
+    :return: True if task should run now
+    """
     if last_run is None:
         return True
 

@@ -23,6 +23,7 @@ from taskiq.cli.scheduler.run import is_interval_task_now
             False,
         ),
         (timedelta(seconds=10), datetime(2023, 1, 1, 0, 0, 0), None, True),
+        (1, datetime(2023, 1, 1, 0, 0, 2), datetime(2023, 1, 1, 0, 0, 0), True),
     ],
 )
 def test_is_interval_task_now(
