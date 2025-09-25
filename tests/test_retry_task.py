@@ -1,5 +1,3 @@
-import random
-
 import pytest
 
 from taskiq import (
@@ -14,7 +12,7 @@ from taskiq.schedule_sources import LabelScheduleSource
 
 @pytest.mark.parametrize(
     "retry_count",
-    [0, random.randint(2, 5)],
+    range(5),
 )
 @pytest.mark.anyio
 async def test_save_task_id_for_retry(retry_count: int) -> None:
