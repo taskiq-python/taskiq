@@ -51,6 +51,7 @@ class TaskiqScheduler:
                 .with_labels(
                     schedule_id=task.schedule_id,
                 )
+                .with_task_id(task_id=task.task_id)
                 .kiq(
                     *task.args,
                     **task.kwargs,
