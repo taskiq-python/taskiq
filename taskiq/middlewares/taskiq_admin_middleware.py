@@ -1,8 +1,7 @@
 import asyncio
 from datetime import UTC, datetime
 from logging import getLogger
-from types import CoroutineType
-from typing import Any, Coroutine, Union
+from typing import Any
 from urllib.parse import urljoin
 
 import aiohttp
@@ -105,10 +104,7 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
         self._pending.add(task)
         task.add_done_callback(self._pending.discard)
 
-    async def post_send(
-        self,
-        message: TaskiqMessage,
-    ) -> Union[None, Coroutine[Any, Any, None], "CoroutineType[Any, Any, None]"]:
+    async def post_send(self, message: TaskiqMessage) -> None:
         """
         This hook is executed right after the task is sent.
 
@@ -127,16 +123,8 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
                 "worker": self.__ta_broker_name,
             },
         )
-        return super().post_send(message)
 
-    async def pre_execute(
-        self,
-        message: TaskiqMessage,
-    ) -> Union[
-        "TaskiqMessage",
-        "Coroutine[Any, Any, TaskiqMessage]",
-        "CoroutineType[Any, Any, TaskiqMessage]",
-    ]:
+    async def pre_execute(self, message: TaskiqMessage) -> TaskiqMessage:
         """
         This hook is called before executing task.
 
@@ -156,13 +144,13 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
                 "worker": self.__ta_broker_name,
             },
         )
-        return super().pre_execute(message)
+        return message
 
     async def post_execute(
         self,
         message: TaskiqMessage,
         result: TaskiqResult[Any],
-    ) -> Union[None, Coroutine[Any, Any, None], "CoroutineType[Any, Any, None]"]:
+    ) -> None:
         """
         This hook executes after task is complete.
 
@@ -181,4 +169,3 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
                 "returnValue": {"return_value": result.return_value},
             },
         )
-        return super().post_execute(message, result)
