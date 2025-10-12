@@ -53,6 +53,12 @@ The scheduler doesn't execute tasks. It only sends them.
 
 You can check list of available schedule sources in the [Available schedule sources](../available-components/schedule-sources.md) section.
 
+::: tip Cool tip!
+
+To use cron functionality, you must include **LabelScheduleSource** even if you use a different source (for example, **ListRedisScheduleSource**).
+
+:::
+
 ## Multiple sources
 
 Sometimes you may want to use multiple sources to assemble a schedule for tasks. The `TaskiqScheduler` can do so.
