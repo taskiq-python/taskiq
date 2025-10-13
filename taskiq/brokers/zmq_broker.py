@@ -61,6 +61,16 @@ class ZeroMQBroker(AsyncBroker):
             self.socket.bind(self.pub_host)
         await super().startup()
 
+    async def shutdown(self) -> None:
+        """
+        Shutdown for zmq broker.
+
+        This function closes actual connections to sockets
+        """
+        if not self.is_worker_process:
+            self.socket.unbind(self.pub_host)
+        return await super().shutdown()
+
     async def kick(self, message: BrokerMessage) -> None:
         """
         Kicking message.
@@ -77,8 +87,7 @@ class ZeroMQBroker(AsyncBroker):
             ]
             for idx in range(math.ceil(len(message.message) / part_len))
         ]
-        with self.socket.connect(self.pub_host) as sock:
-            await sock.send_multipart(parts)
+        await self.socket.send_multipart(parts)
 
     async def listen(self) -> AsyncGenerator[bytes, None]:
         """
