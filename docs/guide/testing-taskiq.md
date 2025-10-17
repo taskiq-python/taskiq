@@ -161,10 +161,7 @@ In such a way you don't need to manually call the `wait_result` in your code.
 To set it up, define the broker as the following:
 
 ```python
-...
-    broker = InMemoryBroker(await_inplace=True)
-...
-
+broker = InMemoryBroker(await_inplace=True)
 ```
 
 With this setup all `await function.kiq()` calls will behave similarly to `await function()`, but
