@@ -87,7 +87,7 @@ def get_task_delay(task: ScheduledTask) -> Optional[int]:
         # If it's timedelta, we simply add the delta to current time.
         if task.cron_offset and isinstance(task.cron_offset, timedelta):
             now += task.cron_offset
-        # If timezone was specified as string we convert it timzone
+        # If timezone was specified as string we convert it timezone
         # offset and then apply.
         elif task.cron_offset and isinstance(task.cron_offset, str):
             now = now.astimezone(pytz.timezone(task.cron_offset))
