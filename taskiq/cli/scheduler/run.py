@@ -249,7 +249,7 @@ async def run_scheduler(args: SchedulerArgs) -> None:
     getLogger("taskiq").setLevel(level=args.log_level)
 
     if isinstance(args.scheduler, str):
-        scheduler = import_object(args.scheduler)
+        scheduler = import_object(args.scheduler, app_dir=args.app_dir)
         if inspect.isfunction(scheduler):
             scheduler = scheduler()
     else:
