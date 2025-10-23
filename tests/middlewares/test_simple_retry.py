@@ -25,6 +25,7 @@ async def test_successful_retry(broker: AsyncMock) -> None:
         TaskiqMessage(
             task_id="test_id",
             task_name="meme",
+            queue="taskiq",
             labels={
                 "retry_on_error": "True",
             },
@@ -47,6 +48,7 @@ async def test_no_retry(broker: AsyncMock) -> None:
         TaskiqMessage(
             task_id="test_id",
             task_name="meme",
+            queue="taskiq",
             labels={},
             args=[],
             kwargs={},
@@ -65,6 +67,7 @@ async def test_max_retries(broker: AsyncMock) -> None:
         TaskiqMessage(
             task_id="test_id",
             task_name="meme",
+            queue="taskiq",
             labels={
                 "retry_on_error": "True",
                 "_retries": "2",
