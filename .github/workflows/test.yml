@@ -2,7 +2,18 @@ name: Testing taskiq
 
 on:
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
   push:
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
 
 jobs:
   lint:
@@ -14,11 +25,13 @@ jobs:
           - mypy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Install poetry
         run: pipx install poetry
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: "poetry"
@@ -34,11 +47,13 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: "${{ matrix.os }}"
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Install poetry
         run: pipx install poetry
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: "${{ matrix.py_version }}"
           cache: "poetry"
