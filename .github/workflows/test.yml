@@ -7,6 +7,11 @@ on:
       - '*.md'
   push:
 
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
 jobs:
   lint:
     strategy:
@@ -18,6 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Install poetry
         run: pipx install poetry
       - name: Set up Python
@@ -38,6 +45,8 @@ jobs:
     runs-on: "${{ matrix.os }}"
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Install poetry
         run: pipx install poetry
       - name: Set up Python
