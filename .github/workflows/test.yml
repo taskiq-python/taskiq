@@ -2,6 +2,9 @@ name: Testing taskiq
 
 on:
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
   push:
 
 jobs:
