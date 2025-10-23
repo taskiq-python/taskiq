@@ -318,9 +318,10 @@ class AsyncBroker(ABC):
                     fmodule = func.__module__
                     if fmodule == "__main__":  # pragma: no cover
                         fmodule = ".".join(
-                            remove_suffix(sys.argv[0], ".py").split(
-                                os.path.sep,
-                            ),
+                            remove_suffix(
+                                os.path.normpath(sys.argv[0]),
+                                ".py",
+                            ).split(os.path.sep),
                         )
                     fname = func.__name__
                     if fname == "<lambda>":

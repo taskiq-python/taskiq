@@ -88,7 +88,7 @@ def start_listen(args: WorkerArgs) -> None:
     hardkill_counter = 0
     if args.configure_logging and get_start_method() == "spawn":
         logging.basicConfig(
-            level=logging.getLevelName(args.log_level),
+            level=args.log_level,
             format=args.log_format,
         )
 
@@ -190,10 +190,10 @@ def run_worker(args: WorkerArgs) -> Optional[int]:
         set_start_method("spawn")
     if args.configure_logging:
         logging.basicConfig(
-            level=logging.getLevelName(args.log_level),
+            level=args.log_level,
             format=args.log_format,
         )
-    logging.getLogger("taskiq").setLevel(level=logging.getLevelName(args.log_level))
+    logging.getLogger("taskiq").setLevel(level=args.log_level)
     logging.getLogger("watchdog.observers.inotify_buffer").setLevel(level=logging.INFO)
     logger.info("Pid of a main process: %s", str(os.getpid()))
     logger.info("Starting %s worker processes.", args.workers)

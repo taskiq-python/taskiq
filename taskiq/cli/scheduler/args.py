@@ -13,7 +13,7 @@ class SchedulerArgs:
     scheduler: Union[str, TaskiqScheduler]
     modules: List[str]
     app_dir: Optional[str] = None
-    log_level: str = LogLevel.INFO.name
+    log_level: LogLevel = LogLevel.INFO
     configure_logging: bool = True
     fs_discover: bool = False
     tasks_pattern: Sequence[str] = ("**/tasks.py",)
@@ -107,4 +107,6 @@ class SchedulerArgs:
         # This is an argparse limitation.
         if len(namespace.tasks_pattern) > 1:
             namespace.tasks_pattern.pop(0)
+        # Convert log_level string to LogLevel enum
+        namespace.log_level = LogLevel[namespace.log_level]
         return cls(**namespace.__dict__)
