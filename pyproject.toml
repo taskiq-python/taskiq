@@ -55,8 +55,8 @@ aiohttp = "^3"
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.1.2"
 ruff = "^0"
-black = { version = "^22.6.0", allow-prereleases = true }
-mypy = "^1"
+black = { version = "^23.7.0", allow-prereleases = true }
+mypy = "^1.12.0"
 pre-commit = "^2.20.0"
 coverage = "^6.4.2"
 pytest-cov = "^3.0.0"
