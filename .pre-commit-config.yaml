@@ -14,6 +14,11 @@ repos:
     hooks:
       - id: add-trailing-comma
 
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.38.1
+    hooks:
+      - id: typos
+
   - repo: local
     hooks:
       - id: black
