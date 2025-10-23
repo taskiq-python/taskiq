@@ -37,12 +37,13 @@ The format of the schedule label is the following:
 @broker.task(
     schedule=[
         {
-            "cron": "* * * * *", # type: str, either cron or time should be specified.
+            "cron": "*/1 * * * *", # type: str, either cron or time should be specified.
             "cron_offset": None # type: str | timedelta | None, can be omitted.
             "time": None  # type: datetime | None, either cron or time should be specified.
             "args": [], # type List[Any] | None, can be omitted.
             "kwargs": {}, # type: Dict[str, Any] | None, can be omitted.
             "labels": {}, # type: Dict[str, Any] | None, can be omitted.
+            "schedule_id": "every_minute",  # type: str | None, can be omitted.
         }
     ]
 )
@@ -58,6 +59,7 @@ Parameters:
 - `args` - args to use, when invoking the task.
 - `kwargs` - key-word arguments to use when invoking the task.
 - `labels` - additional labels to use when invoking the task.
+- `schedule_id` - unique identifier of the schedule. If not specified, a random uuid will be generated.
 
 To enable this source, just add it to the list of sources:
 
