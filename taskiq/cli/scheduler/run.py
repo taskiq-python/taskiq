@@ -2,7 +2,7 @@ import asyncio
 import inspect
 import sys
 from datetime import datetime, timedelta
-from logging import basicConfig, getLevelName, getLogger
+from logging import basicConfig, getLogger
 from typing import Any, Dict, List, Optional, Union
 
 import pycron
@@ -369,17 +369,17 @@ async def run_scheduler(args: SchedulerArgs) -> None:
     """
     if args.configure_logging:
         basicConfig(
-            level=getLevelName(args.log_level),
+            level=args.log_level,
             format=(
                 "[%(asctime)s][%(levelname)-7s]"
                 "[%(module)s:%(funcName)s:%(lineno)d]"
                 " %(message)s"
             ),
         )
-    getLogger("taskiq").setLevel(level=getLevelName(args.log_level))
+    getLogger("taskiq").setLevel(level=args.log_level)
 
     if isinstance(args.scheduler, str):
-        scheduler = import_object(args.scheduler)
+        scheduler = import_object(args.scheduler, app_dir=args.app_dir)
         if inspect.isfunction(scheduler):
             scheduler = scheduler()
     else:

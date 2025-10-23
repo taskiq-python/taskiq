@@ -13,6 +13,7 @@ class ScheduledTask(BaseModel):
     labels: Dict[str, Any]
     args: List[Any]
     kwargs: Dict[str, Any]
+    task_id: Optional[str] = None
     schedule_id: str = Field(default_factory=lambda: uuid.uuid4().hex)
     cron: Optional[str] = None
     cron_offset: Optional[Union[str, timedelta]] = None

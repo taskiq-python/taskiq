@@ -1,9 +1,11 @@
 import asyncio
+import contextvars
+import functools
 import inspect
 from concurrent.futures import Executor
 from logging import getLogger
 from time import time
-from typing import Any, Callable, Dict, List, Optional, Set, Union, get_type_hints
+from typing import Any, Callable, Dict, Optional, Set, Union, get_type_hints
 
 import anyio
 from taskiq_dependencies import DependencyGraph
@@ -21,25 +23,6 @@ from taskiq.utils import maybe_awaitable
 
 logger = getLogger(__name__)
 QUEUE_DONE = b"-1"
-
-
-def _run_sync(
-    target: Callable[..., Any],
-    args: List[Any],
-    kwargs: Dict[str, Any],
-) -> Any:
-    """
-    Runs function synchronously.
-
-    We use this function, because
-    we cannot pass kwargs in loop.run_with_executor().
-
-    :param target: function to execute.
-    :param args: list of function's args.
-    :param kwargs: dict of function's kwargs.
-    :return: result of function's execution.
-    """
-    return target(*args, **kwargs)
 
 
 class Receiver:
@@ -255,13 +238,13 @@ class Receiver:
             else:
                 is_coroutine = False
                 # If this is a synchronous function, we
-                # run it in executor.
+                # run it in executor and preserve the context.
+                ctx = contextvars.copy_context()
+                func = functools.partial(target, *message.args, **kwargs)
                 target_future = loop.run_in_executor(
                     self.executor,
-                    _run_sync,
-                    target,
-                    message.args,
-                    kwargs,
+                    ctx.run,
+                    func,
                 )
             timeout = message.labels.get("timeout")
             if timeout is not None:

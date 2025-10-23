@@ -46,8 +46,11 @@ class LabelScheduleSource(ScheduleSource):
                 if not {"cron", "interval", "time"} & schedule.keys():
                     continue
                 labels = schedule.get("labels", {})
-                labels.update(task.labels)
-                schedule_id = uuid.uuid4().hex
+
+                task_labels = {k: v for k, v in task.labels.items() if k != "schedule"}
+
+                labels.update(task_labels)
+                schedule_id = schedule.get("schedule_id", uuid.uuid4().hex)
 
                 self.schedules[schedule_id] = ScheduledTask(
                     task_name=task_name,

@@ -69,7 +69,10 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         self.labels.update(labels)
         return self
 
-    def with_task_id(self, task_id: str) -> "AsyncKicker[_FuncParams, _ReturnType]":
+    def with_task_id(
+        self,
+        task_id: Optional[str],
+    ) -> "AsyncKicker[_FuncParams, _ReturnType]":
         """
         Set task_id for current execution.
 
@@ -208,6 +211,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
             labels=message.labels,
             args=message.args,
             kwargs=message.kwargs,
+            task_id=self.custom_task_id,
             cron=cron_str,
             cron_offset=cron_offset,
         )
@@ -271,6 +275,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
             labels=message.labels,
             args=message.args,
             kwargs=message.kwargs,
+            task_id=self.custom_task_id,
             time=time,
         )
         await source.add_schedule(scheduled)

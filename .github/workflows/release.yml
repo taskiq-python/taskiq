@@ -9,17 +9,19 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Install poetry
         run: pipx install poetry
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
       - name: Install deps
         run: poetry install
       - name: Set version
-        run: poetry version "${{ github.ref_name }}"
+        run: poetry version "${GITHUB_REF_NAME}"
       - name: Release package
         env:
           POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
