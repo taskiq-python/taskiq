@@ -261,4 +261,6 @@ class WorkerArgs:
         # This is an argparse limitation.
         if len(namespace.tasks_pattern) > 1:
             namespace.tasks_pattern.pop(0)
+        # Convert log_level string to LogLevel enum
+        namespace.log_level = LogLevel[namespace.log_level]
         return WorkerArgs(**namespace.__dict__)
