@@ -185,3 +185,8 @@ allow-magic-value-types = ["int", "str", "float"]
 
 [tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = ["taskiq_dependencies.Depends", "taskiq.TaskiqDepends"]
+
+[tool.typos.files]
+extend-exclude = [
+    "docs/README.md",  # because of identifier in head section
+]
