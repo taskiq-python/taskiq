@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from importlib import import_module
 from logging import getLogger
 from pathlib import Path
-from typing import Any, Generator, List, Sequence, Union, Optional
+from typing import Any, Generator, List, Optional, Sequence, Union
 
 logger = getLogger("taskiq.worker")
 
