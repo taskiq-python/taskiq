@@ -55,7 +55,7 @@ You can check list of available schedule sources in the [Available schedule sour
 
 ::: tip Cool tip!
 
-To use cron functionality, you must include **LabelScheduleSource** even if you use a different source (for example, **ListRedisScheduleSource**).
+To specify schedules (cron or time-based) in the labels of a task definition, you must include **LabelScheduleSource** along with any other sources you use (e.g., **ListRedisScheduleSource**).
 
 :::
 
