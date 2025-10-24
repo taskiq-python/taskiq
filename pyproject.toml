@@ -49,6 +49,8 @@ pytz = "*"
 orjson = { version = "^3", optional = true }
 msgpack = { version = "^1.0.7", optional = true }
 cbor2 = { version = "^5", optional = true }
+aiohttp = "^3"
+# For health checks
 izulu = "0.50.0"
 aiohttp = "^3"
 
@@ -78,6 +80,7 @@ reload = ["watchdog", "gitignore-parser"]
 orjson = ["orjson"]
 msgpack = ["msgpack"]
 cbor = ["cbor2"]
+health = ["aiohttp"]
 
 [tool.poetry.scripts]
 taskiq = "taskiq.__main__:main"
@@ -188,5 +191,5 @@ extend-immutable-calls = ["taskiq_dependencies.Depends", "taskiq.TaskiqDepends"]
 
 [tool.typos.files]
 extend-exclude = [
-    "docs/README.md",  # because of identifier in head section
+    "docs/README.md", # because of identifier in head section
 ]

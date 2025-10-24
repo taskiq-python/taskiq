@@ -54,6 +54,12 @@ class WorkerArgs:
     hardkill_count: int = 3
     use_process_pool: bool = False
 
+    # Health check arguments
+    health_check_enable: bool = False
+    health_check_host: str = "0.0.0.0"
+    health_check_port: int = 8081
+    health_check_timeout: float = 30.0
+
     @classmethod
     def from_cli(
         cls,
@@ -265,6 +271,33 @@ class WorkerArgs:
             dest="max_process_pool_processes",
             default=None,
             help="Maximum number of processes in process pool.",
+        )
+        parser.add_argument(
+            "--health-check-enable",
+            action="store_true",
+            dest="health_check_enable",
+            help="Enable HTTP health check endpoints for Kubernetes probes.",
+        )
+        parser.add_argument(
+            "--health-check-host",
+            type=str,
+            dest="health_check_host",
+            default="0.0.0.0",
+            help="Host for health check HTTP server (use '::' for IPv6).",
+        )
+        parser.add_argument(
+            "--health-check-port",
+            type=int,
+            dest="health_check_port",
+            default=8081,
+            help="Port for health check HTTP server.",
+        )
+        parser.add_argument(
+            "--health-check-timeout",
+            type=float,
+            dest="health_check_timeout",
+            default=30.0,
+            help="Seconds before worker considered unresponsive.",
         )
 
         namespace = parser.parse_args(args)
