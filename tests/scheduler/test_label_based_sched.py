@@ -20,6 +20,14 @@ from taskiq.scheduler.scheduler import TaskiqScheduler
     [
         pytest.param([{"cron": "* * * * *"}], id="cron"),
         pytest.param([{"time": datetime.now(pytz.UTC)}], id="time"),
+        pytest.param(
+            [{"time": datetime.now(pytz.UTC), "labels": {"foo": "bar"}}],
+            id="labels_inside_schedule",
+        ),
+        pytest.param(
+            [{"cron": "*/1 * * * *", "schedule_id": "every_minute"}],
+            id="schedule_with_id",
+        ),
     ],
 )
 async def test_label_discovery(schedule_label: List[Dict[str, Any]]) -> None:
@@ -37,15 +45,19 @@ async def test_label_discovery(schedule_label: List[Dict[str, Any]]) -> None:
     schedules = await source.get_schedules()
     assert schedules == [
         ScheduledTask(
-            schedule_id=schedules[0].schedule_id,
+            schedule_id=schedule_label[0].get("schedule_id", schedules[0].schedule_id),
             cron=schedule_label[0].get("cron"),
             time=schedule_label[0].get("time"),
             task_name="test_task",
-            labels={"schedule": schedule_label},
+            labels=schedule_label[0].get("labels", {}),
             args=[],
             kwargs={},
         ),
     ]
+
+    # check that labels of tasks are not changed after startup and discovery process
+    task_from_broker = next(iter(broker.get_all_tasks().values()))
+    assert task_from_broker.labels == {"schedule": schedule_label}
 
 
 @pytest.mark.anyio

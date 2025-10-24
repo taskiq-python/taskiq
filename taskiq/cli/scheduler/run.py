@@ -2,7 +2,7 @@ import asyncio
 import inspect
 import sys
 from datetime import datetime, timedelta, timezone
-from logging import basicConfig, getLevelName, getLogger
+from logging import basicConfig, getLogger
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import pytz
@@ -87,7 +87,7 @@ def get_task_delay(task: ScheduledTask) -> Optional[int]:
         # If it's timedelta, we simply add the delta to current time.
         if task.cron_offset and isinstance(task.cron_offset, timedelta):
             now += task.cron_offset
-        # If timezone was specified as string we convert it timzone
+        # If timezone was specified as string we convert it timezone
         # offset and then apply.
         elif task.cron_offset and isinstance(task.cron_offset, str):
             now = now.astimezone(pytz.timezone(task.cron_offset))
@@ -239,17 +239,17 @@ async def run_scheduler(args: SchedulerArgs) -> None:
     """
     if args.configure_logging:
         basicConfig(
-            level=getLevelName(args.log_level),
+            level=args.log_level,
             format=(
                 "[%(asctime)s][%(levelname)-7s]"
                 "[%(module)s:%(funcName)s:%(lineno)d]"
                 " %(message)s"
             ),
         )
-    getLogger("taskiq").setLevel(level=getLevelName(args.log_level))
+    getLogger("taskiq").setLevel(level=args.log_level)
 
     if isinstance(args.scheduler, str):
-        scheduler = import_object(args.scheduler)
+        scheduler = import_object(args.scheduler, app_dir=args.app_dir)
         if inspect.isfunction(scheduler):
             scheduler = scheduler()
     else:

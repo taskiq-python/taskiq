@@ -12,7 +12,8 @@ class SchedulerArgs:
 
     scheduler: Union[str, TaskiqScheduler]
     modules: List[str]
-    log_level: str = LogLevel.INFO.name
+    app_dir: Optional[str] = None
+    log_level: LogLevel = LogLevel.INFO
     configure_logging: bool = True
     fs_discover: bool = False
     tasks_pattern: Sequence[str] = ("**/tasks.py",)
@@ -41,6 +42,16 @@ class SchedulerArgs:
             "modules",
             help="List of modules where to look for tasks.",
             nargs=ZERO_OR_MORE,
+        )
+        parser.add_argument(
+            "--app-dir",
+            "-d",
+            default=None,
+            help=(
+                "Path to application directory. "
+                "This path will be used to import tasks modules. "
+                "If not specified, current working directory will be used."
+            ),
         )
         parser.add_argument(
             "--fs-discover",
@@ -96,4 +107,6 @@ class SchedulerArgs:
         # This is an argparse limitation.
         if len(namespace.tasks_pattern) > 1:
             namespace.tasks_pattern.pop(0)
+        # Convert log_level string to LogLevel enum
+        namespace.log_level = LogLevel[namespace.log_level]
         return cls(**namespace.__dict__)

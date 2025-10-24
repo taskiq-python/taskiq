@@ -72,7 +72,7 @@ def get_receiver_type(args: WorkerArgs) -> Type[Receiver]:
     :raises ValueError: if receiver is not a Receiver type.
     :return: Receiver type.
     """
-    receiver_type = import_object(args.receiver)
+    receiver_type = import_object(args.receiver, app_dir=args.app_dir)
     if not (isinstance(receiver_type, type) and issubclass(receiver_type, Receiver)):
         raise ValueError("Unknown receiver type. Please use Receiver class.")
     return receiver_type
@@ -100,7 +100,7 @@ def start_listen(  # noqa: PLR0915
     hardkill_counter = 0
     if args.configure_logging and get_start_method() == "spawn":
         logging.basicConfig(
-            level=logging.getLevelName(args.log_level),
+            level=args.log_level,
             format=args.log_format,
         )
 
@@ -145,7 +145,7 @@ def start_listen(  # noqa: PLR0915
     # We must set this field before importing tasks,
     # so broker will remember all tasks it's related to.
 
-    broker = import_object(args.broker)
+    broker = import_object(args.broker, app_dir=args.app_dir)
     if inspect.isfunction(broker):
         broker = broker()
     if not isinstance(broker, AsyncBroker):
@@ -213,10 +213,10 @@ def run_worker(args: WorkerArgs) -> Optional[int]:
         set_start_method("spawn")
     if args.configure_logging:
         logging.basicConfig(
-            level=logging.getLevelName(args.log_level),
+            level=args.log_level,
             format=args.log_format,
         )
-    logging.getLogger("taskiq").setLevel(level=logging.getLevelName(args.log_level))
+    logging.getLogger("taskiq").setLevel(level=args.log_level)
     logging.getLogger("watchdog.observers.inotify_buffer").setLevel(level=logging.INFO)
     logger.info("Pid of a main process: %s", str(os.getpid()))
     logger.info("Starting %s worker processes.", args.workers)

@@ -130,7 +130,7 @@ class InMemoryBroker(AsyncBroker):
         await_inplace: bool = False,
     ) -> None:
         super().__init__()
-        self.result_backend = InmemoryResultBackend(
+        self.result_backend: InmemoryResultBackend[Any] = InmemoryResultBackend(
             max_stored_results=max_stored_results,
         )
         self.executor = ThreadPoolExecutor(sync_tasks_pool_size)

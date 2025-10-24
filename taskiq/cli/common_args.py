@@ -1,11 +1,13 @@
 import enum
+import logging
 
 
-class LogLevel(str, enum.Enum):
+class LogLevel(enum.IntEnum):
     """Different log levels."""
 
-    INFO = "INFO"
-    WARNING = "WARNING"
-    DEBUG = "DEBUG"
-    ERROR = "ERROR"
-    FATAL = "FATAL"
+    INFO = logging.INFO
+    WARNING = logging.WARNING
+    DEBUG = logging.DEBUG
+    ERROR = logging.ERROR
+    CRITICAL = logging.CRITICAL
+    FATAL = logging.FATAL

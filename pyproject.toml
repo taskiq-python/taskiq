@@ -49,8 +49,8 @@ pytz = "*"
 orjson = { version = "^3", optional = true }
 msgpack = { version = "^1.0.7", optional = true }
 cbor2 = { version = "^5", optional = true }
+aiohttp = "^3"
 # For health checks
-aiohttp = { version = "^3.8", optional = true }
 izulu = "0.50.0"
 
 [tool.poetry.group.dev.dependencies]
@@ -58,7 +58,7 @@ pytest = "^7.1.2"
 ruff = "^0"
 black = { version = "^22.6.0", allow-prereleases = true }
 mypy = "^1"
-pre-commit = "^2.20.0"
+pre-commit = "^4.3.0"
 coverage = "^6.4.2"
 pytest-cov = "^3.0.0"
 mock = "^4.0.3"
@@ -187,3 +187,8 @@ allow-magic-value-types = ["int", "str", "float"]
 
 [tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = ["taskiq_dependencies.Depends", "taskiq.TaskiqDepends"]
+
+[tool.typos.files]
+extend-exclude = [
+    "docs/README.md", # because of identifier in head section
+]

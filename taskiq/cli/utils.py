@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from importlib import import_module
 from logging import getLogger
 from pathlib import Path
-from typing import Any, Generator, List, Sequence, Union
+from typing import Any, Generator, List, Optional, Sequence, Union
 
 logger = getLogger("taskiq.worker")
 
@@ -35,11 +35,12 @@ def add_cwd_in_path() -> Generator[None, None, None]:
                 logger.warning(f"Cannot remove '{cwd}' from sys.path")
 
 
-def import_object(object_spec: str) -> Any:
+def import_object(object_spec: str, app_dir: Optional[str] = None) -> Any:
     """
     It parses python object spec and imports it.
 
     :param object_spec: string in format like `package.module:variable`
+    :param app_dir: directory to add in sys.path for importing.
     :raises ValueError: if spec has unknown format.
     :returns: imported broker.
     """
@@ -47,6 +48,8 @@ def import_object(object_spec: str) -> Any:
     if len(import_spec) != 2:
         raise ValueError("You should provide object path in `module:variable` format.")
     with add_cwd_in_path():
+        if app_dir:
+            sys.path.insert(0, app_dir)
         module = import_module(import_spec[0])
     return getattr(module, import_spec[1])
 
