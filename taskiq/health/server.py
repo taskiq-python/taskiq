@@ -27,6 +27,7 @@ class HealthCheckServer:
         port: int,
         heartbeat_array: WorkerHeartbeatArray,
         timeout: float = 30.0,
+        host: str = "0.0.0.0",
     ) -> None:
         """Initialize health check server.
 
@@ -34,8 +35,10 @@ class HealthCheckServer:
             port: HTTP server port
             heartbeat_array: Shared heartbeat array
             timeout: Seconds before worker considered dead
+            host: HTTP server host (default: "0.0.0.0", use "::" for IPv6)
         """
         self.port = port
+        self.host = host
         self.heartbeat_array = heartbeat_array
         self.timeout = timeout
         self.app: Optional[web.Application] = None
@@ -51,9 +54,9 @@ class HealthCheckServer:
         self.runner = web.AppRunner(self.app)
         await self.runner.setup()
 
-        site = web.TCPSite(self.runner, "0.0.0.0", self.port)  # noqa: S104
+        site = web.TCPSite(self.runner, self.host, self.port)
         await site.start()
-        logger.info("Health check server started on port %d", self.port)
+        logger.info("Health check server started on %s:%d", self.host, self.port)
 
     async def stop(self) -> None:
         """Stop HTTP server."""

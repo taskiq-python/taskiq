@@ -221,6 +221,7 @@ class ProcessManager:
                 port=args.health_check_port,
                 heartbeat_array=self.heartbeat_array,
                 timeout=args.health_check_timeout,
+                host=args.health_check_host,
             )
         elif args.health_check_enable and not health_available:
             logger.warning(

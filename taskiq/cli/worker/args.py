@@ -55,6 +55,7 @@ class WorkerArgs:
 
     # Health check arguments
     health_check_enable: bool = False
+    health_check_host: str = "0.0.0.0"
     health_check_port: int = 8081
     health_check_timeout: float = 30.0
 
@@ -265,6 +266,13 @@ class WorkerArgs:
             action="store_true",
             dest="health_check_enable",
             help="Enable HTTP health check endpoints for Kubernetes probes.",
+        )
+        parser.add_argument(
+            "--health-check-host",
+            type=str,
+            dest="health_check_host",
+            default="0.0.0.0",
+            help="Host for health check HTTP server (use '::' for IPv6).",
         )
         parser.add_argument(
             "--health-check-port",
