@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from typing import Union
 
 import pytest
 
@@ -46,7 +47,7 @@ def test_valid_interval_tasks() -> None:
         timedelta(seconds=-1),
     ],
 )
-def test_invalid_interval_tasks(interval: int | timedelta) -> None:
+def test_invalid_interval_tasks(interval: Union[int, timedelta]) -> None:
     """Test that invalid interval tasks raise ValueError."""
     with pytest.raises(ValueError):
         ScheduledTask(

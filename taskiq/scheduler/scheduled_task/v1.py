@@ -31,12 +31,11 @@ class ScheduledTask(BaseModel):
 
         :raises ValueError: if cron, interval and time are none, or interval is invalid.
         """
-        if not {"cron", "interval", "time"} & values.keys():
+        if all(values.get(key) is None for key in ("cron", "interval", "time")):
             raise ValueError("Either cron, interval, or datetime must be present.")
 
         # Validate interval constraints
-        if "interval" in values and values["interval"] is not None:
-            interval = values["interval"]
+        if (interval := values.get("interval")) is not None:
             if isinstance(interval, int):
                 if interval < 1:
                     raise ValueError(
