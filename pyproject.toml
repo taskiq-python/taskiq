@@ -36,6 +36,10 @@ pycron = "^3.0.0"
 taskiq_dependencies = ">=1.3.1,<2"
 anyio = ">=3"
 packaging = ">=19"
+# For opentelemetry instrumentation
+opentelemetry-api = { version = "^1.38.0", optional = true }
+opentelemetry-instrumentation = { version = "^0.59b0", optional = true}
+opentelemetry-semantic-conventions = { version = "^0.59b0", optional = true}
 # For prometheus metrics
 prometheus_client = { version = "^0", optional = true }
 # For ZMQBroker
@@ -69,10 +73,12 @@ pytest-mock = "^3.11.1"
 tzlocal = "^5.0.1"
 types-tzlocal = "^5.0.1.1"
 types-pytz = "^2023.3.1.1"
+opentelemetry-test-utils = "^0.59b0"
 
 [tool.poetry.extras]
 zmq = ["pyzmq"]
 uv = ["uvloop"]
+opentelemetry = ["opentelemetry-api", "opentelemetry-instrumentation", "opentelemetry-semantic-conventions"]
 metrics = ["prometheus_client"]
 reload = ["watchdog", "gitignore-parser"]
 orjson = ["orjson"]
@@ -85,6 +91,9 @@ taskiq = "taskiq.__main__:main"
 [tool.poetry.plugins.taskiq_cli]
 worker = "taskiq.cli.worker.cmd:WorkerCMD"
 scheduler = "taskiq.cli.scheduler.cmd:SchedulerCMD"
+
+[tool.poetry.plugins.opentelemetry_instrumentor]
+taskiq = "taskiq.instrumentation:TaskiqInstrumentor"
 
 [tool.mypy]
 strict = true
@@ -174,6 +183,7 @@ line-length = 88
     "SLF001", # Private member accessed
     "S311",   # Standard pseudo-random generators are not suitable for security/cryptographic purposes
     "D101",   # Missing docstring in public class
+    "D102",   # Missing docstring in public method
 ]
 
 [tool.ruff.lint.pydocstyle]
