@@ -1,7 +1,7 @@
 import asyncio
 from datetime import datetime, timezone
 from logging import getLogger
-from typing import Any
+from typing import Any, Optional
 from urllib.parse import urljoin
 
 import aiohttp
@@ -36,7 +36,7 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
         url: str,
         api_token: str,
         timeout: int = 5,
-        taskiq_broker_name: str | None = None,
+        taskiq_broker_name: Optional[str] = None,
     ) -> None:
         super().__init__()
         self.url = url
