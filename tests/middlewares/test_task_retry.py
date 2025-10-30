@@ -6,7 +6,6 @@ from taskiq import InMemoryBroker, SimpleRetryMiddleware, SmartRetryMiddleware
 from taskiq.exceptions import NoResultError
 
 
-@pytest.mark.anyio
 async def test_wait_result() -> None:
     """Tests wait_result."""
     broker = InMemoryBroker().with_middlewares(
@@ -31,7 +30,6 @@ async def test_wait_result() -> None:
     assert resp.return_value == "hello world!"
 
 
-@pytest.mark.anyio
 async def test_wait_result_error() -> None:
     """Tests wait_result."""
     broker = InMemoryBroker().with_middlewares(
@@ -64,7 +62,6 @@ async def test_wait_result_error() -> None:
     assert resp.return_value == "hello world!"
 
 
-@pytest.mark.anyio
 async def test_wait_result_no_result() -> None:
     """Tests wait_result."""
     broker = InMemoryBroker().with_middlewares(
@@ -100,7 +97,6 @@ async def test_wait_result_no_result() -> None:
         await broker.result_backend.get_result(task.task_id)
 
 
-@pytest.mark.anyio
 async def test_max_retries() -> None:
     """Tests wait_result."""
     broker = InMemoryBroker().with_middlewares(
@@ -127,7 +123,6 @@ async def test_max_retries() -> None:
     assert str(resp.error) == str(runs)
 
 
-@pytest.mark.anyio
 async def test_no_retry() -> None:
     broker = InMemoryBroker().with_middlewares(
         SimpleRetryMiddleware(
@@ -153,7 +148,6 @@ async def test_no_retry() -> None:
     assert str(resp.error) == str(runs)
 
 
-@pytest.mark.anyio
 async def test_retry_of_custom_exc_types_of_simple_middleware() -> None:
     # test that the passed error will be handled
     broker = InMemoryBroker().with_middlewares(
@@ -206,7 +200,6 @@ async def test_retry_of_custom_exc_types_of_simple_middleware() -> None:
     assert runs == 1
 
 
-@pytest.mark.anyio
 async def test_retry_of_custom_exc_types_of_smart_middleware() -> None:
     # test that the passed error will be handled
     broker = InMemoryBroker().with_middlewares(

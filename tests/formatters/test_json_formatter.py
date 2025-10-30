@@ -1,12 +1,9 @@
 import json
 
-import pytest
-
 from taskiq.formatters.json_formatter import JSONFormatter
 from taskiq.message import BrokerMessage, TaskiqMessage
 
 
-@pytest.mark.anyio
 async def test_json_dumps() -> None:
     fmt = JSONFormatter()
     msg = TaskiqMessage(
@@ -34,7 +31,6 @@ async def test_json_dumps() -> None:
     assert json.loads(dumped.message) == json.loads(expected.message)
 
 
-@pytest.mark.anyio
 async def test_json_loads() -> None:
     fmt = JSONFormatter()
     msg = (

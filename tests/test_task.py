@@ -50,7 +50,6 @@ class SerializingBackend(AsyncResultBackend[_ReturnType]):
         serializers.JSONSerializer(),
     ],
 )
-@pytest.mark.anyio
 async def test_res_parsing_success(serializer: TaskiqSerializer) -> None:
     class MyResult(BaseModel):
         name: str

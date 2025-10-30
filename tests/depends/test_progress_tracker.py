@@ -56,7 +56,6 @@ def get_message(
     )
 
 
-@pytest.mark.anyio
 @pytest.mark.parametrize(
     "state,meta",
     [
@@ -82,7 +81,6 @@ async def test_progress_tracker_ctx_raw(state: Any, meta: Any) -> None:
     assert progress.state == state
 
 
-@pytest.mark.anyio
 async def test_progress_tracker_ctx_none() -> None:
     broker = InMemoryBroker()
 
@@ -98,7 +96,6 @@ async def test_progress_tracker_ctx_none() -> None:
     assert progress is None
 
 
-@pytest.mark.anyio
 @pytest.mark.parametrize(
     "state,meta",
     [

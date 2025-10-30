@@ -14,7 +14,6 @@ from taskiq.schedule_sources import LabelScheduleSource
     "retry_count",
     range(5),
 )
-@pytest.mark.anyio
 async def test_save_task_id_for_retry(retry_count: int) -> None:
     broker = InMemoryBroker().with_middlewares(
         SmartRetryMiddleware(

@@ -2,15 +2,12 @@ import asyncio
 import contextlib
 from datetime import datetime, timedelta, timezone
 
-import pytest
-
 from taskiq import TaskiqScheduler
 from taskiq.api import run_scheduler_task
 from taskiq.schedule_sources import LabelScheduleSource
 from tests.utils import AsyncQueueBroker
 
 
-@pytest.mark.anyio
 async def test_successful() -> None:
     broker = AsyncQueueBroker()
     scheduler = TaskiqScheduler(broker, sources=[LabelScheduleSource(broker)])
@@ -26,7 +23,6 @@ async def test_successful() -> None:
     scheduler_task.cancel()
 
 
-@pytest.mark.anyio
 async def test_cancelation() -> None:
     broker = AsyncQueueBroker()
     scheduler = TaskiqScheduler(broker, sources=[LabelScheduleSource(broker)])

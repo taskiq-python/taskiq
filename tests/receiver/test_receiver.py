@@ -41,7 +41,6 @@ def get_receiver(
     )
 
 
-@pytest.mark.anyio
 async def test_run_task_successful_async() -> None:
     """Tests that run_task can run async tasks."""
 
@@ -64,7 +63,6 @@ async def test_run_task_successful_async() -> None:
     assert result.return_value == 1
 
 
-@pytest.mark.anyio
 async def test_run_task_successful_sync() -> None:
     """Tests that run_task can run sync tasks."""
 
@@ -86,7 +84,6 @@ async def test_run_task_successful_sync() -> None:
     assert result.return_value == 1
 
 
-@pytest.mark.anyio
 async def test_run_task_exception() -> None:
     """Tests that run_task can run sync tasks."""
 
@@ -109,7 +106,6 @@ async def test_run_task_exception() -> None:
     assert result.is_err
 
 
-@pytest.mark.anyio
 async def test_run_timeouts() -> None:
     async def test_func() -> None:
         await asyncio.sleep(2)
@@ -131,7 +127,6 @@ async def test_run_timeouts() -> None:
     assert result.is_err
 
 
-@pytest.mark.anyio
 async def test_run_timeouts_sync() -> None:
     def test_func() -> None:
         time.sleep(2)
@@ -153,7 +148,6 @@ async def test_run_timeouts_sync() -> None:
     assert result.is_err
 
 
-@pytest.mark.anyio
 async def test_run_task_exception_middlewares() -> None:
     """Tests that run_task can run sync tasks."""
 
@@ -190,7 +184,6 @@ async def test_run_task_exception_middlewares() -> None:
     assert _TestMiddleware.found_exceptions[0].__class__ is ValueError
 
 
-@pytest.mark.anyio
 async def test_callback_success() -> None:
     """Test that callback function works well."""
     broker = InMemoryBroker()
@@ -218,7 +211,6 @@ async def test_callback_success() -> None:
     assert called_times == 1
 
 
-@pytest.mark.anyio
 async def test_callback_no_dep_info() -> None:
     """Test that callback function works well."""
     broker = InMemoryBroker()
@@ -253,7 +245,6 @@ async def test_callback_no_dep_info() -> None:
     assert ret_val == expected
 
 
-@pytest.mark.anyio
 async def test_callback_success_ackable() -> None:
     """Test that acking works."""
     broker = InMemoryBroker()
@@ -292,7 +283,6 @@ async def test_callback_success_ackable() -> None:
     assert acked
 
 
-@pytest.mark.anyio
 async def test_callback_success_ackable_async() -> None:
     """Test that acks work with async functions."""
     broker = InMemoryBroker()
@@ -331,7 +321,6 @@ async def test_callback_success_ackable_async() -> None:
     assert acked
 
 
-@pytest.mark.anyio
 async def test_callback_wrong_format() -> None:
     """Test that wrong format of a message won't throw an error."""
     receiver = get_receiver()
@@ -341,7 +330,6 @@ async def test_callback_wrong_format() -> None:
     )
 
 
-@pytest.mark.anyio
 async def test_callback_unknown_task() -> None:
     """Tests that running an unknown task won't throw an error."""
     broker = InMemoryBroker()
@@ -360,7 +348,6 @@ async def test_callback_unknown_task() -> None:
     await receiver.callback(broker_message.message)
 
 
-@pytest.mark.anyio
 async def test_custom_ctx() -> None:
     """Tests that run_task can run sync tasks."""
 
@@ -400,7 +387,6 @@ async def test_custom_ctx() -> None:
     assert not result.is_err
 
 
-@pytest.mark.anyio
 async def test_callback_semaphore() -> None:
     """Test that callback function semaphore works well."""
     max_async_tasks = 3
@@ -426,7 +412,6 @@ async def test_callback_semaphore() -> None:
     listen_task.cancel()
 
 
-@pytest.mark.anyio
 async def test_no_result_error() -> None:
     broker = InMemoryBroker()
     executed = asyncio.Event()
@@ -444,7 +429,6 @@ async def test_no_result_error() -> None:
     assert not broker._running_tasks
 
 
-@pytest.mark.anyio
 async def test_result() -> None:
     broker = InMemoryBroker()
 
@@ -459,7 +443,6 @@ async def test_result() -> None:
     assert not broker._running_tasks
 
 
-@pytest.mark.anyio
 async def test_error_result() -> None:
     broker = InMemoryBroker()
 

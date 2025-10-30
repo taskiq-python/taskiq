@@ -7,7 +7,6 @@ from taskiq.api import run_receiver_task
 from tests.utils import AsyncQueueBroker
 
 
-@pytest.mark.anyio
 async def test_successful() -> None:
     broker = AsyncQueueBroker()
     kicked = 0
@@ -28,7 +27,6 @@ async def test_successful() -> None:
     assert kicked == desired_kicked
 
 
-@pytest.mark.anyio
 async def test_cancelation() -> None:
     broker = AsyncQueueBroker()
     kicked = 0
