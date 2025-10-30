@@ -44,7 +44,7 @@ class PrometheusMiddleware(TaskiqMiddleware):
         logger.debug("Initializing metrics")
 
         try:
-            from prometheus_client import Counter, Histogram
+            from prometheus_client import Counter, Histogram  # noqa: PLC0415
         except ImportError as exc:
             raise ImportError(
                 "Cannot initialize metrics. Please install 'taskiq[metrics]'.",
@@ -85,7 +85,7 @@ class PrometheusMiddleware(TaskiqMiddleware):
         This function starts prometheus server.
         It starts it only in case if it's a worker process.
         """
-        from prometheus_client import start_http_server
+        from prometheus_client import start_http_server  # noqa: PLC0415
 
         if self.broker.is_worker_process:
             try:
