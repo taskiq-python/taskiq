@@ -1,5 +1,5 @@
 import asyncio
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from logging import getLogger
 from typing import Any
 from urllib.parse import urljoin
@@ -48,7 +48,7 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
 
     @staticmethod
     def _now_iso() -> str:
-        return datetime.now(UTC).replace(tzinfo=None).isoformat()
+        return datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
 
     def _get_client(self) -> aiohttp.ClientSession:
         """Create and cache session."""
