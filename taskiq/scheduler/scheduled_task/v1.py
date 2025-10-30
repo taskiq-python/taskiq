@@ -17,15 +17,43 @@ class ScheduledTask(BaseModel):
     cron: Optional[str] = None
     cron_offset: Optional[Union[str, timedelta]] = None
     time: Optional[datetime] = None
+    interval: Union[int, timedelta, None] = None
 
     @root_validator(pre=False)  # type: ignore
     @classmethod
     def __check(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        This method validates, that either `cron` or `time` field is present.
+        """Validate.
 
-        :raises ValueError: if cron and time are none.
+        This method validates,
+        that either `cron`, `interval` or `time` field is present.
+        For interval tasks, validates that interval is at least 1 second
+        and has no fractional seconds.
+
+        :raises ValueError: if cron, interval and time are none, or interval is invalid.
         """
-        if values.get("cron") is None and values.get("time") is None:
-            raise ValueError("Either cron or datetime must be present.")
+        if all(values.get(key) is None for key in ("cron", "interval", "time")):
+            raise ValueError("Either cron, interval, or datetime must be present.")
+
+        # Validate interval constraints
+        if (interval := values.get("interval")) is not None:
+            if isinstance(interval, int):
+                if interval < 1:
+                    raise ValueError(
+                        f"Interval must be at least 1 second, got {interval} seconds",
+                    )
+            else:
+                # For timedelta, check that it's at least 1 second
+                # and has no fractional seconds
+                total_seconds = interval.total_seconds()
+                if total_seconds != int(total_seconds):
+                    raise ValueError(
+                        f"Fractional intervals are not supported, "
+                        f"got {total_seconds} seconds",
+                    )
+                if total_seconds < 1:
+                    raise ValueError(
+                        f"Interval must be at least 1 second, "
+                        f"got {total_seconds} seconds",
+                    )
+
         return values

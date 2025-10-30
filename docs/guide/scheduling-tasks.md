@@ -124,12 +124,21 @@ Now we can use this source to add new schedules in runtime. Here's an example:
     )
 ```
 
-Or if you want to use cron schedules instead, just use `schedule_by_cron` method.
+You can also use cron or interval scheduling, just use the `schedule_by_cron` or `schedule_by_interval` methods
 
 ```python
     await my_task.schedule_by_cron(
         redis_source,
         "*/5 * * * *",
+        11,
+        arg2="arg2",
+    )
+```
+
+```python
+    await my_task.schedule_by_interval(
+        redis_source,
+        datetime.timedelta(seconds=5),
         11,
         arg2="arg2",
     )
