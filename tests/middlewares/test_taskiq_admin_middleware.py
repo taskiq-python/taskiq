@@ -1,4 +1,5 @@
 import asyncio
+from typing import AsyncGenerator
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -8,7 +9,7 @@ from taskiq.middlewares.taskiq_admin_middleware import TaskiqAdminMiddleware
 
 
 @pytest.fixture
-async def middleware() -> TaskiqAdminMiddleware:
+async def middleware() -> AsyncGenerator[TaskiqAdminMiddleware, None]:
     middleware = TaskiqAdminMiddleware(
         url="http://localhost:8000",
         api_token="test-token",  # noqa: S106
@@ -42,7 +43,6 @@ def _make_mock_response() -> AsyncMock:
 
 
 class TestTaskiqAdminMiddlewarePostSend:
-    @pytest.mark.anyio
     async def test_when_post_send_is_called__then_queued_endpoint_is_called(
         self,
         middleware: TaskiqAdminMiddleware,
@@ -62,7 +62,6 @@ class TestTaskiqAdminMiddlewarePostSend:
             assert mock_post.call_args is not None
             assert "/api/tasks/task-123/queued" in mock_post.call_args[0][0]
 
-    @pytest.mark.anyio
     async def test_when_post_send_is_called__then_payload_includes_task_info(
         self,
         middleware: TaskiqAdminMiddleware,

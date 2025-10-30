@@ -1,10 +1,7 @@
-import pytest
-
 from taskiq.brokers.inmemory_broker import InMemoryBroker
 from taskiq.message import BrokerMessage, TaskiqMessage
 
 
-@pytest.mark.anyio
 async def test_proxy_dumps() -> None:
     # uses json serializer by default
     broker = InMemoryBroker()
@@ -29,7 +26,6 @@ async def test_proxy_dumps() -> None:
     assert broker.formatter.dumps(msg) == expected
 
 
-@pytest.mark.anyio
 async def test_proxy_loads() -> None:
     # uses json serializer by default
     broker = InMemoryBroker()
