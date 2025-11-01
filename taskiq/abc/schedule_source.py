@@ -42,6 +42,29 @@ class ScheduleSource(ABC):
             f"The source {self.__class__.__name__} does not support adding schedules.",
         )
 
+    async def update_schedule(
+        self,
+        schedule: "ScheduledTask",
+    ) -> None:
+        """
+        Update an existing schedule.
+
+        This function is used to update existing schedules.
+        It's a convenient helper for people who want to update schedules
+        for the current source.
+
+        As an example, if your source works with a database,
+        you may want to update existing rows in the table.
+
+        Note that this function may do nothing.
+
+        :param schedule: schedule to update.
+        """
+        raise NotImplementedError(
+            f"The source {self.__class__.__name__} does "
+            "not support updating schedules.",
+        )
+
     async def delete_schedule(self, schedule_id: str) -> None:
         """
         Method to delete schedule by id.
