@@ -1943,33 +1943,6 @@ virtualenv = ">=20.29.1"
 test = ["devpi-process (>=1.0.2)", "pytest (>=8.3.4)", "pytest-mock (>=3.14)"]
 
 [[package]]
-name = "types-pytz"
-version = "2023.4.0.20240130"
-description = "Typing stubs for pytz"
-optional = false
-python-versions = ">=3.8"
-groups = ["dev"]
-files = [
-    {file = "types-pytz-2023.4.0.20240130.tar.gz", hash = "sha256:33676a90bf04b19f92c33eec8581136bea2f35ddd12759e579a624a006fd387a"},
-    {file = "types_pytz-2023.4.0.20240130-py3-none-any.whl", hash = "sha256:6ce76a9f8fd22bd39b01a59c35bfa2db39b60d11a2f77145e97b730de7e64fe0"},
-]
-
-[[package]]
-name = "types-tzlocal"
-version = "5.1.0.1"
-description = "Typing stubs for tzlocal"
-optional = false
-python-versions = ">=3.7"
-groups = ["dev"]
-files = [
-    {file = "types-tzlocal-5.1.0.1.tar.gz", hash = "sha256:b84a115c0c68f0d0fa9af1c57f0645eeef0e539147806faf1f95ac3ac01ce47b"},
-    {file = "types_tzlocal-5.1.0.1-py3-none-any.whl", hash = "sha256:0302e8067c86936de8f7e0aaedc2cfbf240080802c603df0f80312fbd4efb926"},
-]
-
-[package.dependencies]
-types-pytz = "*"
-
-[[package]]
 name = "typing-extensions"
 version = "4.12.2"
 description = "Backported and Experimental Type Hints for Python 3.8+"
@@ -1988,29 +1961,11 @@ description = "Provider of IANA time zone data"
 optional = false
 python-versions = ">=2"
 groups = ["dev"]
-markers = "platform_system == \"Windows\""
+markers = "sys_platform == \"win32\""
 files = [
     {file = "tzdata-2025.2-py2.py3-none-any.whl", hash = "sha256:1a403fada01ff9221ca8044d701868fa132215d84beb92242d9acd2147f667a8"},
     {file = "tzdata-2025.2.tar.gz", hash = "sha256:b60a638fcc0daffadf82fe0f57e53d06bdec2f36c4df66280ae79bce6bd6f2b9"},
 ]
-
-[[package]]
-name = "tzlocal"
-version = "5.3.1"
-description = "tzinfo object for the local timezone"
-optional = false
-python-versions = ">=3.9"
-groups = ["dev"]
-files = [
-    {file = "tzlocal-5.3.1-py3-none-any.whl", hash = "sha256:eb1a66c3ef5847adf7a834f1be0800581b683b5608e74f86ecbcef8ab91bb85d"},
-    {file = "tzlocal-5.3.1.tar.gz", hash = "sha256:cceffc7edecefea1f595541dbd6e990cb1ea3d19bf01b2809f362a03dd7921fd"},
-]
-
-[package.dependencies]
-tzdata = {version = "*", markers = "platform_system == \"Windows\""}
-
-[package.extras]
-devenv = ["check-manifest", "pytest (>=4.3)", "pytest-cov", "pytest-mock (>=3.3)", "zest.releaser"]
 
 [[package]]
 name = "uvloop"
