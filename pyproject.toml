@@ -82,7 +82,6 @@ dev = [
     "pytest-xdist[psutil]>=2.5.0",
     "tox>=4.6.4",
     "freezegun>=1.2.2",
-    "pytest-mock>=3.11.1",
     "tzlocal>=5.0.1",
 ]
 
