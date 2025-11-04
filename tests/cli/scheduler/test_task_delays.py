@@ -22,7 +22,8 @@ def test_should_run_success() -> None:
 
 
 def test_should_run_cron_str_offset() -> None:
-    hour = datetime.datetime.now().hour
+    timezone = ZoneInfo("Europe/Paris")
+    hour = datetime.datetime.now(tz=timezone).hour
     delay = get_task_delay(
         ScheduledTask(
             task_name="",
@@ -30,7 +31,7 @@ def test_should_run_cron_str_offset() -> None:
             args=[],
             kwargs={},
             cron=f"* {hour} * * *",
-            cron_offset=str(ZoneInfo("Europe/Paris")),
+            cron_offset=str(timezone),
         ),
     )
     assert delay is not None and delay >= 0
