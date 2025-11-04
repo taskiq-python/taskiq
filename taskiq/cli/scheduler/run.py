@@ -4,8 +4,8 @@ import sys
 from datetime import datetime, timedelta, timezone
 from logging import basicConfig, getLogger
 from typing import Any, Dict, List, Optional, Set, Tuple
+from zoneinfo import ZoneInfo
 
-import pytz
 from pycron import is_now
 
 from taskiq.abc.schedule_source import ScheduleSource
@@ -29,7 +29,7 @@ def to_tz_aware(time: datetime) -> datetime:
     :return: timezone aware time.
     """
     if time.tzinfo is None:
-        return time.replace(tzinfo=pytz.UTC)
+        return time.replace(tzinfo=timezone.utc)
     return time
 
 
@@ -81,7 +81,7 @@ def get_task_delay(task: ScheduledTask) -> Optional[int]:
     :param task: task to check.
     :return: True if task must be sent.
     """
-    now = datetime.now(tz=pytz.UTC)
+    now = datetime.now(tz=timezone.utc)
     if task.cron is not None:
         # If user specified cron offset we apply it.
         # If it's timedelta, we simply add the delta to current time.
@@ -90,7 +90,7 @@ def get_task_delay(task: ScheduledTask) -> Optional[int]:
         # If timezone was specified as string we convert it timezone
         # offset and then apply.
         elif task.cron_offset and isinstance(task.cron_offset, str):
-            now = now.astimezone(pytz.timezone(task.cron_offset))
+            now = now.astimezone(ZoneInfo(task.cron_offset))
         if is_now(task.cron, now):
             return 0
         return None
@@ -159,9 +159,9 @@ async def run_scheduler_loop(  # noqa: C901
     loop = asyncio.get_event_loop()
     running_schedules: Dict[str, asyncio.Task[Any]] = {}
     ran_cron_jobs: Set[str] = set()
-    current_minute = datetime.now(tz=pytz.UTC).minute
+    current_minute = datetime.now(tz=timezone.utc).minute
     while True:
-        now = datetime.now(tz=pytz.UTC)
+        now = datetime.now(tz=timezone.utc)
         # If minute changed, we need to clear
         # ran_cron_jobs set and update current minute.
         if now.minute != current_minute:
@@ -220,7 +220,7 @@ async def run_scheduler_loop(  # noqa: C901
                         task_future.get_name().removeprefix("schedule_"),
                     ),
                 )
-        delay = next_run - datetime.now(tz=pytz.UTC)
+        delay = next_run - datetime.now(tz=timezone.utc)
         logger.debug(
             "Sleeping for %.2f seconds before getting schedules.",
             delay.total_seconds(),

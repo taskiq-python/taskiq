@@ -1,6 +1,5 @@
 import datetime
 
-import pytz
 from freezegun import freeze_time
 from tzlocal import get_localzone
 
@@ -69,7 +68,7 @@ def test_time_utc_without_zone() -> None:
 
 
 def test_time_utc_with_zone() -> None:
-    time = datetime.datetime.now(tz=pytz.UTC)
+    time = datetime.datetime.now(tz=datetime.timezone.utc)
     delay = get_task_delay(
         ScheduledTask(
             task_name="",
@@ -99,7 +98,9 @@ def test_time_utc_with_local_zone() -> None:
 
 @freeze_time("2023-01-14 12:00:00")
 def test_time_localtime_without_zone() -> None:
-    time = datetime.datetime.now(tz=pytz.FixedOffset(240)).replace(tzinfo=None)
+    time = datetime.datetime.now(
+        tz=datetime.timezone(datetime.timedelta(minutes=240)),
+    ).replace(tzinfo=None)
     time_to_run = time - datetime.timedelta(seconds=1)
 
     delay = get_task_delay(
@@ -112,8 +113,10 @@ def test_time_localtime_without_zone() -> None:
         ),
     )
 
-    expected_delay = time_to_run.replace(tzinfo=pytz.UTC) - datetime.datetime.now(
-        pytz.UTC,
+    expected_delay = time_to_run.replace(
+        tzinfo=datetime.timezone.utc,
+    ) - datetime.datetime.now(
+        datetime.timezone.utc,
     )
 
     assert delay == int(expected_delay.total_seconds())
@@ -121,7 +124,9 @@ def test_time_localtime_without_zone() -> None:
 
 @freeze_time("2023-01-14 12:00:00")
 def test_time_delay() -> None:
-    time = datetime.datetime.now(tz=pytz.UTC) + datetime.timedelta(seconds=15)
+    time = datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(
+        seconds=15,
+    )
     delay = get_task_delay(
         ScheduledTask(
             task_name="",
@@ -136,7 +141,7 @@ def test_time_delay() -> None:
 
 @freeze_time("2023-01-14 12:00:00.05")
 def test_time_delay_with_milliseconds() -> None:
-    time = datetime.datetime.now(tz=pytz.UTC) + datetime.timedelta(
+    time = datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(
         seconds=15,
         milliseconds=150,
     )

@@ -31,7 +31,7 @@ classifiers = [
     "Development Status :: 3 - Alpha",
 ]
 keywords = ["taskiq", "tasks", "distributed", "async"]
-requires-python = "^3.9"
+requires-python = ">=3.9,<4"
 dependencies = [
     "typing-extensions>=3.10.0.0",
     "pydantic>=1.0,<=3.0",
@@ -40,7 +40,6 @@ dependencies = [
     "taskiq_dependencies>=1.3.1,<2",
     "anyio>=4",
     "packaging>=19",
-    "pytz",
     "izulu==0.50.0",
     "aiohttp>=3",
 ]
@@ -79,7 +78,6 @@ dev = [
     "mypy>=1",
     "types-mock>=4.0.15",
     "types-tzlocal>=5.0.1.1",
-    "types-pytz>=2023.3.1.1",
     # test
     "pytest>=7.1.2",
     "pytest-cov>=3.0.0",

@@ -3,7 +3,6 @@ import uuid
 from typing import Any
 
 import pytest
-import pytz
 
 from taskiq.abc.serializer import TaskiqSerializer
 from taskiq.serializers import (
@@ -62,5 +61,5 @@ def test_uuid_serialization(serializer: TaskiqSerializer) -> None:
     ],
 )
 def test_datetime_serialization(serializer: TaskiqSerializer) -> None:
-    now = datetime.datetime.now(tz=pytz.UTC)
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
     assert serializer.loadb(serializer.dumpb(now)) == now
