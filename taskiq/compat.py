@@ -64,7 +64,7 @@ else:
         model_class: Type[Model],
         message: Union[str, bytes, bytearray],
     ) -> Model:
-        return model_class.parse_raw(message)
+        return model_class.parse_raw(message)  # type: ignore[arg-type]
 
     def model_dump_json(instance: Model) -> str:
         return instance.json()

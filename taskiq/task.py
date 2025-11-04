@@ -1,9 +1,7 @@
 import asyncio
 from logging import getLogger
 from time import time
-from typing import TYPE_CHECKING, Any, Generic, Optional, Type
-
-from typing_extensions import TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Optional, Type, TypeVar
 
 from taskiq.compat import parse_obj_as
 from taskiq.exceptions import (

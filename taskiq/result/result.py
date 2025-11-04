@@ -1,13 +1,18 @@
 import json
 import pickle
+import sys
 from functools import partial
 from typing import Any, Callable, Dict, Generic, Optional, TypeVar
 
 from pydantic import Field
-from typing_extensions import Self
 
 from taskiq.compat import IS_PYDANTIC2
 from taskiq.serialization import exception_to_python, prepare_exception
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 _ReturnType = TypeVar("_ReturnType")
 

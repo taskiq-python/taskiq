@@ -2313,4 +2313,4 @@ zmq = ["pyzmq"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9,<4"
-content-hash = "fb7fbaa16cf11a11f9e731e8297260cda7d6977f61470a716961401655375ac1"
+content-hash = "8c14c0d5091c434c50e2e04b3536df554e72d9422dde9fc1c7777a32ae1d372b"
