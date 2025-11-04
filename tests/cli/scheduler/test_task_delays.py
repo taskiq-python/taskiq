@@ -1,7 +1,7 @@
 import datetime
+from zoneinfo import ZoneInfo
 
 from freezegun import freeze_time
-from tzlocal import get_localzone
 
 from taskiq.cli.scheduler.run import get_task_delay
 from taskiq.scheduler.scheduled_task import ScheduledTask
@@ -23,7 +23,6 @@ def test_should_run_success() -> None:
 
 def test_should_run_cron_str_offset() -> None:
     hour = datetime.datetime.now().hour
-    zone = get_localzone()
     delay = get_task_delay(
         ScheduledTask(
             task_name="",
@@ -31,7 +30,7 @@ def test_should_run_cron_str_offset() -> None:
             args=[],
             kwargs={},
             cron=f"* {hour} * * *",
-            cron_offset=str(zone),
+            cron_offset=str(ZoneInfo("Europe/Paris")),
         ),
     )
     assert delay is not None and delay >= 0
@@ -82,7 +81,7 @@ def test_time_utc_with_zone() -> None:
 
 
 def test_time_utc_with_local_zone() -> None:
-    localtz = get_localzone()
+    localtz = ZoneInfo("Europe/Paris")
     time = datetime.datetime.now(tz=localtz)
     delay = get_task_delay(
         ScheduledTask(

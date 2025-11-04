@@ -74,7 +74,6 @@ dev = [
     "black>=22.6.0",
     # type check
     "mypy>=1",
-    "types-tzlocal>=5.0.1.1",
     # test
     "pytest>=7.1.2",
     "pytest-cov>=3.0.0",
@@ -82,7 +81,6 @@ dev = [
     "pytest-xdist[psutil]>=2.5.0",
     "tox>=4.6.4",
     "freezegun>=1.2.2",
-    "tzlocal>=5.0.1",
 ]
 
 [project.urls]
