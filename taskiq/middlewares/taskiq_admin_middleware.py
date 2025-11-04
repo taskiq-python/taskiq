@@ -6,7 +6,9 @@ from urllib.parse import urljoin
 
 import aiohttp
 
-from taskiq import TaskiqMessage, TaskiqMiddleware, TaskiqResult
+from taskiq.abc.middleware import TaskiqMiddleware
+from taskiq.message import TaskiqMessage
+from taskiq.result import TaskiqResult
 
 __all__ = ("TaskiqAdminMiddleware",)
 
@@ -118,6 +120,7 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
             {
                 "args": message.args,
                 "kwargs": message.kwargs,
+                "labels": message.labels,
                 "queuedAt": self._now_iso(),
                 "taskName": message.task_name,
                 "worker": self.__ta_broker_name,
@@ -139,6 +142,7 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
             {
                 "args": message.args,
                 "kwargs": message.kwargs,
+                "labels": message.labels,
                 "startedAt": self._now_iso(),
                 "taskName": message.task_name,
                 "worker": self.__ta_broker_name,
