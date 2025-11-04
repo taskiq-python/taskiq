@@ -1,9 +1,9 @@
 # flake8: noqa
 from functools import lru_cache
+from importlib.metadata import version
 from typing import Any, Dict, Hashable, Optional, Type, TypeVar, Union
 
 import pydantic
-from importlib_metadata import version
 from packaging.version import Version, parse
 
 PYDANTIC_VER = parse(version("pydantic"))

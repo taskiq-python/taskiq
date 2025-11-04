@@ -1,8 +1,7 @@
 import argparse
 import sys
+from importlib.metadata import entry_points
 from typing import Dict
-
-from importlib_metadata import entry_points
 
 from taskiq import __version__
 from taskiq.abc.cmd import TaskiqCMD
