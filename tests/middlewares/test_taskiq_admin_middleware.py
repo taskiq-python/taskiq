@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -26,7 +27,19 @@ def message() -> TaskiqMessage:
     return TaskiqMessage(
         task_id="task-123",
         task_name="test_task",
-        labels={},
+        labels={
+            "schedule": {
+                "cron": "*/1 * * * *",
+                "cron_offset": datetime.timedelta(hours=1),
+                "time": datetime.datetime.now(datetime.timezone.utc),
+                "labels": {
+                    "test_bool": True,
+                    "test_int": 1,
+                    "test_str": "str",
+                    "test_bytes": b"bytes",
+                },
+            },
+        },
         args=[1, 2, 3],
         kwargs={"key": "value"},
     )
@@ -80,8 +93,9 @@ class TestTaskiqAdminMiddlewarePostSend:
             call_args = mock_post.call_args
             assert call_args is not None
             payload = call_args[1]["json"]
-            assert payload["args"] == [1, 2, 3]
-            assert payload["kwargs"] == {"key": "value"}
-            assert payload["taskName"] == "test_task"
+            assert payload["args"] == message.args
+            assert payload["kwargs"] == message.kwargs
+            assert payload["taskName"] == message.task_name
             assert payload["worker"] == "test-broker"
+            assert payload["labels"] == message.labels
             assert "queuedAt" in payload
