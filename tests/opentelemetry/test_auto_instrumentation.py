@@ -1,4 +1,3 @@
-import pytest
 from opentelemetry.test.test_base import TestBase
 from opentelemetry.trace import SpanKind, StatusCode
 
@@ -7,7 +6,6 @@ from taskiq.instrumentation import TaskiqInstrumentor
 
 
 class TestTaskiqAutoInstrumentation(TestBase):
-    @pytest.mark.anyio
     async def test_auto_instrument(self) -> None:
         TaskiqInstrumentor().instrument()
 

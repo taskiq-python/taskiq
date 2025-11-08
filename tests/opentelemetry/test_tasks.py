@@ -2,7 +2,6 @@ import asyncio
 from contextlib import AbstractContextManager
 from typing import Any, Callable, Optional, Tuple
 
-import pytest
 from opentelemetry import baggage, context
 from opentelemetry.instrumentation.utils import unwrap
 from opentelemetry.semconv.trace import SpanAttributes
@@ -26,7 +25,6 @@ class TestTaskiqInstrumentation(TestBase):
         super().tearDown()
         TaskiqInstrumentor().uninstrument_broker(broker)
 
-    @pytest.mark.anyio
     async def test_task(self) -> None:
         TaskiqInstrumentor().instrument_broker(broker)
 
@@ -73,7 +71,6 @@ class TestTaskiqInstrumentation(TestBase):
         self.assertEqual(consumer.parent.span_id, producer.context.span_id)
         self.assertEqual(consumer.context.trace_id, producer.context.trace_id)
 
-    @pytest.mark.anyio
     async def test_task_raises(self) -> None:
         TaskiqInstrumentor().instrument_broker(broker)
 
@@ -132,7 +129,6 @@ class TestTaskiqInstrumentation(TestBase):
         self.assertEqual(consumer.parent.span_id, producer.context.span_id)
         self.assertEqual(consumer.context.trace_id, producer.context.trace_id)
 
-    @pytest.mark.anyio
     async def test_uninstrument(self) -> None:
         TaskiqInstrumentor().instrument_broker(broker)
         TaskiqInstrumentor().uninstrument_broker(broker)
@@ -146,7 +142,6 @@ class TestTaskiqInstrumentation(TestBase):
         spans = self.memory_exporter.get_finished_spans()
         self.assertEqual(len(spans), 0)
 
-    @pytest.mark.anyio
     async def test_baggage(self) -> None:
         TaskiqInstrumentor().instrument_broker(broker)
 
@@ -158,7 +153,6 @@ class TestTaskiqInstrumentation(TestBase):
 
         self.assertEqual(result.return_value, {"key": "value"})
 
-    @pytest.mark.anyio
     async def test_task_not_instrumented_does_not_raise(self) -> None:
         def _retrieve_context_wrapper_none_token(
             wrapped: Callable[
