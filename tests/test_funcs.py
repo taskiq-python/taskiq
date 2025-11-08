@@ -8,7 +8,6 @@ from taskiq.funcs import gather
 from taskiq.task import AsyncTaskiqTask
 
 
-@pytest.mark.anyio
 async def test_gather() -> None:
     """Test successful task gathering."""
     rb_mock = AsyncMock()
@@ -21,7 +20,6 @@ async def test_gather() -> None:
     assert await gather(task1, task2) == (1, 1)  # type: ignore
 
 
-@pytest.mark.anyio
 async def test_gather_timeout() -> None:
     """Tests how gather works if timeout is reached."""
     rb_mock = AsyncMock()
@@ -34,7 +32,6 @@ async def test_gather_timeout() -> None:
         await gather(task1, task2, timeout=0.4)
 
 
-@pytest.mark.anyio
 async def test_gather_result_backend_error() -> None:
     """Test how gather works if result backend doesn't work."""
     rb_mock = AsyncMock()

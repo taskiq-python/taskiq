@@ -8,7 +8,6 @@ from taskiq.events import TaskiqEvents
 from taskiq.state import TaskiqState
 
 
-@pytest.mark.anyio
 async def test_inmemory_success() -> None:
     broker = InMemoryBroker()
     test_val = uuid.uuid4().hex
@@ -23,7 +22,6 @@ async def test_inmemory_success() -> None:
     assert not broker._running_tasks
 
 
-@pytest.mark.anyio
 async def test_cannot_listen() -> None:
     broker = InMemoryBroker()
 
@@ -32,7 +30,6 @@ async def test_cannot_listen() -> None:
             pass
 
 
-@pytest.mark.anyio
 async def test_startup() -> None:
     broker = InMemoryBroker()
     test_value = uuid.uuid4().hex
@@ -51,7 +48,6 @@ async def test_startup() -> None:
     assert broker.state.from_client == test_value
 
 
-@pytest.mark.anyio
 async def test_shutdown() -> None:
     broker = InMemoryBroker()
     test_value = uuid.uuid4().hex
@@ -70,7 +66,6 @@ async def test_shutdown() -> None:
     assert broker.state.from_client == test_value
 
 
-@pytest.mark.anyio
 async def test_execution() -> None:
     broker = InMemoryBroker()
     test_value = uuid.uuid4().hex
@@ -87,7 +82,6 @@ async def test_execution() -> None:
     assert result.return_value == test_value
 
 
-@pytest.mark.anyio
 async def test_inline_awaits() -> None:
     broker = InMemoryBroker(await_inplace=True)
     slept = False
@@ -104,7 +98,6 @@ async def test_inline_awaits() -> None:
     assert not broker._running_tasks
 
 
-@pytest.mark.anyio
 async def test_wait_all() -> None:
     broker = InMemoryBroker()
     slept = False

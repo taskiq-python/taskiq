@@ -1,8 +1,6 @@
 from datetime import datetime
 from typing import List, Union
 
-import pytest
-
 from taskiq import InMemoryBroker, ScheduleSource
 from taskiq.cli.scheduler.run import get_all_schedules
 from taskiq.scheduler.scheduled_task import ScheduledTask
@@ -20,7 +18,6 @@ class DummySource(ScheduleSource):
         return self.schedules
 
 
-@pytest.mark.anyio
 async def test_get_schedules_success() -> None:
     """Tests that schedules are returned correctly."""
     schedules1 = [
@@ -62,7 +59,6 @@ async def test_get_schedules_success() -> None:
     ]
 
 
-@pytest.mark.anyio
 async def test_get_schedules_error() -> None:
     """Tests that if source returned an error, empty list will be returned."""
     source1 = DummySource(

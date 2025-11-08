@@ -14,7 +14,6 @@ from taskiq.scheduler.scheduled_task import ScheduledTask
 from taskiq.scheduler.scheduler import TaskiqScheduler
 
 
-@pytest.mark.anyio
 @pytest.mark.parametrize(
     "schedule_label",
     [
@@ -60,7 +59,6 @@ async def test_label_discovery(schedule_label: List[Dict[str, Any]]) -> None:
     assert task_from_broker.labels == {"schedule": schedule_label}
 
 
-@pytest.mark.anyio
 async def test_label_discovery_no_cron() -> None:
     broker = InMemoryBroker()
 
@@ -77,7 +75,6 @@ async def test_label_discovery_no_cron() -> None:
     assert schedules == []
 
 
-@pytest.mark.anyio
 async def test_task_scheduled_at_time_runs_only_once(mock_sleep: None) -> None:
     event = asyncio.Event()
     broker = InMemoryBroker()

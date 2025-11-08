@@ -1,7 +1,5 @@
 from typing import List
 
-import pytest
-
 from taskiq.abc.schedule_source import ScheduleSource
 from taskiq.brokers.inmemory_broker import InMemoryBroker
 from taskiq.exceptions import ScheduledTaskCancelledError
@@ -22,7 +20,6 @@ class CancellingScheduleSource(ScheduleSource):
         raise ScheduledTaskCancelledError
 
 
-@pytest.mark.anyio
 async def test_scheduled_task_cancelled() -> None:
     broker = InMemoryBroker()
     source = CancellingScheduleSource()

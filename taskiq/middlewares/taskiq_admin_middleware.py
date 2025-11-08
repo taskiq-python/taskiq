@@ -1,12 +1,14 @@
 import asyncio
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from logging import getLogger
-from typing import Any
+from typing import Any, Optional
 from urllib.parse import urljoin
 
 import aiohttp
 
-from taskiq import TaskiqMessage, TaskiqMiddleware, TaskiqResult
+from taskiq.abc.middleware import TaskiqMiddleware
+from taskiq.message import TaskiqMessage
+from taskiq.result import TaskiqResult
 
 __all__ = ("TaskiqAdminMiddleware",)
 
@@ -36,7 +38,7 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
         url: str,
         api_token: str,
         timeout: int = 5,
-        taskiq_broker_name: str | None = None,
+        taskiq_broker_name: Optional[str] = None,
     ) -> None:
         super().__init__()
         self.url = url
@@ -48,7 +50,7 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
 
     @staticmethod
     def _now_iso() -> str:
-        return datetime.now(UTC).replace(tzinfo=None).isoformat()
+        return datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
 
     def _get_client(self) -> aiohttp.ClientSession:
         """Create and cache session."""
@@ -118,6 +120,7 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
             {
                 "args": message.args,
                 "kwargs": message.kwargs,
+                "labels": message.labels,
                 "queuedAt": self._now_iso(),
                 "taskName": message.task_name,
                 "worker": self.__ta_broker_name,
@@ -139,6 +142,7 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
             {
                 "args": message.args,
                 "kwargs": message.kwargs,
+                "labels": message.labels,
                 "startedAt": self._now_iso(),
                 "taskName": message.task_name,
                 "worker": self.__ta_broker_name,
