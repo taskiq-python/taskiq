@@ -37,10 +37,9 @@ API
 ---
 """
 
-from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Collection, Optional
+from typing import Any, Callable, Collection, Optional
 from weakref import WeakSet as _WeakSet
 
 try:
@@ -61,9 +60,6 @@ from wrapt import wrap_function_wrapper
 
 from taskiq import AsyncBroker
 from taskiq.middlewares.opentelemetry_middleware import OpenTelemetryMiddleware
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger("taskiq.opentelemetry")
 
