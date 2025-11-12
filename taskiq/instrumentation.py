@@ -17,15 +17,12 @@ Usage
 
     broker = InMemoryBroker()
 
-    @broker.on_event(TaskiqEvents.WORKER_STARTUP)
-    async def startup(state: TaskiqState) -> None:
-        TaskiqInstrumentor().instrument()
-
     @broker.task
     async def add(x, y):
         return x + y
 
     async def main():
+        TaskiqInstrumentor().instrument()
         await broker.startup()
         await my_task.kiq(1, 2)
         await broker.shutdown()

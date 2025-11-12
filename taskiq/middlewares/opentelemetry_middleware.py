@@ -191,7 +191,7 @@ class OpenTelemetryMiddleware(TaskiqMiddleware):
         ctx = retrieve_context(message, is_publish=True)
 
         if ctx is None:
-            logger.warning("no existing span found for task_id=%s", message.task_id)
+            logger.debug("no existing span found for task_id=%s", message.task_id)
             return
 
         _, activation, _ = ctx
