@@ -222,7 +222,7 @@ class OpenTelemetryMiddleware(TaskiqMiddleware):
         attach_context(message, span, activation, token)
         return message
 
-    def post_execute(  # pylint: disable=R6301
+    def post_save(  # pylint: disable=R6301
         self,
         message: TaskiqMessage,
         result: TaskiqResult[T],
