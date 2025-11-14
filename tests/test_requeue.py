@@ -1,9 +1,6 @@
-import pytest
-
 from taskiq import Context, InMemoryBroker, TaskiqDepends
 
 
-@pytest.mark.anyio
 async def test_requeue() -> None:
     broker = InMemoryBroker()
 
@@ -26,7 +23,6 @@ async def test_requeue() -> None:
     assert runs_count == 2
 
 
-@pytest.mark.anyio
 async def test_requeue_from_dependency() -> None:
     broker = InMemoryBroker()
 

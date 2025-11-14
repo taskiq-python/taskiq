@@ -1,9 +1,14 @@
+import sys
 import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, model_validator
-from typing_extensions import Self
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 
 class ScheduledTask(BaseModel):

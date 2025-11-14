@@ -1,12 +1,12 @@
 import asyncio
 import inspect
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from logging import basicConfig, getLogger
 from typing import Any, Dict, List, Optional, Union
+from zoneinfo import ZoneInfo
 
 import pycron
-import pytz
 from typing_extensions import TypeAlias
 
 from taskiq.abc.schedule_source import ScheduleSource
@@ -33,7 +33,7 @@ def to_tz_aware(time: datetime) -> datetime:
     :return: timezone aware time.
     """
     if time.tzinfo is None:
-        return time.replace(tzinfo=pytz.UTC)
+        return time.replace(tzinfo=timezone.utc)
     return time
 
 
@@ -105,7 +105,7 @@ def is_cron_task_now(
     # If timezone was specified as string we convert it timezone
     # offset and then apply.
     elif offset and isinstance(offset, str):
-        now = now.astimezone(pytz.timezone(offset))
+        now = now.astimezone(ZoneInfo(offset))
 
     try:
         return pycron.is_now(cron_value, now)
@@ -176,7 +176,7 @@ async def send(
 
 
 async def _sleep_until_next_second() -> None:
-    now = datetime.now(tz=pytz.UTC)
+    now = datetime.now(tz=timezone.utc)
     await asyncio.sleep(1 - now.microsecond / 1_000_000)
 
 
@@ -236,7 +236,7 @@ class SchedulerLoop:
             )
 
     def _mark_cron_tasks_as_already_run(self) -> None:
-        current_minute = datetime.now(tz=pytz.UTC).replace(second=0, microsecond=0)
+        current_minute = datetime.now(tz=timezone.utc).replace(second=0, microsecond=0)
         for _, task_list in self.scheduled_tasks.items():
             for task in task_list:
                 if task.cron is not None:
@@ -313,7 +313,7 @@ class SchedulerLoop:
         running_schedules: Dict[str, asyncio.Task[Any]] = {}
 
         self.scheduled_tasks = await get_all_schedules(self.scheduler)
-        self.scheduled_tasks_updated_at = datetime.now(tz=pytz.UTC)
+        self.scheduled_tasks_updated_at = datetime.now(tz=timezone.utc)
 
         if skip_first_run:
             self._mark_cron_tasks_as_already_run()
@@ -321,7 +321,7 @@ class SchedulerLoop:
         await _sleep_until_next_second()
 
         while True:
-            now = datetime.now(tz=pytz.UTC)
+            now = datetime.now(tz=timezone.utc)
             next_run = (now + loop_interval).replace(microsecond=0)
 
             if now - self.scheduled_tasks_updated_at >= update_interval:
@@ -350,7 +350,7 @@ class SchedulerLoop:
                             ),
                         )
 
-            delay = next_run - datetime.now(tz=pytz.UTC)
+            delay = next_run - datetime.now(tz=timezone.utc)
             logger.debug(
                 "Sleeping for %.3f seconds before getting schedules.",
                 delay.total_seconds(),

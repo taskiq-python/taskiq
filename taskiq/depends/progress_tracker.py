@@ -1,8 +1,7 @@
 import enum
-from typing import Generic, Optional, Union
+from typing import Generic, Optional, TypeVar, Union
 
 from taskiq_dependencies import Depends
-from typing_extensions import TypeVar
 
 from taskiq.compat import IS_PYDANTIC2
 from taskiq.context import Context

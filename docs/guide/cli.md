@@ -93,9 +93,17 @@ pip install "taskiq[reload]"
 poetry add taskiq -E reload
 ```
 
+@tab uv
+
+```bash:no-line-numbers
+uv add taskiq[reload]
+```
+
 :::
 
 To enable this option simply pass the `--reload` or `-r` option to worker taskiq CLI.
+
+You can set `--reload-dir` to specify directory to watch for changes. It can be specified multiple times if you need to watch multiple directories.
 
 Also this option supports `.gitignore` files. If you have such file in your directory, it won't reload worker
 when you modify ignored files. To disable this functionality pass `--do-not-use-gitignore` option.
@@ -124,8 +132,11 @@ The number of signals before a hard kill can be configured with the `--hardkill-
 
 ### Other parameters
 
+* `--app-dir` - Path to application directory. This path will be used to import tasks modules. If not specified, current working directory will be used.
+* `--workers` - Number of worker child processes (default: 2).
 * `--no-configure-logging` - disables default logging configuration for workers.
-- `--log-level` is used to set a log level (default `INFO`).
+* `--log-level` is used to set a log level (default `INFO`).
+* `--log-format` is used to set a log format (default `%(asctime)s][%(name)s][%(levelname)-7s][%(processName)s] %(message)s`).
 * `--max-async-tasks` - maximum number of simultaneously running async tasks.
 * `--max-prefetch` - number of tasks to be prefetched before execution. (Useful for systems with high message rates, but brokers should support acknowledgements).
 * `--max-threadpool-threads` - number of threads for sync function execution.
@@ -133,8 +144,9 @@ The number of signals before a hard kill can be configured with the `--hardkill-
 * `--receiver` - python path to custom receiver class.
 * `--receiver_arg` - custom args for receiver.
 * `--ack-type` - Type of acknowledgement. This parameter is used to set when to acknowledge the task. Possible values are `when_received`, `when_executed`, `when_saved`. Default is `when_saved`.
-* `max-tasks-per-child` - maximum number of tasks to be executed by a single worker process before restart.
-* `--shutdown-timeout` - maximum amount of time for graceful broker's shutdown in seconds.
+* `--max-tasks-per-child` - maximum number of tasks to be executed by a single worker process before restart.
+* `--max-fails` - Maximum number of child process exits.
+* `--shutdown-timeout` - maximum amount of time for graceful broker's shutdown in seconds (default 5).
 * `--wait-tasks-timeout` - if cannot read new messages from the broker or maximum number of tasks is reached, worker will wait for all current tasks to finish. This parameter sets the maximum amount of time to wait until shutdown.
 * `--hardkill-count` - Number of termination signals to the main process before performing a hardkill.
 
@@ -150,7 +162,7 @@ taskiq scheduler <path to scheduler> [optional module to import]...
 
 For example
 
-```python
+```bash
 taskiq scheduler my_project.broker:scheduler my_project.module1 my_project.module2
 ```
 
@@ -158,11 +170,11 @@ taskiq scheduler my_project.broker:scheduler my_project.module1 my_project.modul
 
 Path to scheduler is the only required argument.
 
+- `--app-dir` - Path to application directory. This path will be used to import tasks modules. If not specified, current working directory will be used.
 - `--tasks-pattern` or `-tp`.
   It's a glob pattern of files to import. By default it is `**/tasks.py` which searches for all `tasks.py` files. May be specified multiple times.
 - `--fs-discover` or `-fsd`. This option enables search of task files in current directory recursively, using the given pattern.
 - `--no-configure-logging` - use this parameter if your application configures custom logging.
 - `--log-level` is used to set a log level (default `INFO`).
 - `--skip-first-run` - skip first run of scheduler. This option skips running tasks immediately after scheduler start.
-- `--update-interval` - interval in seconds to check for new tasks from sources (default `60`).
-- `--loop-interval` - interval in seconds to check tasks to send (default `1`).
+- `--update-interval` - interval in seconds to check for new tasks. By default scheduler will check for new scheduled tasks every first second of the minute.

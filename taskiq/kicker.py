@@ -1,3 +1,4 @@
+import sys
 from collections.abc import Coroutine
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timedelta
@@ -16,7 +17,6 @@ from typing import (
 )
 
 from pydantic import BaseModel
-from typing_extensions import ParamSpec
 
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.compat import model_dump
@@ -27,6 +27,11 @@ from taskiq.scheduler.created_schedule import CreatedSchedule
 from taskiq.scheduler.scheduled_task import CronSpec, ScheduledTask
 from taskiq.task import AsyncTaskiqTask
 from taskiq.utils import maybe_awaitable
+
+if sys.version_info >= (3, 10):
+    from typing import ParamSpec
+else:
+    from typing_extensions import ParamSpec
 
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.broker import AsyncBroker

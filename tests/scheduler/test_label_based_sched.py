@@ -1,9 +1,8 @@
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 
 import pytest
-import pytz
 from freezegun import freeze_time
 
 from taskiq.brokers.inmemory_broker import InMemoryBroker
@@ -14,14 +13,13 @@ from taskiq.scheduler.scheduled_task import ScheduledTask
 from taskiq.scheduler.scheduler import TaskiqScheduler
 
 
-@pytest.mark.anyio
 @pytest.mark.parametrize(
     "schedule_label",
     [
         pytest.param([{"cron": "* * * * *"}], id="cron"),
-        pytest.param([{"time": datetime.now(pytz.UTC)}], id="time"),
+        pytest.param([{"time": datetime.now(timezone.utc)}], id="time"),
         pytest.param(
-            [{"time": datetime.now(pytz.UTC), "labels": {"foo": "bar"}}],
+            [{"time": datetime.now(timezone.utc), "labels": {"foo": "bar"}}],
             id="labels_inside_schedule",
         ),
         pytest.param(
@@ -60,7 +58,6 @@ async def test_label_discovery(schedule_label: List[Dict[str, Any]]) -> None:
     assert task_from_broker.labels == {"schedule": schedule_label}
 
 
-@pytest.mark.anyio
 async def test_label_discovery_no_cron() -> None:
     broker = InMemoryBroker()
 
@@ -77,7 +74,6 @@ async def test_label_discovery_no_cron() -> None:
     assert schedules == []
 
 
-@pytest.mark.anyio
 async def test_task_scheduled_at_time_runs_only_once(mock_sleep: None) -> None:
     event = asyncio.Event()
     broker = InMemoryBroker()
@@ -95,8 +91,8 @@ async def test_task_scheduled_at_time_runs_only_once(mock_sleep: None) -> None:
         @broker.task(
             task_name="test_task",
             schedule=[
-                {"time": datetime.now(pytz.UTC), "args": [1]},
-                {"time": datetime.now(pytz.UTC) + timedelta(days=1), "args": [2]},
+                {"time": datetime.now(timezone.utc), "args": [1]},
+                {"time": datetime.now(timezone.utc) + timedelta(days=1), "args": [2]},
                 {"cron": "1 * * * *", "args": [3]},
             ],
         )
