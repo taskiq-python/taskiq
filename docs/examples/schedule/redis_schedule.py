@@ -15,4 +15,4 @@ scheduler = TaskiqScheduler(broker, sources=[redis_source])
 @broker.task
 async def my_task(arg1: int, arg2: str) -> None:
     """Example task."""
-    print("Hello from my_task!", arg1, arg2)  # noqa: T201
+    print("Hello from my_task!", arg1, arg2)

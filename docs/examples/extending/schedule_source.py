@@ -1,5 +1,3 @@
-from typing import List
-
 from taskiq import ScheduledTask, ScheduleSource
 
 
@@ -10,7 +8,7 @@ class MyScheduleSource(ScheduleSource):
     async def shutdown(self) -> None:
         """Do something on shutdown."""
 
-    async def get_schedules(self) -> List["ScheduledTask"]:
+    async def get_schedules(self) -> list["ScheduledTask"]:
         # Here you must return list of scheduled tasks from your source.
         return [
             ScheduledTask(

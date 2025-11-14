@@ -1,7 +1,7 @@
 import asyncio
 from logging import getLogger
 from time import time
-from typing import TYPE_CHECKING, Any, Generic, Optional, Type, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from taskiq.compat import parse_obj_as
 from taskiq.exceptions import (
@@ -27,7 +27,7 @@ class AsyncTaskiqTask(Generic[_ReturnType]):
         self,
         task_id: str,
         result_backend: "AsyncResultBackend[_ReturnType]",
-        return_type: Optional[Type[_ReturnType]] = None,
+        return_type: type[_ReturnType] | None = None,
     ) -> None:
         self.task_id = task_id
         self.result_backend = result_backend
@@ -103,7 +103,7 @@ class AsyncTaskiqTask(Generic[_ReturnType]):
                 raise TaskiqResultTimeoutError(timeout=timeout)
         return await self.get_result(with_logs=with_logs)
 
-    async def get_progress(self) -> "Optional[TaskProgress[Any]]":
+    async def get_progress(self) -> "TaskProgress[Any] | None":
         """
         Get task progress.
 

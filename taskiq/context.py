@@ -14,7 +14,7 @@ class Context:
     def __init__(self, message: TaskiqMessage, broker: AsyncBroker) -> None:
         self.message = message
         self.broker = broker
-        self.state: "TaskiqState" = None  # type: ignore
+        self.state: TaskiqState = None  # type: ignore
         self.state = broker.state
 
     async def requeue(self) -> None:

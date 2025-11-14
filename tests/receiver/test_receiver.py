@@ -2,8 +2,9 @@ import asyncio
 import contextvars
 import random
 import time
+from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, ClassVar, Generator, List, Optional
+from typing import Any, ClassVar
 
 import pytest
 from taskiq_dependencies import Depends
@@ -19,9 +20,9 @@ from tests.utils import AsyncQueueBroker
 
 
 def get_receiver(
-    broker: Optional[AsyncBroker] = None,
+    broker: AsyncBroker | None = None,
     no_parse: bool = False,
-    max_async_tasks: Optional[int] = None,
+    max_async_tasks: int | None = None,
 ) -> Receiver:
     """
     Returns receiver with custom broker and args.
@@ -152,7 +153,7 @@ async def test_run_task_exception_middlewares() -> None:
     """Tests that run_task can run sync tasks."""
 
     class _TestMiddleware(TaskiqMiddleware):
-        found_exceptions: ClassVar[List[BaseException]] = []
+        found_exceptions: ClassVar[list[BaseException]] = []
 
         def on_error(
             self,
@@ -471,7 +472,6 @@ def ctxvar() -> Generator[contextvars.ContextVar[int], None, None]:
     _ctx_variable.reset(token)
 
 
-@pytest.mark.anyio
 async def test_run_task_successful_sync_preserve_contextvars(
     ctxvar: contextvars.ContextVar[int],
 ) -> None:
@@ -495,7 +495,6 @@ async def test_run_task_successful_sync_preserve_contextvars(
     assert result.return_value == EXPECTED_CTX_VALUE
 
 
-@pytest.mark.anyio
 async def test_run_task_successful_async_preserve_contextvars(
     ctxvar: contextvars.ContextVar[int],
 ) -> None:

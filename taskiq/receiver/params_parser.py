@@ -1,6 +1,6 @@
 import inspect
 from logging import getLogger
-from typing import Any, Dict, Optional
+from typing import Any
 
 from taskiq.compat import parse_obj_as
 from taskiq.message import TaskiqMessage
@@ -9,8 +9,8 @@ logger = getLogger(__name__)
 
 
 def parse_params(
-    signature: Optional[inspect.Signature],
-    type_hints: Dict[str, Any],
+    signature: inspect.Signature | None,
+    type_hints: dict[str, Any],
     message: TaskiqMessage,
 ) -> None:
     """

@@ -6,11 +6,8 @@ from types import CoroutineType
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
     Generic,
-    Optional,
     ParamSpec,
-    Type,
     TypeVar,
     Union,
     overload,
@@ -46,19 +43,19 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         self,
         task_name: str,
         broker: "AsyncBroker",
-        labels: Dict[str, Any],
-        return_type: Optional[Type[_ReturnType]] = None,
+        labels: dict[str, Any],
+        return_type: type[_ReturnType] | None = None,
     ) -> None:
         self.task_name = task_name
         self.broker = broker
         self.labels = labels
-        self.custom_task_id: Optional[str] = None
-        self.custom_schedule_id: Optional[str] = None
+        self.custom_task_id: str | None = None
+        self.custom_schedule_id: str | None = None
         self.return_type = return_type
 
     def with_labels(
         self,
-        **labels: Union[str, float],
+        **labels: str | float,
     ) -> "AsyncKicker[_FuncParams, _ReturnType]":
         """
         Update function's labels before sending.
@@ -71,7 +68,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
 
     def with_task_id(
         self,
-        task_id: Optional[str],
+        task_id: str | None,
     ) -> "AsyncKicker[_FuncParams, _ReturnType]":
         """
         Set task_id for current execution.
@@ -221,7 +218,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
     async def schedule_by_interval(
         self,
         source: "ScheduleSource",
-        interval: Union[int, timedelta],
+        interval: int | timedelta,
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
     ) -> CreatedSchedule[_ReturnType]:

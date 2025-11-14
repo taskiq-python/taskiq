@@ -1,9 +1,8 @@
 from datetime import timedelta
-from typing import Union
 
 
 def validate_interval_value(
-    value: Union[int, timedelta, None],
+    value: int | timedelta | None,
 ) -> None:
     """Validate that the given interval value meets required constraints.
 

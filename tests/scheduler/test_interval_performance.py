@@ -1,6 +1,5 @@
 import asyncio
 import time
-from typing import List
 
 from taskiq import TaskiqScheduler
 from taskiq.api import run_scheduler_task
@@ -19,7 +18,7 @@ async def test_interval_task_performance() -> None:
     scheduler_task = asyncio.create_task(run_scheduler_task(scheduler))
 
     try:
-        execution_times: List[float] = []
+        execution_times: list[float] = []
 
         # Wait for 5 executions
         for _ in range(5):

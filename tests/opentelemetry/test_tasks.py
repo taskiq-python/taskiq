@@ -1,6 +1,7 @@
 import asyncio
+from collections.abc import Callable
 from contextlib import AbstractContextManager
-from typing import Any, Callable, Optional, Tuple
+from typing import Any
 
 from opentelemetry import baggage, context
 from opentelemetry.instrumentation.utils import unwrap
@@ -157,18 +158,12 @@ class TestTaskiqInstrumentation(TestBase):
         def _retrieve_context_wrapper_none_token(
             wrapped: Callable[
                 [Any],
-                Optional[
-                    Tuple[
-                        Span,
-                        AbstractContextManager[Span],
-                        Optional[object],
-                    ]
-                ],
+                tuple[Span, AbstractContextManager[Span], object | None] | None,
             ],
             instance: Any,
             args: Any,
             kwargs: Any,
-        ) -> Optional[Tuple[Span, AbstractContextManager[Span], None]]:
+        ) -> tuple[Span, AbstractContextManager[Span], None] | None:
             ctx = wrapped(*args, **kwargs)
             if ctx is None:
                 return ctx

@@ -35,7 +35,8 @@ API
 """
 
 import logging
-from typing import Any, Callable, Collection, Optional
+from collections.abc import Callable, Collection
+from typing import Any
 from weakref import WeakSet as _WeakSet
 
 from taskiq.cli.worker.args import WorkerArgs
@@ -79,8 +80,8 @@ class TaskiqInstrumentor(BaseInstrumentor):
     def instrument_broker(
         self,
         broker: AsyncBroker,
-        tracer_provider: Optional[TracerProvider] = None,
-        meter_provider: Optional[MeterProvider] = None,
+        tracer_provider: TracerProvider | None = None,
+        meter_provider: MeterProvider | None = None,
     ) -> None:
         """Instrument broker."""
         if not hasattr(broker, "_is_instrumented_by_opentelemetry"):

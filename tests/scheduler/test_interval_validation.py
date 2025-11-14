@@ -1,5 +1,4 @@
 from datetime import timedelta
-from typing import Union
 
 import pytest
 
@@ -19,7 +18,7 @@ from taskiq.scheduler.scheduled_task.validators import validate_interval_value
         timedelta(seconds=1, microseconds=0),
     ],
 )
-def test_validate_interval_value_success(value: Union[int, timedelta, None]) -> None:
+def test_validate_interval_value_success(value: int | timedelta | None) -> None:
     validate_interval_value(value)
 
 
@@ -35,6 +34,6 @@ def test_validate_interval_value_success(value: Union[int, timedelta, None]) -> 
         timedelta(seconds=1, microseconds=1),
     ],
 )
-def test_validate_interval_value_fail(value: Union[int, timedelta, None]) -> None:
+def test_validate_interval_value_fail(value: int | timedelta | None) -> None:
     with pytest.raises(ValueError):
         validate_interval_value(value)
