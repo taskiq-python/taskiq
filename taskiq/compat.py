@@ -1,9 +1,9 @@
 # flake8: noqa
 from functools import lru_cache
+from importlib.metadata import version
 from typing import Any, Dict, Hashable, Optional, Type, TypeVar, Union
 
 import pydantic
-from importlib_metadata import version
 from packaging.version import Version, parse
 
 PYDANTIC_VER = parse(version("pydantic"))
@@ -64,7 +64,7 @@ else:
         model_class: Type[Model],
         message: Union[str, bytes, bytearray],
     ) -> Model:
-        return model_class.parse_raw(message)
+        return model_class.parse_raw(message)  # type: ignore[arg-type]
 
     def model_dump_json(instance: Model) -> str:
         return instance.json()
