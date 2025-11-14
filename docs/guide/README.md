@@ -23,7 +23,7 @@ You might have seen projects built on top of asyncio that solve a similar proble
 
 |                Feature name | Taskiq |  Arq  | AioTasks | streaQ |
 | --------------------------: | :----: | :---: | :------: | :----: |
-|         Actively maintained |   ✅    |   ✅   |    ❌     |   ✅   |
+|         Actively maintained |   ✅    |   ❌   |    ❌     |   ✅   |
 |    Multiple broker backends |   ✅    |   ❌   |    ✅     |   ❌   |
 |    Multiple result backends |   ✅    |   ❌   |    ❌     |   ❌   |
 |  Have a rich documentation  |   ✅    |   ❌   |    ❌     |   ✅   |
