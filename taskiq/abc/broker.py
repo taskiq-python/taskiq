@@ -3,21 +3,16 @@ import sys
 import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from functools import wraps
 from logging import getLogger
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncGenerator,
-    Awaitable,
-    Callable,
     ClassVar,
-    DefaultDict,
-    Dict,
-    List,
-    Optional,
+    ParamSpec,
+    TypeAlias,
     TypeVar,
-    Union,
     get_type_hints,
     overload,
 )
@@ -38,13 +33,9 @@ from taskiq.utils import maybe_awaitable, remove_suffix
 from taskiq.warnings import TaskiqDeprecationWarning
 
 if sys.version_info >= (3, 11):
-    from typing import ParamSpec, Self, TypeAlias
-elif sys.version_info >= (3, 10):
-    from typing import ParamSpec, TypeAlias
-
-    from typing_extensions import Self
+    from typing import Self
 else:
-    from typing_extensions import ParamSpec, Self, TypeAlias
+    from typing_extensions import Self
 
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -55,7 +46,7 @@ _T = TypeVar("_T")
 _FuncParams = ParamSpec("_FuncParams")
 _ReturnType = TypeVar("_ReturnType")
 
-EventHandler: TypeAlias = Callable[[TaskiqState], Optional[Awaitable[None]]]
+EventHandler: TypeAlias = Callable[[TaskiqState], Awaitable[None] | None]
 
 logger = getLogger("taskiq")
 
@@ -81,12 +72,12 @@ class AsyncBroker(ABC):
     in async mode.
     """
 
-    global_task_registry: ClassVar[Dict[str, AsyncTaskiqDecoratedTask[Any, Any]]] = {}
+    global_task_registry: ClassVar[dict[str, AsyncTaskiqDecoratedTask[Any, Any]]] = {}
 
     def __init__(
         self,
-        result_backend: "Optional[AsyncResultBackend[_T]]" = None,
-        task_id_generator: Optional[Callable[[], str]] = None,
+        result_backend: "AsyncResultBackend[_T] | None" = None,
+        task_id_generator: Callable[[], str] | None = None,
     ) -> None:
         if result_backend is None:
             result_backend = DummyResultBackend()
@@ -106,29 +97,29 @@ class AsyncBroker(ABC):
                 TaskiqDeprecationWarning,
                 stacklevel=2,
             )
-        self.middlewares: "List[TaskiqMiddleware]" = []
+        self.middlewares: list[TaskiqMiddleware] = []
         self.result_backend = result_backend
         self.decorator_class = AsyncTaskiqDecoratedTask
         self.serializer: TaskiqSerializer = JSONSerializer()
-        self.formatter: "TaskiqFormatter" = ProxyFormatter(self)
+        self.formatter: TaskiqFormatter = ProxyFormatter(self)
         self.id_generator = task_id_generator
-        self.local_task_registry: Dict[str, AsyncTaskiqDecoratedTask[Any, Any]] = {}
+        self.local_task_registry: dict[str, AsyncTaskiqDecoratedTask[Any, Any]] = {}
         # Every event has a list of handlers.
         # Every handler is a function which takes state as a first argument.
         # And handler can be either sync or async.
-        self.event_handlers: DefaultDict[
+        self.event_handlers: defaultdict[
             TaskiqEvents,
-            List[Callable[[TaskiqState], Optional[Awaitable[None]]]],
+            list[Callable[[TaskiqState], Awaitable[None] | None]],
         ] = defaultdict(list)
         self.state = TaskiqState()
-        self.custom_dependency_context: Dict[Any, Any] = {}
-        self.dependency_overrides: Dict[Any, Any] = {}
+        self.custom_dependency_context: dict[Any, Any] = {}
+        self.dependency_overrides: dict[Any, Any] = {}
         # True only if broker runs in worker process.
         self.is_worker_process = False
         # True only if broker runs in scheduler process.
         self.is_scheduler_process = False
 
-    def find_task(self, task_name: str) -> Optional[AsyncTaskiqDecoratedTask[Any, Any]]:
+    def find_task(self, task_name: str) -> AsyncTaskiqDecoratedTask[Any, Any] | None:
         """
         Returns task by name.
 
@@ -148,7 +139,7 @@ class AsyncBroker(ABC):
             task_name,
         )
 
-    def get_all_tasks(self) -> Dict[str, AsyncTaskiqDecoratedTask[Any, Any]]:
+    def get_all_tasks(self) -> dict[str, AsyncTaskiqDecoratedTask[Any, Any]]:
         """
         Method to fetch all tasks available in broker.
 
@@ -163,7 +154,7 @@ class AsyncBroker(ABC):
         """
         return {**self.global_task_registry, **self.local_task_registry}
 
-    def add_dependency_context(self, new_ctx: Dict[Any, Any]) -> None:
+    def add_dependency_context(self, new_ctx: dict[Any, Any]) -> None:
         """
         Add first-level dependencies.
 
@@ -247,7 +238,7 @@ class AsyncBroker(ABC):
         """
 
     @abstractmethod
-    def listen(self) -> AsyncGenerator[Union[bytes, AckableMessage], None]:
+    def listen(self) -> AsyncGenerator[bytes | AckableMessage, None]:
         """
         This function listens to new messages and yields them.
 
@@ -275,7 +266,7 @@ class AsyncBroker(ABC):
     @overload
     def task(
         self,
-        task_name: Optional[str] = None,
+        task_name: str | None = None,
         **labels: Any,
     ) -> Callable[
         [Callable[_FuncParams, _ReturnType]],
@@ -285,7 +276,7 @@ class AsyncBroker(ABC):
 
     def task(  # type: ignore[misc]
         self,
-        task_name: Optional[str] = None,
+        task_name: str | None = None,
         **labels: Any,
     ) -> Any:
         """
@@ -312,8 +303,8 @@ class AsyncBroker(ABC):
         """
 
         def make_decorated_task(
-            inner_labels: Dict[str, Union[str, int]],
-            inner_task_name: Optional[str] = None,
+            inner_labels: dict[str, str | int],
+            inner_task_name: str | None = None,
         ) -> Callable[
             [Callable[_FuncParams, _ReturnType]],
             AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType],
@@ -373,7 +364,7 @@ class AsyncBroker(ABC):
     def register_task(
         self,
         func: Callable[_FuncParams, _ReturnType],
-        task_name: Optional[str] = None,
+        task_name: str | None = None,
         **labels: Any,
     ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]:
         """

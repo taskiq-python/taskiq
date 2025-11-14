@@ -1,5 +1,5 @@
 import enum
-from typing import Generic, Optional, TypeVar, Union
+from typing import Generic, TypeVar
 
 from taskiq_dependencies import Depends
 
@@ -35,8 +35,8 @@ else:
 class TaskProgress(_TaskProgressConfig, Generic[_ProgressType]):
     """Progress of task execution."""
 
-    state: Union[TaskState, str]
-    meta: Optional[_ProgressType]
+    state: TaskState | str
+    meta: _ProgressType | None
 
 
 class ProgressTracker(Generic[_ProgressType]):
@@ -50,8 +50,8 @@ class ProgressTracker(Generic[_ProgressType]):
 
     async def set_progress(
         self,
-        state: Union[TaskState, str],
-        meta: Optional[_ProgressType] = None,
+        state: TaskState | str,
+        meta: _ProgressType | None = None,
     ) -> None:
         """Set progress.
 
@@ -72,7 +72,7 @@ class ProgressTracker(Generic[_ProgressType]):
             progress,
         )
 
-    async def get_progress(self) -> Optional[TaskProgress[_ProgressType]]:
+    async def get_progress(self) -> TaskProgress[_ProgressType] | None:
         """Get progress."""
         return await self.context.broker.result_backend.get_progress(
             self.context.message.task_id,

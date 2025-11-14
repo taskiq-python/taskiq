@@ -1,10 +1,11 @@
 import os
 import sys
+from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from importlib import import_module
 from logging import getLogger
 from pathlib import Path
-from typing import Any, Generator, List, Optional, Sequence, Union
+from typing import Any
 
 logger = getLogger("taskiq.worker")
 
@@ -35,7 +36,7 @@ def add_cwd_in_path() -> Generator[None, None, None]:
                 logger.warning(f"Cannot remove '{cwd}' from sys.path")
 
 
-def import_object(object_spec: str, app_dir: Optional[str] = None) -> Any:
+def import_object(object_spec: str, app_dir: str | None = None) -> Any:
     """
     It parses python object spec and imports it.
 
@@ -54,7 +55,7 @@ def import_object(object_spec: str, app_dir: Optional[str] = None) -> Any:
     return getattr(module, import_spec[1])
 
 
-def import_from_modules(modules: List[str]) -> None:
+def import_from_modules(modules: list[str]) -> None:
     """
     Import all modules from modules variable.
 
@@ -71,8 +72,8 @@ def import_from_modules(modules: List[str]) -> None:
 
 
 def import_tasks(
-    modules: List[str],
-    pattern: Union[str, Sequence[str]],
+    modules: list[str],
+    pattern: str | Sequence[str],
     fs_discover: bool,
 ) -> None:
     """

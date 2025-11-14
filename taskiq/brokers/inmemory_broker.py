@@ -1,7 +1,8 @@
 import asyncio
 from collections import OrderedDict
+from collections.abc import AsyncGenerator
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, AsyncGenerator, Optional, Set, TypeVar
+from typing import Any, TypeVar
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.result_backend import AsyncResultBackend, TaskiqResult
@@ -103,7 +104,7 @@ class InmemoryResultBackend(AsyncResultBackend[_ReturnType]):
     async def get_progress(
         self,
         task_id: str,
-    ) -> Optional[TaskProgress[Any]]:
+    ) -> TaskProgress[Any] | None:
         """
         Get progress of task execution.
 
@@ -142,7 +143,7 @@ class InMemoryBroker(AsyncBroker):
             propagate_exceptions=propagate_exceptions,
         )
         self.await_inplace = await_inplace
-        self._running_tasks: "Set[asyncio.Task[Any]]" = set()
+        self._running_tasks: set[asyncio.Task[Any]] = set()
 
     async def kick(self, message: BrokerMessage) -> None:
         """

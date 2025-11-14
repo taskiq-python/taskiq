@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -16,10 +16,10 @@ class TaskiqMessage(BaseModel):
 
     task_id: str
     task_name: str
-    labels: Dict[str, Any]
-    labels_types: Optional[Dict[str, int]] = None
-    args: List[Any]
-    kwargs: Dict[str, Any]
+    labels: dict[str, Any]
+    labels_types: dict[str, int] | None = None
+    args: list[Any]
+    kwargs: dict[str, Any]
 
     def parse_labels(self) -> None:
         """
@@ -41,4 +41,4 @@ class BrokerMessage(BaseModel):
     task_id: str
     task_name: str
     message: bytes
-    labels: Dict[str, Any]
+    labels: dict[str, Any]

@@ -1,5 +1,5 @@
 import uuid
-from typing import Dict, TypeVar
+from typing import TypeVar
 
 import pytest
 from pydantic import BaseModel
@@ -17,7 +17,7 @@ _ReturnType = TypeVar("_ReturnType")
 class SerializingBackend(AsyncResultBackend[_ReturnType]):
     def __init__(self, serializer: TaskiqSerializer) -> None:
         self._serializer = serializer
-        self._results: Dict[str, bytes] = {}
+        self._results: dict[str, bytes] = {}
 
     async def set_result(
         self,

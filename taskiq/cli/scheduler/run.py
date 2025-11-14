@@ -3,7 +3,7 @@ import inspect
 import sys
 from datetime import datetime, timedelta, timezone
 from logging import basicConfig, getLogger
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from pycron import is_now
@@ -33,7 +33,7 @@ def to_tz_aware(time: datetime) -> datetime:
     return time
 
 
-async def get_schedules(source: ScheduleSource) -> List[ScheduledTask]:
+async def get_schedules(source: ScheduleSource) -> list[ScheduledTask]:
     """
     Get schedules from source.
 
@@ -55,7 +55,7 @@ async def get_schedules(source: ScheduleSource) -> List[ScheduledTask]:
 
 async def get_all_schedules(
     scheduler: TaskiqScheduler,
-) -> List[Tuple[ScheduleSource, List[ScheduledTask]]]:
+) -> list[tuple[ScheduleSource, list[ScheduledTask]]]:
     """
     Task to update all schedules.
 
@@ -71,10 +71,10 @@ async def get_all_schedules(
     schedules = await asyncio.gather(
         *[get_schedules(source) for source in scheduler.sources],
     )
-    return list(zip(scheduler.sources, schedules))
+    return list(zip(scheduler.sources, schedules, strict=True))
 
 
-def get_task_delay(task: ScheduledTask) -> Optional[int]:
+def get_task_delay(task: ScheduledTask) -> int | None:
     """
     Get delay of the task in seconds.
 
@@ -145,7 +145,7 @@ async def delayed_send(
 
 async def run_scheduler_loop(  # noqa: C901
     scheduler: TaskiqScheduler,
-    interval: Optional[timedelta] = None,
+    interval: timedelta | None = None,
 ) -> None:
     """
     Runs scheduler loop.
@@ -157,8 +157,8 @@ async def run_scheduler_loop(  # noqa: C901
     :param interval: interval to check for schedule updates.
     """
     loop = asyncio.get_event_loop()
-    running_schedules: Dict[str, asyncio.Task[Any]] = {}
-    ran_cron_jobs: Set[str] = set()
+    running_schedules: dict[str, asyncio.Task[Any]] = {}
+    ran_cron_jobs: set[str] = set()
     current_minute = datetime.now(tz=timezone.utc).minute
     while True:
         now = datetime.now(tz=timezone.utc)

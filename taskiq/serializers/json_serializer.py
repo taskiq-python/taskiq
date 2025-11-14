@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from json import dumps, loads
-from typing import Any, Callable, Optional
+from typing import Any
 
 from taskiq.abc.serializer import TaskiqSerializer
 
@@ -7,7 +8,7 @@ from taskiq.abc.serializer import TaskiqSerializer
 class JSONSerializer(TaskiqSerializer):
     """Default taskiq serializer."""
 
-    def __init__(self, default: Optional[Callable[..., None]] = None) -> None:
+    def __init__(self, default: Callable[..., None] | None = None) -> None:
         self.default = default
 
     def dumpb(self, value: Any) -> bytes:

@@ -1,5 +1,5 @@
 import asyncio
-from typing import Sequence
+from collections.abc import Sequence
 
 from taskiq.abc.cmd import TaskiqCMD
 from taskiq.cli.scheduler.args import SchedulerArgs

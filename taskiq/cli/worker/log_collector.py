@@ -1,7 +1,8 @@
 import logging
 import sys
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import IO, Any, Generator, List, TextIO
+from typing import IO, Any, TextIO
 
 
 class Redirector:
@@ -46,7 +47,7 @@ def log_collector(
         collected logging calls.
     :yields: new target.
     """
-    old_targets: "List[TextIO]" = []
+    old_targets: list[TextIO] = []
     log_handler = logging.StreamHandler(new_target)
     log_handler.setFormatter(logging.Formatter(custom_format))
 

@@ -40,4 +40,4 @@ class TaskiqState(_Base):
             ) from exc
 
     def __str__(self) -> str:
-        return "TaskiqState(%s)" % super().__str__()
+        return f"TaskiqState({super().__str__()})"

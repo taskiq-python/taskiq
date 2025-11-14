@@ -1,7 +1,6 @@
 import argparse
 import sys
 from importlib.metadata import entry_points
-from typing import Dict
 
 from taskiq import __version__
 from taskiq.abc.cmd import TaskiqCMD
@@ -37,7 +36,7 @@ def main() -> None:  # pragma: no cover
         action="store_true",
         help="print current taskiq version and exit",
     )
-    subcommands: Dict[str, TaskiqCMD] = {}
+    subcommands: dict[str, TaskiqCMD] = {}
     subparsers = parser.add_subparsers(
         title="Available subcommands",
         metavar="",

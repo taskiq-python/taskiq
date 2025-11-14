@@ -16,12 +16,12 @@ We have lots of tests in CI. But since CI runs from first-time contributors shou
 
 ## Setting up environment
 
-We use poetry for managing dependencies. To install it, please follow the official guide in [documentation](https://python-poetry.org/docs/).
+We use uv for managing dependencies. To install it, please follow the official guide in [documentation](https://docs.astral.sh/uv/getting-started/installation/).
 
 After you have cloned the taskiq repo, install dependencies using this command:
 
 ```bash
-poetry install
+uv sync
 ```
 
 It will install all required dependencies.
