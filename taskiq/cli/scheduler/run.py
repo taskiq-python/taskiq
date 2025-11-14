@@ -71,7 +71,7 @@ async def get_all_schedules(
     schedules = await asyncio.gather(
         *[get_schedules(source) for source in scheduler.sources],
     )
-    return list(zip(scheduler.sources, schedules, strict=False))
+    return list(zip(scheduler.sources, schedules, strict=True))
 
 
 def get_task_delay(task: ScheduledTask) -> Optional[int]:
