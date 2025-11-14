@@ -246,7 +246,7 @@ await my_task.kicker().with_labels(timeout=0.3).kiq()
 
 ::: caution Cool alert
 
-We use [run_in_executor](https://docs.python.org/3/library/asyncio-eventloop.html#asyncio.loop.run_in_executor) method to run sync functions. Timeouts will raise a TimeoutException, but
+We use [run_in_executor](https://docs.python.org/3/library/asyncio-eventloop.html#asyncio.loop.run_in_executor) method to run sync functions. Timeouts will raise a TimeoutError, but
 synchronous function may not stop from execution. This is a constraint of python.
 
 :::
