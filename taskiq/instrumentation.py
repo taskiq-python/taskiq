@@ -36,8 +36,11 @@ API
 
 
 import logging
+from functools import partial
 from typing import Any, Callable, Collection, Optional
 from weakref import WeakSet as _WeakSet
+
+from taskiq.cli.worker.args import WorkerArgs
 
 try:
     import opentelemetry  # noqa: F401
@@ -53,12 +56,29 @@ from opentelemetry.instrumentation.instrumentor import (  # type: ignore[attr-de
 from opentelemetry.instrumentation.utils import unwrap
 from opentelemetry.metrics import MeterProvider
 from opentelemetry.trace import TracerProvider
-from wrapt import wrap_function_wrapper
+from wrapt import wrap_function_wrapper, wrap_object_attribute
 
 from taskiq import AsyncBroker
+from taskiq.cli.worker.process_manager import ProcessManager
 from taskiq.middlewares.opentelemetry_middleware import OpenTelemetryMiddleware
 
 logger = logging.getLogger("taskiq.opentelemetry")
+
+
+def _worker_function_with_sitecustomize(
+    worker_function: Callable[[WorkerArgs], None],
+    *args: Any,
+    **kwargs: Any,
+) -> None:
+    import opentelemetry.instrumentation.auto_instrumentation.sitecustomize  # noqa
+
+    return worker_function(*args, **kwargs)
+
+
+def _worker_function_factory(
+    worker_function: Callable[[WorkerArgs], None],
+) -> Callable[[WorkerArgs], None]:
+    return partial(_worker_function_with_sitecustomize, worker_function)
 
 
 class TaskiqInstrumentor(BaseInstrumentor):
@@ -121,7 +141,12 @@ class TaskiqInstrumentor(BaseInstrumentor):
             self.instrument_broker(broker)
             return result
 
-        wrap_function_wrapper("taskiq", "AsyncBroker.__init__", broker_init)
+        wrap_function_wrapper("taskiq.abc.broker", "AsyncBroker.__init__", broker_init)
+        wrap_object_attribute(
+            "taskiq.cli.worker.process_manager",
+            "ProcessManager.worker_function",
+            _worker_function_factory,
+        )
 
     def _uninstrument(self, **kwargs: Any) -> None:
         instances_to_uninstrument = list(self._instrumented_brokers)
@@ -129,3 +154,4 @@ class TaskiqInstrumentor(BaseInstrumentor):
             self.uninstrument_broker(broker)
         self._instrumented_brokers.clear()
         unwrap(AsyncBroker, "__init__")
+        delattr(ProcessManager, "worker_function")
