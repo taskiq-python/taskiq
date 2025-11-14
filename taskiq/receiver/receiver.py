@@ -139,7 +139,7 @@ class Receiver:
         ):
             await maybe_awaitable(message.ack())
 
-        for middleware in self.broker.middlewares:
+        for middleware in reversed(self.broker.middlewares):
             if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
                 await maybe_awaitable(middleware.post_execute(taskiq_msg, result))
 
@@ -147,7 +147,7 @@ class Receiver:
             if not isinstance(result.error, NoResultError):
                 await self.broker.result_backend.set_result(taskiq_msg.task_id, result)
 
-                for middleware in self.broker.middlewares:
+                for middleware in reversed(self.broker.middlewares):
                     if middleware.__class__.post_save != TaskiqMiddleware.post_save:
                         await maybe_awaitable(middleware.post_save(taskiq_msg, result))
 
@@ -289,7 +289,7 @@ class Receiver:
         )
         # If exception is found we execute middlewares.
         if found_exception is not None:
-            for middleware in self.broker.middlewares:
+            for middleware in reversed(self.broker.middlewares):
                 if middleware.__class__.on_error != TaskiqMiddleware.on_error:
                     await maybe_awaitable(
                         middleware.on_error(

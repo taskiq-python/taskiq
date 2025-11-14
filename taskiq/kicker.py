@@ -168,7 +168,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         except Exception as exc:
             raise SendTaskError from exc
 
-        for middleware in self.broker.middlewares:
+        for middleware in reversed(self.broker.middlewares):
             if middleware.__class__.post_send != TaskiqMiddleware.post_send:
                 await maybe_awaitable(middleware.post_send(message))
 
