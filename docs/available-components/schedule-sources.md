@@ -37,9 +37,10 @@ The format of the schedule label is the following:
 @broker.task(
     schedule=[
         {
-            "cron": "*/1 * * * *", # type: str, either cron or time should be specified.
-            "cron_offset": None # type: str | timedelta | None, can be omitted.
-            "time": None  # type: datetime | None, either cron or time should be specified.
+            "cron": "* * * * *", # type: str, either cron, interval or time should be specified.
+            "cron_offset": None, # type: str | timedelta | None, can be omitted.
+            "interval": None,  # type: int | timedelta, either cron, interval or time should be specified.
+            "time": None,  # type: datetime | None, either cron, interval or time should be specified.
             "args": [], # type List[Any] | None, can be omitted.
             "kwargs": {}, # type: Dict[str, Any] | None, can be omitted.
             "labels": {}, # type: Dict[str, Any] | None, can be omitted.
@@ -55,6 +56,7 @@ Parameters:
 
 - `cron` - crontab string when to run the task.
 - `cron_offset` - timezone offset for cron values. Explained [here](../guide/scheduling-tasks.md#working-with-timezones)
+- `interval` - Interval to run periodic tasks. Must be at least 1 second and cannot have fractional seconds.
 - `time` - specific time when send the task.
 - `args` - args to use, when invoking the task.
 - `kwargs` - key-word arguments to use when invoking the task.

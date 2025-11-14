@@ -1,6 +1,6 @@
 import sys
 from collections.abc import Coroutine
-from datetime import datetime
+from datetime import datetime, timedelta
 from types import CoroutineType
 from typing import (
     TYPE_CHECKING,
@@ -168,6 +168,32 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         return await self.kicker().schedule_by_cron(
             source,
             cron,
+            *args,
+            **kwargs,
+        )
+
+    async def schedule_by_interval(
+        self,
+        source: "ScheduleSource",
+        interval: Union[int, timedelta],
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> CreatedSchedule[_ReturnType]:
+        """
+        Schedule the task to start using an interval.
+
+        This method requires a schedule source,
+        which is capable of dynamically adding new schedules.
+
+        :param source: schedule source.
+        :param interval: interval in seconds or timedelta instance.
+        :param args: function's arguments.
+        :param kwargs: function's key word arguments.
+        :return: schedule id.
+        """
+        return await self.kicker().schedule_by_interval(
+            source,
+            interval,
             *args,
             **kwargs,
         )

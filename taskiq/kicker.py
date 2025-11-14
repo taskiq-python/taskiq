@@ -1,7 +1,7 @@
 import sys
 from collections.abc import Coroutine
 from dataclasses import asdict, is_dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from logging import getLogger
 from types import CoroutineType
 from typing import (
@@ -219,6 +219,38 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
             task_id=self.custom_task_id,
             cron=cron_str,
             cron_offset=cron_offset,
+        )
+        await source.add_schedule(scheduled)
+        return CreatedSchedule(self, source, scheduled)
+
+    async def schedule_by_interval(
+        self,
+        source: "ScheduleSource",
+        interval: Union[int, timedelta],
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> CreatedSchedule[_ReturnType]:
+        """
+        Function to schedule task using an interval.
+
+        :param source: schedule source.
+        :param interval: interval in seconds or timedelta instance.
+        :param args: function's args.
+        :param kwargs: function's kwargs.
+
+        :return: schedule id.
+        """
+        schedule_id = self.custom_schedule_id
+        if schedule_id is None:
+            schedule_id = self.broker.id_generator()
+        message = self._prepare_message(*args, **kwargs)
+        scheduled = ScheduledTask(
+            schedule_id=schedule_id,
+            task_name=message.task_name,
+            labels=message.labels,
+            args=message.args,
+            kwargs=message.kwargs,
+            interval=interval,
         )
         await source.add_schedule(scheduled)
         return CreatedSchedule(self, source, scheduled)
