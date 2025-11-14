@@ -1,34 +1,31 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import pytest
-import pytz
-from tzlocal import get_localzone
 
 from taskiq.cli.scheduler.run import is_time_task_now
 
 
 def test_time_utc_without_zone() -> None:
+    now = datetime.now(tz=timezone.utc)
+    is_now = is_time_task_now(
+        time_value=now - timedelta(seconds=1),
+        now=now,
+    )
+    assert is_now
+
+
+def test_time_with_utc_zone() -> None:
     now = datetime.now()
     is_now = is_time_task_now(
         time_value=now - timedelta(seconds=1),
-        now=now,
+        now=now.replace(tzinfo=timezone.utc),
     )
     assert is_now
 
 
-def test_time_utc_with_zone() -> None:
-    now = datetime.now(tz=pytz.UTC)
-    is_now = is_time_task_now(
-        time_value=now - timedelta(seconds=1),
-        now=now,
-    )
-    assert is_now
-
-
-def test_time_utc_with_local_zone() -> None:
-    localtz = get_localzone()
-    now = datetime.now(tz=localtz)
+def test_time_with_local_zone() -> None:
+    now = datetime.now()
     is_now = is_time_task_now(
         time_value=now - timedelta(seconds=1),
         now=now,

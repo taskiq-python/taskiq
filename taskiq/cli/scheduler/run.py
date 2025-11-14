@@ -204,7 +204,7 @@ class SchedulerLoop:
     def _update_schedules_task_future_callback(self, task_: asyncio.Task[Any]) -> None:
         self.scheduled_tasks = task_.result()
 
-        new_schedules_ids: set[str] = set()
+        new_schedules_ids: set[ScheduleId] = set()
         for source, task_list in self.scheduled_tasks.items():
             logger.debug("Got %d schedules from source %s.", len(task_list), source)
             new_schedules_ids.update({t.schedule_id for t in task_list})
@@ -310,7 +310,7 @@ class SchedulerLoop:
         if loop_interval is None:
             loop_interval = timedelta(seconds=1)
 
-        running_schedules: Dict[str, asyncio.Task[Any]] = {}
+        running_schedules: Dict[ScheduleId, asyncio.Task[Any]] = {}
 
         self.scheduled_tasks = await get_all_schedules(self.scheduler)
         self.scheduled_tasks_updated_at = datetime.now(tz=timezone.utc)

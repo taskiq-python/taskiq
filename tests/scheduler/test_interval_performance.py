@@ -2,15 +2,12 @@ import asyncio
 import time
 from typing import List
 
-import pytest
-
 from taskiq import TaskiqScheduler
 from taskiq.api import run_scheduler_task
 from taskiq.schedule_sources import LabelScheduleSource
 from tests.utils import AsyncQueueBroker
 
 
-@pytest.mark.anyio
 async def test_interval_task_performance() -> None:
     broker = AsyncQueueBroker()
     scheduler = TaskiqScheduler(broker, sources=[LabelScheduleSource(broker)])

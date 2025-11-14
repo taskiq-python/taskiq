@@ -1,9 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Union
+from zoneinfo import ZoneInfo
 
 import pytest
-import pytz
-from tzlocal import get_localzone
 
 from taskiq.cli.scheduler.run import CronValueError, is_cron_task_now
 
@@ -18,13 +17,13 @@ def test_should_run_success() -> None:
 
 
 def test_should_run_cron_str_offset() -> None:
-    now = datetime.now(timezone.utc)
-    hour = datetime.now().hour
-    zone = get_localzone()
+    utc_now = datetime.now(timezone.utc)
+    tz = ZoneInfo("US/Eastern")
+    hour = datetime.now(tz=tz).hour
     is_now = is_cron_task_now(
         cron_value=f"* {hour} * * *",
-        offset=str(zone),
-        now=now,
+        offset=tz.key,
+        now=utc_now,
     )
     assert is_now
 
@@ -71,10 +70,6 @@ def test_is_cron_task_now(
     last_run: Optional[datetime],
     expected: bool,
 ) -> None:
-    now = pytz.UTC.localize(now)
-    if last_run:
-        last_run = pytz.UTC.localize(last_run)
-
     assert is_cron_task_now(cron_value, now, offset, last_run) == expected
 
 
