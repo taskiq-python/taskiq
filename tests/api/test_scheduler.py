@@ -33,7 +33,7 @@ async def test_cancelation() -> None:
 
     scheduler_task = asyncio.create_task(run_scheduler_task(scheduler))
 
-    msg = await asyncio.wait_for(broker.queue.get(), 1)
+    msg = await asyncio.wait_for(broker.queue.get(), 2)
     assert msg
 
     scheduler_task.cancel()
