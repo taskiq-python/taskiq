@@ -51,9 +51,9 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
-          cache-suffix: ${{ matrix.python-version }}
+          cache-suffix: ${{ matrix.py_version }}
           version: "latest"
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ matrix.py_version }}
       - name: Install deps
         run: uv sync --all-extras
       - name: Setup pydantic version
