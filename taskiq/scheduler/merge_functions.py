@@ -1,14 +1,14 @@
 import copy
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.scheduler.scheduled_task import ScheduledTask
 
 
 def preserve_all(
-    old_tasks: List["ScheduledTask"],
-    new_tasks: List["ScheduledTask"],
-) -> List["ScheduledTask"]:
+    old_tasks: list["ScheduledTask"],
+    new_tasks: list["ScheduledTask"],
+) -> list["ScheduledTask"]:
     """
     This function simply merges two lists.
 
@@ -22,9 +22,9 @@ def preserve_all(
 
 
 def only_unique(
-    old_tasks: List["ScheduledTask"],
-    new_tasks: List["ScheduledTask"],
-) -> List["ScheduledTask"]:
+    old_tasks: list["ScheduledTask"],
+    new_tasks: list["ScheduledTask"],
+) -> list["ScheduledTask"]:
     """
     This function preserves only unique schedules.
 
@@ -43,9 +43,9 @@ def only_unique(
 
 
 def only_new(
-    _old_tasks: List["ScheduledTask"],
-    new_tasks: List["ScheduledTask"],
-) -> List["ScheduledTask"]:
+    _old_tasks: list["ScheduledTask"],
+    new_tasks: list["ScheduledTask"],
+) -> list["ScheduledTask"]:
     """
     This function preserves only new schedules.
 

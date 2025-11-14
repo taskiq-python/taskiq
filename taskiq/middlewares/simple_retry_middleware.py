@@ -1,5 +1,6 @@
+from collections.abc import Iterable
 from logging import getLogger
-from typing import Any, Iterable, Optional
+from typing import Any
 
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.exceptions import NoResultError
@@ -18,7 +19,7 @@ class SimpleRetryMiddleware(TaskiqMiddleware):
         default_retry_count: int = 3,
         default_retry_label: bool = False,
         no_result_on_retry: bool = True,
-        types_of_exceptions: Optional[Iterable[type[BaseException]]] = None,
+        types_of_exceptions: Iterable[type[BaseException]] | None = None,
     ) -> None:
         self.default_retry_count = default_retry_count
         self.default_retry_label = default_retry_label

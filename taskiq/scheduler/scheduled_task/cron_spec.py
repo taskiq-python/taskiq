@@ -1,5 +1,4 @@
 from datetime import timedelta
-from typing import Optional, Union
 
 from pydantic import BaseModel
 
@@ -7,13 +6,13 @@ from pydantic import BaseModel
 class CronSpec(BaseModel):
     """Cron specification for running tasks."""
 
-    minutes: Optional[Union[str, int]] = "*"
-    hours: Optional[Union[str, int]] = "*"
-    days: Optional[Union[str, int]] = "*"
-    months: Optional[Union[str, int]] = "*"
-    weekdays: Optional[Union[str, int]] = "*"
+    minutes: str | int | None = "*"
+    hours: str | int | None = "*"
+    days: str | int | None = "*"
+    months: str | int | None = "*"
+    weekdays: str | int | None = "*"
 
-    offset: Optional[Union[str, timedelta]] = None
+    offset: str | timedelta | None = None
 
     def to_cron(self) -> str:  # pragma: no cover
         """Converts cron spec to cron string."""

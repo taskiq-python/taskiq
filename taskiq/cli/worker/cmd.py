@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
 from taskiq.abc.cmd import TaskiqCMD
 from taskiq.cli.worker.args import WorkerArgs
@@ -13,7 +13,7 @@ class WorkerCMD(TaskiqCMD):
 
     short_help = "Helper to run workers"
 
-    def exec(self, args: Sequence[str]) -> Optional[int]:
+    def exec(self, args: Sequence[str]) -> int | None:
         """
         Start worker process.
 

@@ -1,6 +1,7 @@
 import base64
 import enum
-from typing import Any, Callable, Dict, Optional, Tuple
+from collections.abc import Callable
+from typing import Any
 
 
 class LabelType(enum.IntEnum):
@@ -14,7 +15,7 @@ class LabelType(enum.IntEnum):
     BYTES = enum.auto()
 
 
-_LABEL_PARSERS: Dict[LabelType, Callable[[str], Any]] = {
+_LABEL_PARSERS: dict[LabelType, Callable[[str], Any]] = {
     LabelType.INT: int,
     LabelType.STR: str,
     LabelType.FLOAT: float,
@@ -24,7 +25,7 @@ _LABEL_PARSERS: Dict[LabelType, Callable[[str], Any]] = {
 }
 
 
-def prepare_label(label_value: Any) -> Tuple[str, int]:
+def prepare_label(label_value: Any) -> tuple[str, int]:
     """
     Prepare label value for serialization.
 
@@ -39,7 +40,7 @@ def prepare_label(label_value: Any) -> Tuple[str, int]:
     return str(label_value), LabelType.ANY.value
 
 
-def parse_label(label_value: Any, label_type: Optional[int] = None) -> Any:
+def parse_label(label_value: Any, label_type: int | None = None) -> Any:
     """
     Parse label value from serialized format.
 

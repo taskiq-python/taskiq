@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
 from freezegun import freeze_time
@@ -28,7 +28,7 @@ from taskiq.scheduler.scheduler import TaskiqScheduler
         ),
     ],
 )
-async def test_label_discovery(schedule_label: List[Dict[str, Any]]) -> None:
+async def test_label_discovery(schedule_label: list[dict[str, Any]]) -> None:
     broker = InMemoryBroker()
 
     @broker.task(

@@ -169,6 +169,7 @@ lint.select = [
     "PL",  # PyLint checks
     "RUF", # Specific to Ruff checks
     "FA102",  # Future annotations
+    "UP",  # pyupgrade
 ]
 lint.ignore = [
     "D105",    # Missing docstring in magic method
@@ -194,6 +195,15 @@ line-length = 88
     "S311",   # Standard pseudo-random generators are not suitable for security/cryptographic purposes
     "D101",   # Missing docstring in public class
     "D102",  # Missing docstring in public method
+]
+"docs/examples/*" = [
+    "D103",  # Missing docstring in public function
+    "D101",   # Missing docstring in public class
+    "D102",  # Missing docstring in public method
+    "S311",  #  Standard pseudo-random generators
+    "S101",  # use of asserts detected
+    "T201",  # print found
+
 ]
 
 [tool.ruff.lint.pydocstyle]

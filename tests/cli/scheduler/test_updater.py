@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import List, Union
 
 from taskiq import InMemoryBroker, ScheduleSource
 from taskiq.cli.scheduler.run import get_all_schedules
@@ -8,10 +7,10 @@ from taskiq.scheduler.scheduler import TaskiqScheduler
 
 
 class DummySource(ScheduleSource):
-    def __init__(self, schedules: Union[Exception, List[ScheduledTask]]) -> None:
+    def __init__(self, schedules: Exception | list[ScheduledTask]) -> None:
         self.schedules = schedules
 
-    async def get_schedules(self) -> List[ScheduledTask]:
+    async def get_schedules(self) -> list[ScheduledTask]:
         """Return test schedules, or raise an exception."""
         if isinstance(self.schedules, Exception):
             raise self.schedules
@@ -45,7 +44,7 @@ async def test_get_schedules_success() -> None:
             time=datetime.now(),
         ),
     ]
-    sources: List[ScheduleSource] = [
+    sources: list[ScheduleSource] = [
         DummySource(schedules1),
         DummySource(schedules2),
     ]

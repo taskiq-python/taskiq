@@ -1,16 +1,12 @@
 import sys
-from collections.abc import Coroutine
+from collections.abc import Callable, Coroutine
 from datetime import datetime
 from types import CoroutineType
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
     Generic,
-    Optional,
     ParamSpec,
-    Type,
     TypeVar,
     Union,
     overload,
@@ -51,8 +47,8 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         broker: "AsyncBroker",
         task_name: str,
         original_func: Callable[_FuncParams, _ReturnType],
-        labels: Dict[str, Any],
-        return_type: Optional[Type[_ReturnType]] = None,
+        labels: dict[str, Any],
+        return_type: type[_ReturnType] | None = None,
     ) -> None:
         self.broker = broker
         self.task_name = task_name

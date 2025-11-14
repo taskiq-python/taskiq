@@ -1,5 +1,5 @@
 from argparse import ArgumentParser
-from typing import Sequence
+from collections.abc import Sequence
 
 from taskiq.abc.cmd import TaskiqCMD
 
