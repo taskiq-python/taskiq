@@ -210,7 +210,7 @@ class ProcessManager:
             events.append(event)
 
         # Wait for workers startup
-        for worker, event in zip(self.workers, events, strict=False):
+        for worker, event in zip(self.workers, events, strict=True):
             _wait_for_worker_startup(worker, event)
 
     def start(self) -> Optional[int]:  # noqa: C901

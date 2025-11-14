@@ -53,19 +53,19 @@ opentelemetry = [
 
 [dependency-groups]
 dev = [
-	"pre-commit>=4.3.0",
+	"pre-commit>=4.4.0",
 	# lint
-	"ruff>=0",
-	"black>=22.6.0",
+	"ruff>=0.14.5",
+	"black>=25.11.0",
 	# type check
-	"mypy>=1",
+	"mypy>=1.18.2",
 	# test
-	"pytest>=7.1.2",
-	"pytest-cov>=3.0.0",
-	"coverage>=6.4.2",
-	"pytest-xdist[psutil]>=2.5.0",
-	"tox>=4.6.4",
-	"freezegun>=1.2.2",
+	"pytest>=9.0.1",
+	"pytest-cov>=7.0.0",
+	"coverage>=7.11.3",
+	"pytest-xdist[psutil]>=3.8.0",
+	"tox>=4.32.0",
+	"freezegun>=1.5.5",
 	"tzdata>=2025.2; sys_platform == 'win32'",
 	"opentelemetry-test-utils (>=0.59b0,<1)",
 ]
@@ -121,8 +121,12 @@ omit = [
 ]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.8.14,<0.9.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "taskiq"
+module-root = ""
 
 [tool.ruff]
 target-version="py310"
