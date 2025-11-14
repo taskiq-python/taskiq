@@ -16,6 +16,8 @@ from typing import (
     Dict,
     List,
     Optional,
+    ParamSpec,
+    TypeAlias,
     TypeVar,
     Union,
     get_type_hints,
@@ -38,13 +40,9 @@ from taskiq.utils import maybe_awaitable, remove_suffix
 from taskiq.warnings import TaskiqDeprecationWarning
 
 if sys.version_info >= (3, 11):
-    from typing import ParamSpec, Self, TypeAlias
-elif sys.version_info >= (3, 10):
-    from typing import ParamSpec, TypeAlias
-
-    from typing_extensions import Self
+    from typing import Self
 else:
-    from typing_extensions import ParamSpec, Self, TypeAlias
+    from typing_extensions import Self
 
 
 if TYPE_CHECKING:  # pragma: no cover
