@@ -36,7 +36,6 @@ API
 
 
 import logging
-from functools import partial
 from typing import Any, Callable, Collection, Optional
 from weakref import WeakSet as _WeakSet
 
@@ -56,34 +55,23 @@ from opentelemetry.instrumentation.instrumentor import (  # type: ignore[attr-de
 from opentelemetry.instrumentation.utils import unwrap
 from opentelemetry.metrics import MeterProvider
 from opentelemetry.trace import TracerProvider
-from wrapt import wrap_function_wrapper, wrap_object_attribute
+from wrapt import wrap_function_wrapper
 
+import taskiq.cli.worker.run
 from taskiq import AsyncBroker
-from taskiq.cli.worker.process_manager import ProcessManager
 from taskiq.middlewares.opentelemetry_middleware import OpenTelemetryMiddleware
 
 logger = logging.getLogger("taskiq.opentelemetry")
-
-
-def _worker_function_with_initialize(
-    worker_function: Callable[[WorkerArgs], None],
-    *args: Any,
-    **kwargs: Any,
-) -> None:
-    initialize()
-    return worker_function(*args, **kwargs)
-
-
-def _worker_function_factory(
-    worker_function: Callable[[WorkerArgs], None],
-) -> Callable[[WorkerArgs], None]:
-    return partial(_worker_function_with_initialize, worker_function)
 
 
 class TaskiqInstrumentor(BaseInstrumentor):
     """OpenTelemetry instrumentor for Taskiq."""
 
     _instrumented_brokers: _WeakSet[AsyncBroker] = _WeakSet()
+    _original_start_listen: Callable[
+        [WorkerArgs],
+        None,
+    ] = taskiq.cli.worker.run.start_listen
 
     def __init__(self) -> None:
         super().__init__()
@@ -129,6 +117,11 @@ class TaskiqInstrumentor(BaseInstrumentor):
         """This function tells which library this instrumentor instruments."""
         return ("taskiq >= 0.0.1",)
 
+    @classmethod
+    def _start_listen_with_initialize(cls, args: WorkerArgs) -> None:
+        initialize()
+        cls._original_start_listen(args)
+
     def _instrument(self, **kwargs: Any) -> None:
         def broker_init(
             init: Callable[[Any], Any],
@@ -141,11 +134,7 @@ class TaskiqInstrumentor(BaseInstrumentor):
             return result
 
         wrap_function_wrapper("taskiq.abc.broker", "AsyncBroker.__init__", broker_init)
-        wrap_object_attribute(
-            "taskiq.cli.worker.process_manager",
-            "ProcessManager.worker_function",
-            _worker_function_factory,
-        )
+        taskiq.cli.worker.run.start_listen = self._start_listen_with_initialize
 
     def _uninstrument(self, **kwargs: Any) -> None:
         instances_to_uninstrument = list(self._instrumented_brokers)
@@ -153,4 +142,4 @@ class TaskiqInstrumentor(BaseInstrumentor):
             self.uninstrument_broker(broker)
         self._instrumented_brokers.clear()
         unwrap(AsyncBroker, "__init__")
-        delattr(ProcessManager, "worker_function")
+        taskiq.cli.worker.run.start_listen = self._original_start_listen  # type: ignore[assignment]
