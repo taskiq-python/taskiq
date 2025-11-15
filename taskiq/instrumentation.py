@@ -49,7 +49,7 @@ except ImportError as exc:
         "Cannot instrument. Please install 'taskiq[opentelemetry]'.",
     ) from exc
 
-
+from opentelemetry.instrumentation.auto_instrumentation import initialize
 from opentelemetry.instrumentation.instrumentor import (  # type: ignore[attr-defined]
     BaseInstrumentor,
 )
@@ -65,20 +65,19 @@ from taskiq.middlewares.opentelemetry_middleware import OpenTelemetryMiddleware
 logger = logging.getLogger("taskiq.opentelemetry")
 
 
-def _worker_function_with_sitecustomize(
+def _worker_function_with_initialize(
     worker_function: Callable[[WorkerArgs], None],
     *args: Any,
     **kwargs: Any,
 ) -> None:
-    import opentelemetry.instrumentation.auto_instrumentation.sitecustomize  # noqa
-
+    initialize()
     return worker_function(*args, **kwargs)
 
 
 def _worker_function_factory(
     worker_function: Callable[[WorkerArgs], None],
 ) -> Callable[[WorkerArgs], None]:
-    return partial(_worker_function_with_sitecustomize, worker_function)
+    return partial(_worker_function_with_initialize, worker_function)
 
 
 class TaskiqInstrumentor(BaseInstrumentor):
