@@ -4,6 +4,8 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, root_validator
 
+from taskiq.scheduler.scheduled_task.validators import validate_interval_value
+
 
 class ScheduledTask(BaseModel):
     """Abstraction over task schedule."""
@@ -34,26 +36,5 @@ class ScheduledTask(BaseModel):
         if all(values.get(key) is None for key in ("cron", "interval", "time")):
             raise ValueError("Either cron, interval, or datetime must be present.")
 
-        # Validate interval constraints
-        if (interval := values.get("interval")) is not None:
-            if isinstance(interval, int):
-                if interval < 1:
-                    raise ValueError(
-                        f"Interval must be at least 1 second, got {interval} seconds",
-                    )
-            else:
-                # For timedelta, check that it's at least 1 second
-                # and has no fractional seconds
-                total_seconds = interval.total_seconds()
-                if total_seconds != int(total_seconds):
-                    raise ValueError(
-                        f"Fractional intervals are not supported, "
-                        f"got {total_seconds} seconds",
-                    )
-                if total_seconds < 1:
-                    raise ValueError(
-                        f"Interval must be at least 1 second, "
-                        f"got {total_seconds} seconds",
-                    )
-
+        validate_interval_value(values.get("interval"))
         return values
