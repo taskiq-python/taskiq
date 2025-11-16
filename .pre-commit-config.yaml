@@ -48,6 +48,7 @@ repos:
           - "--fix"
           - "taskiq"
           - "tests"
+          - "docs/examples"
 
       - id: mypy
         name: Validate types with MyPy
