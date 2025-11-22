@@ -1,7 +1,7 @@
 from typing import Any
+from unittest.mock import AsyncMock
 
 import pytest
-from mock import AsyncMock
 
 from taskiq.exceptions import ResultIsReadyError, TaskiqResultTimeoutError
 from taskiq.funcs import gather

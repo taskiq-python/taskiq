@@ -8,14 +8,16 @@ from typing import (
     Iterable,
     List,
     Optional,
+    Protocol,
     Set,
     Tuple,
     Type,
+    TypeVar,
     Union,
+    runtime_checkable,
 )
 
 import pydantic
-from typing_extensions import Protocol, TypeVar, runtime_checkable
 
 import taskiq.exceptions
 from taskiq.compat import IS_PYDANTIC2, validate_call

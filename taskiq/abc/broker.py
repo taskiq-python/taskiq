@@ -23,8 +23,6 @@ from typing import (
 )
 from uuid import uuid4
 
-from typing_extensions import ParamSpec, Self, TypeAlias
-
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.abc.serializer import TaskiqSerializer
 from taskiq.acks import AckableMessage
@@ -38,6 +36,16 @@ from taskiq.serializers.json_serializer import JSONSerializer
 from taskiq.state import TaskiqState
 from taskiq.utils import maybe_awaitable, remove_suffix
 from taskiq.warnings import TaskiqDeprecationWarning
+
+if sys.version_info >= (3, 11):
+    from typing import ParamSpec, Self, TypeAlias
+elif sys.version_info >= (3, 10):
+    from typing import ParamSpec, TypeAlias
+
+    from typing_extensions import Self
+else:
+    from typing_extensions import ParamSpec, Self, TypeAlias
+
 
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.formatter import TaskiqFormatter

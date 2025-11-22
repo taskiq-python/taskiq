@@ -1,7 +1,7 @@
 import uuid
+from unittest.mock import AsyncMock
 
 import pytest
-from mock import AsyncMock
 
 from taskiq.formatters.json_formatter import JSONFormatter
 from taskiq.message import TaskiqMessage
