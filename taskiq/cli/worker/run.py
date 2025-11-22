@@ -133,14 +133,17 @@ def start_listen(args: WorkerArgs) -> None:
     # We must set this field before importing tasks,
     # so broker will remember all tasks it's related to.
 
-    broker = import_object(args.broker, app_dir=args.app_dir)
-    if inspect.isfunction(broker):
-        broker = broker()
-    if not isinstance(broker, AsyncBroker):
-        raise ValueError(
-            "Unknown broker type. Please use AsyncBroker instance "
-            "or pass broker factory function that returns an AsyncBroker instance.",
-        )
+    if isinstance(args.broker, AsyncBroker):
+        broker = args.broker
+    else:
+        broker = import_object(args.broker, app_dir=args.app_dir)
+        if inspect.isfunction(broker):
+            broker = broker()
+        if not isinstance(broker, AsyncBroker):
+            raise ValueError(
+                "Unknown broker type. Please use AsyncBroker instance "
+                "or pass broker factory function that returns an AsyncBroker instance.",
+            )
 
     broker.is_worker_process = True
     import_tasks(args.modules, args.tasks_pattern, args.fs_discover)

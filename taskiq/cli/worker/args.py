@@ -1,7 +1,8 @@
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from dataclasses import dataclass, field
-from typing import List, Optional, Sequence, Tuple
+from typing import List, Optional, Sequence, Tuple, Union
 
+from taskiq.abc.broker import AsyncBroker
 from taskiq.acks import AcknowledgeType
 from taskiq.cli.common_args import LogLevel
 
@@ -24,7 +25,7 @@ def receiver_arg_type(string: str) -> Tuple[str, str]:
 class WorkerArgs:
     """Taskiq worker CLI arguments."""
 
-    broker: str
+    broker: Union[str, AsyncBroker]
     modules: List[str]
     app_dir: Optional[str] = None
     tasks_pattern: Sequence[str] = ("**/tasks.py",)
