@@ -2,12 +2,8 @@
 name = "taskiq"
 version = "0.0.0"
 description = "Distributed task queue with full async support"
-authors = [
-    {name = "Pavel Kirilin", email = "<win10@list.ru>"}
-]
-maintainers = [
-    {name = "Pavel Kirilin", email = "<win10@list.ru>"}
-]
+authors = [{ name = "Pavel Kirilin", email = "<win10@list.ru>" }]
+maintainers = [{ name = "Pavel Kirilin", email = "<win10@list.ru>" }]
 readme = "README.md"
 repository = "https://github.com/taskiq-python/taskiq"
 homepage = "https://taskiq-python.github.io/"
@@ -15,73 +11,64 @@ documentation = "https://taskiq-python.github.io/"
 license = "MIT"
 license-files = ["LICENSE"]
 classifiers = [
-    "Typing :: Typed",
-    "Programming Language :: Python",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Operating System :: OS Independent",
-    "Intended Audience :: Developers",
-    "Topic :: System :: Networking",
-    "Development Status :: 3 - Alpha",
+	"Typing :: Typed",
+	"Programming Language :: Python",
+	"Programming Language :: Python :: 3",
+	"Programming Language :: Python :: 3 :: Only",
+	"Programming Language :: Python :: 3.9",
+	"Programming Language :: Python :: 3.10",
+	"Programming Language :: Python :: 3.11",
+	"Programming Language :: Python :: 3.12",
+	"Programming Language :: Python :: 3.13",
+	"Operating System :: OS Independent",
+	"Intended Audience :: Developers",
+	"Topic :: System :: Networking",
+	"Development Status :: 3 - Alpha",
 ]
 keywords = ["taskiq", "tasks", "distributed", "async"]
 requires-python = ">=3.9,<4"
 dependencies = [
-    "typing-extensions>=3.10.0.0; python_version < '3.11'",
-    "pydantic>=1.0,<=3.0",
-    "pycron>=3.0.0",
-    "taskiq_dependencies>=1.3.1,<2",
-    "anyio>=4",
-    "packaging>=19",
-    "izulu==0.50.0",
-    "aiohttp>=3",
+	"typing-extensions>=3.10.0.0; python_version < '3.11'",
+	"pydantic>=1.0,<=3.0",
+	"pycron>=3.0.0",
+	"taskiq_dependencies>=1.3.1,<2",
+	"anyio>=4",
+	"packaging>=19",
+	"izulu==0.50.0",
+	"aiohttp>=3",
 ]
 
 [project.optional-dependencies]
-zmq = [
-    "pyzmq>=26",
-]
-uv = [
-    "uvloop>=0.16.0,<1; sys_platform != 'win32'",
-]
-metrics = [
-    "prometheus_client>=0",
-]
-reload = [
-    "watchdog>=4",
-    "gitignore-parser>=0",
-]
-orjson = [
-    "orjson>=3",
-]
-msgpack = [
-    "msgpack>=1.0.7",
-]
-cbor = [
-    "cbor2>=5",
+zmq = ["pyzmq>=26"]
+uv = ["uvloop>=0.16.0,<1; sys_platform != 'win32'"]
+metrics = ["prometheus_client>=0"]
+reload = ["watchdog>=4", "gitignore-parser>=0"]
+orjson = ["orjson>=3"]
+msgpack = ["msgpack>=1.0.7"]
+cbor = ["cbor2>=5"]
+opentelemetry = [
+	"opentelemetry-api (>=1.38.0,<2.0.0)",
+	"opentelemetry-instrumentation (>=0.59b0,<1)",
+	"opentelemetry-semantic-conventions (>=0.59b0,<1)",
 ]
 
 [dependency-groups]
 dev = [
-    "pre-commit>=4.3.0",
-    # lint
-    "ruff>=0",
-    "black>=22.6.0",
-    # type check
-    "mypy>=1",
-    # test
-    "pytest>=7.1.2",
-    "pytest-cov>=3.0.0",
-    "coverage>=6.4.2",
-    "pytest-xdist[psutil]>=2.5.0",
-    "tox>=4.6.4",
-    "freezegun>=1.2.2",
-    "tzdata>=2025.2; sys_platform == 'win32'",
+	"pre-commit>=4.3.0",
+	# lint
+	"ruff>=0",
+	"black>=22.6.0",
+	# type check
+	"mypy>=1",
+	# test
+	"pytest>=7.1.2",
+	"pytest-cov>=3.0.0",
+	"coverage>=6.4.2",
+	"pytest-xdist[psutil]>=2.5.0",
+	"tox>=4.6.4",
+	"freezegun>=1.2.2",
+	"tzdata>=2025.2; sys_platform == 'win32'",
+	"opentelemetry-test-utils (>=0.59b0,<1)",
 ]
 
 [project.urls]
@@ -97,6 +84,9 @@ taskiq = "taskiq.__main__:main"
 [project.entry-points.taskiq_cli]
 worker = "taskiq.cli.worker.cmd:WorkerCMD"
 scheduler = "taskiq.cli.scheduler.cmd:SchedulerCMD"
+
+[project.entry-points.opentelemetry_instrumentor]
+taskiq = "taskiq.instrumentation:TaskiqInstrumentor"
 
 [tool.mypy]
 strict = true
@@ -120,14 +110,14 @@ anyio_mode = "auto"
 
 [tool.coverage.run]
 omit = [
-    "taskiq/__main__.py",
-    "taskiq/abc/cmd.py",
-    "taskiq/cli/scheduler/args.py",
-    "taskiq/cli/scheduler/cmd.py",
-    "taskiq/cli/utils.py",
-    "taskiq/cli/worker/args.py",
-    "taskiq/cli/worker/async_task_runner.py",
-    "taskiq/cli/worker/cmd.py",
+	"taskiq/__main__.py",
+	"taskiq/abc/cmd.py",
+	"taskiq/cli/scheduler/args.py",
+	"taskiq/cli/scheduler/cmd.py",
+	"taskiq/cli/utils.py",
+	"taskiq/cli/worker/args.py",
+	"taskiq/cli/worker/async_task_runner.py",
+	"taskiq/cli/worker/cmd.py",
 ]
 
 [build-system]
@@ -135,47 +125,47 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
-target-version="py39"
+target-version = "py39"
 # List of enabled rulsets.
 # See https://docs.astral.sh/ruff/rules/ for more information.
 lint.select = [
-    "E",   # Error
-    "F",   # Pyflakes
-    "W",   # Pycodestyle
-    "C90", # McCabe complexity
-    "I",   # Isort
-    "N",   # pep8-naming
-    "D",   # Pydocstyle
-    "ANN", # Pytype annotations
-    "S",   # Bandit
-    "B",   # Bugbear
-    "COM", # Commas
-    "C4",  # Comprehensions
-    "ISC", # Implicit string concat
-    "PIE", # Unnecessary code
-    "T20", # Catch prints
-    "PYI", # validate pyi files
-    "Q",   # Checks for quotes
-    "RSE", # Checks raise statements
-    "RET", # Checks return statements
-    "SLF", # Self checks
-    "SIM", # Simplificator
-    "PTH", # Pathlib checks
-    "ERA", # Checks for commented out code
-    "PL",  # PyLint checks
-    "RUF", # Specific to Ruff checks
-    "FA102",  # Future annotations
+	"E",     # Error
+	"F",     # Pyflakes
+	"W",     # Pycodestyle
+	"C90",   # McCabe complexity
+	"I",     # Isort
+	"N",     # pep8-naming
+	"D",     # Pydocstyle
+	"ANN",   # Pytype annotations
+	"S",     # Bandit
+	"B",     # Bugbear
+	"COM",   # Commas
+	"C4",    # Comprehensions
+	"ISC",   # Implicit string concat
+	"PIE",   # Unnecessary code
+	"T20",   # Catch prints
+	"PYI",   # validate pyi files
+	"Q",     # Checks for quotes
+	"RSE",   # Checks raise statements
+	"RET",   # Checks return statements
+	"SLF",   # Self checks
+	"SIM",   # Simplificator
+	"PTH",   # Pathlib checks
+	"ERA",   # Checks for commented out code
+	"PL",    # PyLint checks
+	"RUF",   # Specific to Ruff checks
+	"FA102", # Future annotations
 ]
 lint.ignore = [
-    "D105",    # Missing docstring in magic method
-    "D107",    # Missing docstring in __init__
-    "D212",    # Multi-line docstring summary should start at the first line
-    "D401",    # First line should be in imperative mood
-    "D104",    # Missing docstring in public package
-    "D100",    # Missing docstring in public module
-    "ANN401",  # typing.Any are disallowed in `**kwargs
-    "PLR0913", # Too many arguments for function call
-    "D106",    # Missing docstring in public nested class
+	"D105",    # Missing docstring in magic method
+	"D107",    # Missing docstring in __init__
+	"D212",    # Multi-line docstring summary should start at the first line
+	"D401",    # First line should be in imperative mood
+	"D104",    # Missing docstring in public package
+	"D100",    # Missing docstring in public module
+	"ANN401",  # typing.Any are disallowed in `**kwargs
+	"PLR0913", # Too many arguments for function call
+	"D106",    # Missing docstring in public nested class
 ]
 exclude = [".venv/"]
 lint.mccabe = { max-complexity = 10 }
@@ -183,13 +173,13 @@ line-length = 88
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = [
-    "S101",   # Use of assert detected
-    "S301",   # Use of pickle detected
-    "D103",   # Missing docstring in public function
-    "SLF001", # Private member accessed
-    "S311",   # Standard pseudo-random generators are not suitable for security/cryptographic purposes
-    "D101",   # Missing docstring in public class
-    "D102",  # Missing docstring in public method
+	"S101",   # Use of assert detected
+	"S301",   # Use of pickle detected
+	"D103",   # Missing docstring in public function
+	"SLF001", # Private member accessed
+	"S311",   # Standard pseudo-random generators are not suitable for security/cryptographic purposes
+	"D101",   # Missing docstring in public class
+	"D102",   # Missing docstring in public method
 ]
 
 [tool.ruff.lint.pydocstyle]
@@ -204,5 +194,5 @@ extend-immutable-calls = ["taskiq_dependencies.Depends", "taskiq.TaskiqDepends"]
 
 [tool.typos.files]
 extend-exclude = [
-    "docs/README.md",  # because of identifier in head section
+	"docs/README.md", # because of identifier in head section
 ]
