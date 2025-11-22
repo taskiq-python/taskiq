@@ -30,20 +30,17 @@ class CreatedSchedule(Generic[_ReturnType]):
     @overload
     async def kiq(
         self: "CreatedSchedule[CoroutineType[Any,Any, _T]]",
-    ) -> AsyncTaskiqTask[_T]:
-        ...
+    ) -> AsyncTaskiqTask[_T]: ...
 
     @overload
     async def kiq(
         self: "CreatedSchedule[Coroutine[Any,Any, _T]]",
-    ) -> AsyncTaskiqTask[_T]:
-        ...
+    ) -> AsyncTaskiqTask[_T]: ...
 
     @overload
     async def kiq(
         self: "CreatedSchedule[_ReturnType]",
-    ) -> AsyncTaskiqTask[_ReturnType]:
-        ...
+    ) -> AsyncTaskiqTask[_ReturnType]: ...
 
     async def kiq(self) -> Any:
         """Kick the task as if you were not scheduling it."""

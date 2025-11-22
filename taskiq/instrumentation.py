@@ -34,7 +34,6 @@ API
 ---
 """
 
-
 import logging
 from typing import Any, Callable, Collection, Optional
 from weakref import WeakSet as _WeakSet
