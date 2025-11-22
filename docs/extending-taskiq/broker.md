@@ -26,8 +26,7 @@ As a broker developer, please send only raw bytes from the `message` field of a 
 ## Acknowledgement
 
 The `listen` method should yield raw bytes of a message.
-But if your broker supports acking or rejecting messages, the broker should return `taskiq.AckableMessage`
-with required fields.
+But if your broker supports acking messages, the broker should return `taskiq.AckableMessage` with the required field.
 
 For example:
 
@@ -40,9 +39,7 @@ async def listen(self) -> AsyncGenerator[AckableMessage, None]:
          # Ack is a function that takes no parameters.
          # So you either set here method of a message,
          # or you can make a closure.
-         ack=message.ack
-         # Can be set to None if broker doesn't support it.
-         reject=message.reject
+         ack=message.ack,
       )
 ```
 
