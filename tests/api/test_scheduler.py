@@ -14,8 +14,7 @@ async def test_successful() -> None:
     scheduler_task = asyncio.create_task(run_scheduler_task(scheduler))
 
     @broker.task(schedule=[{"time": datetime.now(timezone.utc) - timedelta(seconds=1)}])
-    def _() -> None:
-        ...
+    def _() -> None: ...
 
     msg = await asyncio.wait_for(broker.queue.get(), 0.3)
     assert msg
@@ -28,8 +27,7 @@ async def test_cancelation() -> None:
     scheduler = TaskiqScheduler(broker, sources=[LabelScheduleSource(broker)])
 
     @broker.task(schedule=[{"time": datetime.now(timezone.utc)}])
-    def _() -> None:
-        ...
+    def _() -> None: ...
 
     scheduler_task = asyncio.create_task(run_scheduler_task(scheduler))
 
