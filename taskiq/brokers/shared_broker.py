@@ -1,17 +1,11 @@
-import sys
-from typing import Any, AsyncGenerator, Optional, TypeVar
+from collections.abc import AsyncGenerator
+from typing import Any, ParamSpec, TypeVar
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.decor import AsyncTaskiqDecoratedTask
 from taskiq.exceptions import SharedBrokerListenError, SharedBrokerSendTaskError
 from taskiq.kicker import AsyncKicker
 from taskiq.message import BrokerMessage
-
-if sys.version_info >= (3, 10):
-    from typing import ParamSpec
-else:
-    from typing_extensions import ParamSpec
-
 
 _ReturnType = TypeVar("_ReturnType")
 _Params = ParamSpec("_Params")
@@ -44,7 +38,7 @@ class AsyncSharedBroker(AsyncBroker):
 
     def __init__(self) -> None:
         super().__init__(None)
-        self._default_broker: Optional[AsyncBroker] = None
+        self._default_broker: AsyncBroker | None = None
         self.decorator_class = SharedDecoratedTask
 
     def default_broker(self, new_broker: AsyncBroker) -> None:

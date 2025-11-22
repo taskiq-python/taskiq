@@ -1,5 +1,3 @@
-from typing import List
-
 from taskiq.abc.schedule_source import ScheduleSource
 from taskiq.brokers.inmemory_broker import InMemoryBroker
 from taskiq.exceptions import ScheduledTaskCancelledError
@@ -8,7 +6,7 @@ from taskiq.scheduler.scheduler import TaskiqScheduler
 
 
 class CancellingScheduleSource(ScheduleSource):
-    async def get_schedules(self) -> List["ScheduledTask"]:
+    async def get_schedules(self) -> list["ScheduledTask"]:
         """Return schedules list."""
         return []
 

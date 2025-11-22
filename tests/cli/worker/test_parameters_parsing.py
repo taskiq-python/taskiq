@@ -1,6 +1,6 @@
 import inspect
 from dataclasses import dataclass
-from typing import Any, Type, get_type_hints
+from typing import Any, get_type_hints
 
 import pytest
 from pydantic import BaseModel
@@ -39,7 +39,7 @@ def test_parse_params_no_signature() -> None:
 
 
 @pytest.mark.parametrize("test_class", [_TestPydanticClass, _TestDataclass])
-def test_parse_params_classes(test_class: Type[Any]) -> None:
+def test_parse_params_classes(test_class: type[Any]) -> None:
     """Test that dataclasses are parsed correctly."""
 
     def test_func(param: test_class) -> test_class:  # type: ignore
@@ -81,7 +81,7 @@ def test_parse_params_classes(test_class: Type[Any]) -> None:
 
 
 @pytest.mark.parametrize("test_class", [_TestPydanticClass, _TestDataclass])
-def test_parse_params_wrong_data(test_class: Type[Any]) -> None:
+def test_parse_params_wrong_data(test_class: type[Any]) -> None:
     """Tests that wrong data isn't parsed and doesn't throw errors."""
 
     def test_func(param: test_class) -> test_class:  # type: ignore
@@ -121,7 +121,7 @@ def test_parse_params_wrong_data(test_class: Type[Any]) -> None:
 
 
 @pytest.mark.parametrize("test_class", [_TestPydanticClass, _TestDataclass])
-def test_parse_params_nones(test_class: Type[Any]) -> None:
+def test_parse_params_nones(test_class: type[Any]) -> None:
     """Tests that None values are not parsed."""
 
     def test_func(param: test_class) -> test_class:  # type: ignore

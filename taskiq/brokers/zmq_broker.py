@@ -1,6 +1,7 @@
 import math
+from collections.abc import AsyncGenerator, Callable
 from logging import getLogger
-from typing import AsyncGenerator, Callable, Optional, TypeVar
+from typing import TypeVar
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.result_backend import AsyncResultBackend
@@ -32,8 +33,8 @@ class ZeroMQBroker(AsyncBroker):
         self,
         zmq_pub_host: str = "tcp://0.0.0.0:5555",
         zmq_sub_host: str = "tcp://localhost:5555",
-        result_backend: "Optional[AsyncResultBackend[_T]]" = None,
-        task_id_generator: Optional[Callable[[], str]] = None,
+        result_backend: "AsyncResultBackend[_T] | None" = None,
+        task_id_generator: Callable[[], str] | None = None,
     ) -> None:
         if zmq is None:
             raise RuntimeError(

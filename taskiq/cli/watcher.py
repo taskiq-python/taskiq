@@ -1,6 +1,7 @@
+from collections.abc import Callable
 from logging import getLogger
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from gitignore_parser import parse_gitignore
 from watchdog.events import FileSystemEvent

@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 from izulu import root
 
@@ -13,7 +13,7 @@ class TaskiqResultTimeoutError(TaskiqError):
     """Waiting for task results has timed out."""
 
     __template__ = "Waiting for task results has timed out, timeout={timeout}"
-    timeout: Optional[float] = None
+    timeout: float | None = None
 
 
 class BrokerError(TaskiqError):

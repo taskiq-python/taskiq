@@ -1,5 +1,6 @@
 import datetime
-from typing import Any, Callable, Dict, Optional
+from collections.abc import Callable
+from typing import Any
 
 from taskiq.abc.serializer import TaskiqSerializer
 
@@ -19,17 +20,15 @@ class CBORSerializer(TaskiqSerializer):
     def __init__(
         self,
         datetime_as_timestamp: bool = True,
-        timezone: Optional[datetime.tzinfo] = None,
+        timezone: datetime.tzinfo | None = None,
         value_sharing: bool = False,
-        default: Optional[Callable[[Any, Any], Any]] = None,
+        default: Callable[[Any, Any], Any] | None = None,
         canonical: bool = False,
         date_as_datetime: bool = True,
         string_referencing: bool = True,
         # Decoder options
-        tag_hook: Optional[Callable[["cbor2.CBORDecoder", Any], Any]] = None,
-        object_hook: Optional[
-            Callable[["cbor2.CBORDecoder", Dict[Any, Any]], Any]
-        ] = None,
+        tag_hook: Callable[["cbor2.CBORDecoder", Any], Any] | None = None,
+        object_hook: Callable[["cbor2.CBORDecoder", dict[Any, Any]], Any] | None = None,
     ) -> None:
         if cbor2 is None:
             raise ImportError("cbor2 is not installed")

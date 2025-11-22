@@ -83,7 +83,7 @@ def test_representable(obj: Any, repr: str) -> None:
 def test_unrepresentable() -> None:
     obj = ReprStrException()
     repr = serialization.safe_repr(obj=obj)
-    assert repr.startswith("<Unrepresentable {!r}".format(type(obj)))
+    assert repr.startswith(f"<Unrepresentable {type(obj)!r}")
 
 
 def test_create_exception_cls() -> None:

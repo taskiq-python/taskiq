@@ -1,6 +1,6 @@
 import asyncio
 import datetime
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest

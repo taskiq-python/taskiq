@@ -1,5 +1,5 @@
 import asyncio
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 from taskiq import AsyncBroker, BrokerMessage
 from taskiq.acks import AckableMessage
@@ -14,7 +14,7 @@ class AsyncQueueBroker(AsyncBroker):
     """
 
     def __init__(self) -> None:
-        self.queue: "asyncio.Queue[bytes]" = asyncio.Queue()
+        self.queue: asyncio.Queue[bytes] = asyncio.Queue()
         super().__init__(None, None)
 
     async def kick(self, message: BrokerMessage) -> None:

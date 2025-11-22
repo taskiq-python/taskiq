@@ -1,5 +1,5 @@
 import asyncio
-from typing import Annotated, Optional
+from typing import Annotated
 
 from redis.asyncio import ConnectionPool, Redis  # type: ignore
 from taskiq_aio_pika import AioPikaBroker
@@ -33,7 +33,7 @@ async def shutdown(state: TaskiqState) -> None:
 async def get_val(
     key: str,
     context: Annotated[Context, TaskiqDepends()],
-) -> Optional[str]:
+) -> str | None:
     # Now we can use our pool.
     redis = Redis(connection_pool=context.state.redis, decode_responses=True)
     return await redis.get(key)

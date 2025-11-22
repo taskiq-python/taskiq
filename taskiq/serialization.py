@@ -1,17 +1,12 @@
 import sys
 import traceback
+from collections.abc import Iterable
 from inspect import getmro
 from itertools import takewhile
 from typing import (
     Any,
     Generic,
-    Iterable,
-    List,
-    Optional,
     Protocol,
-    Set,
-    Tuple,
-    Type,
     TypeVar,
     Union,
     runtime_checkable,
@@ -26,7 +21,7 @@ DecodedType = TypeVar("DecodedType")
 EncodedType = TypeVar("EncodedType")
 
 UNWANTED_BASE_CLASSES = (Exception, BaseException, object)
-SEEN_EXCEPTIONS_CACHE: Set[int] = set()
+SEEN_EXCEPTIONS_CACHE: set[int] = set()
 
 
 @runtime_checkable
@@ -67,9 +62,9 @@ def safe_repr(obj: Any) -> str:
 
 def subclass_exception(
     name: str,
-    parent: Type[Exception],
+    parent: type[Exception],
     module: str,
-) -> Type[Exception]:
+) -> type[Exception]:
     """Create new exception class.
 
     :param name: cls name
@@ -83,8 +78,8 @@ def subclass_exception(
 def create_exception_cls(
     name: str,
     module: str,
-    parent: Optional[Type[Exception]] = None,
-) -> Type[Exception]:
+    parent: type[Exception] | None = None,
+) -> type[Exception]:
     """Dynamically create an exception class.
 
     :param name: cls name
@@ -101,7 +96,7 @@ def create_exception_cls(
 def ensure_serializable(
     items: Iterable[DecodedType],
     coder: Coder[DecodedType, Any],
-) -> Tuple[Union[DecodedType, str], ...]:
+) -> tuple[DecodedType | str, ...]:
     """Ensure items will serialize.
 
     For a given list of arbitrary objects, return the object
@@ -111,7 +106,7 @@ def ensure_serializable(
     :param coder: serializaer
     :return: tuple of serializable values
     """
-    safe_exc_args: List[Union[DecodedType, str]] = []
+    safe_exc_args: list[DecodedType | str] = []
 
     for arg in items:
         try:
@@ -130,7 +125,7 @@ class _UnpickleableExceptionWrapper(Exception):  # noqa: N818
         self,
         exc_module: str,
         exc_cls_name: str,
-        exc_args: Tuple[Any, ...],
+        exc_args: tuple[Any, ...],
         text: str = "",
     ) -> None:
         self.exc_module = exc_module
@@ -179,16 +174,16 @@ class _UnpickleableExceptionWrapper(Exception):  # noqa: N818
 
 
 def _itermro(
-    cls: Type[BaseException],
-    stop: Iterable[Type[Any]],
-) -> Iterable[Type[BaseException]]:
+    cls: type[BaseException],
+    stop: Iterable[type[Any]],
+) -> Iterable[type[BaseException]]:
     return takewhile(lambda sup: sup not in stop, getmro(cls))
 
 
 def find_pickleable_exception(
     exc: BaseException,
     coder: Coder[Any, Any],
-) -> Optional[BaseException]:
+) -> BaseException | None:
     """Find first pickleable exception base class.
 
     With an exception instance, iterate over its super classes (by MRO)
@@ -216,7 +211,7 @@ def find_pickleable_exception(
 def get_pickleable_exception(
     exc: BaseException,
     coder: Coder[Any, Any],
-) -> Optional[BaseException]:
+) -> BaseException | None:
     """Make sure exception is pickleable.
 
     :param exc: exception
@@ -254,10 +249,10 @@ if IS_PYDANTIC2:
         """Serializable exception model for pydantic v2."""
 
         exc_type: str
-        exc_message: Tuple[Any, ...]
-        exc_module: Optional[str]
-        exc_cause: Optional[Union[BaseException, "ExceptionRepr"]] = None
-        exc_context: Optional[Union[BaseException, "ExceptionRepr"]] = None
+        exc_message: tuple[Any, ...]
+        exc_module: str | None
+        exc_cause: Union[BaseException, "ExceptionRepr"] | None = None
+        exc_context: Union[BaseException, "ExceptionRepr"] | None = None
         exc_suppress_context: bool = False
 
         model_config = pydantic.ConfigDict(arbitrary_types_allowed=True)
@@ -268,10 +263,10 @@ else:
         """Serializable exception model for pydantic v1."""
 
         exc_type: str
-        exc_message: Tuple[Any, ...]
-        exc_module: Optional[str]
-        exc_cause: Optional[Union[BaseException, "ExceptionRepr"]] = None
-        exc_context: Optional[Union[BaseException, "ExceptionRepr"]] = None
+        exc_message: tuple[Any, ...]
+        exc_module: str | None
+        exc_cause: Union[BaseException, "ExceptionRepr"] | None = None
+        exc_context: Union[BaseException, "ExceptionRepr"] | None = None
         exc_suppress_context: bool = False
 
         class Config:
@@ -281,7 +276,7 @@ else:
 def _prepare_exception(
     exc: BaseException,
     coder: Coder[Any, Any],
-) -> Optional[Union[BaseException, ExceptionRepr]]:
+) -> BaseException | ExceptionRepr | None:
     # Prevent infinite loop
     if id(exc) in SEEN_EXCEPTIONS_CACHE:
         return None
@@ -320,7 +315,7 @@ def _prepare_exception(
 def prepare_exception(
     exc: BaseException,
     coder: Coder[Any, Any],
-) -> Union[BaseException, ExceptionRepr]:
+) -> BaseException | ExceptionRepr:
     """Prepare exception for serialization.
 
     :param exc: exception to encode
@@ -333,8 +328,8 @@ def prepare_exception(
 
 @validate_call(config=pydantic.ConfigDict(arbitrary_types_allowed=True))
 def exception_to_python(
-    exc: Optional[Union[BaseException, ExceptionRepr]],
-) -> Optional[BaseException]:
+    exc: BaseException | ExceptionRepr | None,
+) -> BaseException | None:
     """Convert serialized exception to Python exception.
 
     :param exc: encoded exception
