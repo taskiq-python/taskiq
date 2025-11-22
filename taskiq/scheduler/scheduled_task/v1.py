@@ -4,6 +4,8 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, root_validator
 
+from taskiq.scheduler.scheduled_task.validators import validate_interval_value
+
 
 class ScheduledTask(BaseModel):
     """Abstraction over task schedule."""
@@ -17,15 +19,22 @@ class ScheduledTask(BaseModel):
     cron: Optional[str] = None
     cron_offset: Optional[Union[str, timedelta]] = None
     time: Optional[datetime] = None
+    interval: Union[int, timedelta, None] = None
 
     @root_validator(pre=False)  # type: ignore
     @classmethod
     def __check(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        This method validates, that either `cron` or `time` field is present.
+        """Validate.
 
-        :raises ValueError: if cron and time are none.
+        This method validates,
+        that either `cron`, `interval` or `time` field is present.
+        For interval tasks, validates that interval is at least 1 second
+        and has no fractional seconds.
+
+        :raises ValueError: if cron, interval and time are none, or interval is invalid.
         """
-        if values.get("cron") is None and values.get("time") is None:
-            raise ValueError("Either cron or datetime must be present.")
+        if all(values.get(key) is None for key in ("cron", "interval", "time")):
+            raise ValueError("Either cron, interval, or datetime must be present.")
+
+        validate_interval_value(values.get("interval"))
         return values
