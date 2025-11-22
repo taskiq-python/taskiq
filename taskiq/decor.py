@@ -109,24 +109,21 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         self: "AsyncTaskiqDecoratedTask[_FuncParams, CoroutineType[Any, Any, _T]]",
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
-    ) -> AsyncTaskiqTask[_T]:
-        ...
+    ) -> AsyncTaskiqTask[_T]: ...
 
     @overload
     async def kiq(
         self: "AsyncTaskiqDecoratedTask[_FuncParams, Coroutine[Any, Any, _T]]",
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
-    ) -> AsyncTaskiqTask[_T]:
-        ...
+    ) -> AsyncTaskiqTask[_T]: ...
 
     @overload
     async def kiq(
         self: "AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]",
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
-    ) -> AsyncTaskiqTask[_ReturnType]:
-        ...
+    ) -> AsyncTaskiqTask[_ReturnType]: ...
 
     async def kiq(
         self,
