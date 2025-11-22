@@ -3,7 +3,7 @@ import inspect
 import sys
 from datetime import datetime, timedelta, timezone
 from logging import basicConfig, getLogger
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from zoneinfo import ZoneInfo
 
 import pycron
@@ -59,23 +59,22 @@ async def get_schedules(source: ScheduleSource) -> List[ScheduledTask]:
 
 async def get_all_schedules(
     scheduler: TaskiqScheduler,
-) -> Dict[ScheduleSource, List[ScheduledTask]]:
+) -> List[Tuple[ScheduleSource, List[ScheduledTask]]]:
     """
     Task to update all schedules.
 
     This function updates all schedules
-    from all sources and returns a dict
-    with source as a key and list of
-    scheduled tasks as a value.
+    from all sources and returns a list
+    of (source, tasks) pairs.
 
     :param scheduler: current scheduler.
-    :return: dict with source as a key and list of scheduled tasks as a value.
+    :return: list of (source, tasks) pairs.
     """
     logger.debug("Started schedule update.")
     schedules: List[List[ScheduledTask]] = await asyncio.gather(
         *[get_schedules(source) for source in scheduler.sources],
     )
-    return dict(zip(scheduler.sources, schedules))
+    return list(zip(scheduler.sources, schedules))
 
 
 class CronValueError(Exception):
@@ -197,7 +196,7 @@ class SchedulerLoop:
         self.interval_tasks_last_run: dict[ScheduleId, datetime] = {}
         self.time_tasks_last_run: dict[ScheduleId, datetime] = {}
 
-        self.scheduled_tasks: Dict[ScheduleSource, List[ScheduledTask]] = {}
+        self.scheduled_tasks: List[Tuple[ScheduleSource, List[ScheduledTask]]] = []
         self.scheduled_tasks_updated_at: Optional[datetime] = None
         self._update_schedules_task_future: Optional[asyncio.Task[Any]] = None
 
@@ -205,7 +204,7 @@ class SchedulerLoop:
         self.scheduled_tasks = task_.result()
 
         new_schedules_ids: set[ScheduleId] = set()
-        for source, task_list in self.scheduled_tasks.items():
+        for source, task_list in self.scheduled_tasks:
             logger.debug("Got %d schedules from source %s.", len(task_list), source)
             new_schedules_ids.update({t.schedule_id for t in task_list})
 
@@ -237,7 +236,7 @@ class SchedulerLoop:
 
     def _mark_cron_tasks_as_already_run(self) -> None:
         current_minute = datetime.now(tz=timezone.utc).replace(second=0, microsecond=0)
-        for _, task_list in self.scheduled_tasks.items():
+        for _, task_list in self.scheduled_tasks:
             for task in task_list:
                 if task.cron is not None:
                     self.cron_tasks_last_run[task.schedule_id] = current_minute
@@ -328,7 +327,7 @@ class SchedulerLoop:
                 await self._update_scheduled_tasks()
                 self.scheduled_tasks_updated_at = now
 
-            for source, task_list in self.scheduled_tasks.items():
+            for source, task_list in self.scheduled_tasks:
                 for task in task_list:
                     is_ready_to_send: bool = self._is_schedule_ready_to_send(
                         task=task,
