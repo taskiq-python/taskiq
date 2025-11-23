@@ -1,6 +1,6 @@
 from argparse import ZERO_OR_MORE, ArgumentDefaultsHelpFormatter, ArgumentParser
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import List, Optional, Sequence, Union
 
 from taskiq.cli.common_args import LogLevel
 from taskiq.scheduler.scheduler import TaskiqScheduler
@@ -10,19 +10,19 @@ from taskiq.scheduler.scheduler import TaskiqScheduler
 class SchedulerArgs:
     """Arguments for scheduler."""
 
-    scheduler: Union[str, TaskiqScheduler]
-    modules: List[str]
-    app_dir: Optional[str] = None
+    scheduler: str | TaskiqScheduler
+    modules: list[str]
+    app_dir: str | None = None
     log_level: LogLevel = LogLevel.INFO
     configure_logging: bool = True
     fs_discover: bool = False
     tasks_pattern: Sequence[str] = ("**/tasks.py",)
     skip_first_run: bool = False
-    update_interval: Optional[int] = None
-    loop_interval: Optional[int] = None
+    update_interval: int | None = None
+    loop_interval: int | None = None
 
     @classmethod
-    def from_cli(cls, args: Optional[Sequence[str]] = None) -> "SchedulerArgs":
+    def from_cli(cls, args: Sequence[str] | None = None) -> "SchedulerArgs":
         """
         Build scheduler args from CLI arguments.
 

@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 import pytest
 
@@ -45,7 +44,7 @@ def test_time_with_local_zone() -> None:
 def test_is_time_task_now(
     time_value: datetime,
     now: datetime,
-    last_run: Optional[datetime],
+    last_run: datetime | None,
     expected: bool,
 ) -> None:
     assert is_time_task_now(time_value, now, last_run) == expected

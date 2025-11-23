@@ -1,6 +1,7 @@
 import inspect
+from collections.abc import Awaitable, Coroutine
 from types import CoroutineType
-from typing import Any, Awaitable, Coroutine, TypeVar, Union
+from typing import Any, TypeVar, Union
 
 _T = TypeVar("_T")
 

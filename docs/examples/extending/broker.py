@@ -1,4 +1,4 @@
-from typing import AsyncGenerator, Union
+from collections.abc import AsyncGenerator
 
 from taskiq import AckableMessage, AsyncBroker, BrokerMessage
 
@@ -23,7 +23,7 @@ class MyBroker(AsyncBroker):
         # Send a message.message.
         pass
 
-    async def listen(self) -> AsyncGenerator[Union[bytes, AckableMessage], None]:
+    async def listen(self) -> AsyncGenerator[bytes | AckableMessage, None]:
         while True:
             # Get new message.
             new_message: bytes = ...  # type: ignore

@@ -1,5 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict, Optional
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -16,9 +16,9 @@ from taskiq.receiver import Receiver
 
 
 def get_receiver(
-    broker: Optional[AsyncBroker] = None,
+    broker: AsyncBroker | None = None,
     no_parse: bool = False,
-    max_async_tasks: Optional[int] = None,
+    max_async_tasks: int | None = None,
 ) -> Receiver:
     """
     Returns receiver with custom broker and args.
@@ -40,10 +40,10 @@ def get_receiver(
 
 def get_message(
     task: AsyncTaskiqDecoratedTask[Any, Any],
-    task_id: Optional[str] = None,
+    task_id: str | None = None,
     *args: Any,
-    labels: Optional[Dict[str, str]] = None,
-    **kwargs: Dict[str, Any],
+    labels: dict[str, str] | None = None,
+    **kwargs: dict[str, Any],
 ) -> TaskiqMessage:
     if labels is None:
         labels = {}

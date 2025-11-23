@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Generic, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from taskiq.result import TaskiqResult
 
@@ -70,7 +70,7 @@ class AsyncResultBackend(ABC, Generic[_ReturnType]):
     async def get_progress(
         self,
         task_id: str,
-    ) -> "Optional[TaskProgress[Any]]":
+    ) -> "TaskProgress[Any] | None":
         """
         Gets progress.
 
