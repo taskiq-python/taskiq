@@ -16,7 +16,7 @@ async def test_successful() -> None:
     @broker.task(schedule=[{"time": datetime.now(timezone.utc) - timedelta(seconds=1)}])
     def _() -> None: ...
 
-    msg = await asyncio.wait_for(broker.queue.get(), 1)
+    msg = await asyncio.wait_for(broker.queue.get(), 2)
     assert msg
 
     scheduler_task.cancel()

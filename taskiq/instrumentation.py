@@ -114,7 +114,7 @@ class TaskiqInstrumentor(BaseInstrumentor):
 
     def instrumentation_dependencies(self) -> Collection[str]:
         """This function tells which library this instrumentor instruments."""
-        return ("taskiq >= 0.0.1",)
+        return ("taskiq >= 0.0.0",)
 
     @classmethod
     def _start_listen_with_initialize(cls, args: WorkerArgs) -> None:
