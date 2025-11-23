@@ -31,6 +31,8 @@ T = TypeVar("T")
 # Taskiq Context key
 CTX_KEY = "__otel_task_span"
 
+# unlike pydantic v2, v1 includes CTX_KEY by default
+# excluding it here
 PYDANTIC_VER = parse(version("pydantic"))
 IS_PYDANTIC1 = Version("2.0") > PYDANTIC_VER
 if IS_PYDANTIC1:
@@ -107,6 +109,8 @@ def attach_context(
 
     if ctx_dict is None:
         ctx_dict = {}
+        # use object.__setattr__ directly
+        # to skip pydantic v1 setattr
         object.__setattr__(message, CTX_KEY, ctx_dict)
 
     ctx_dict[(message.task_id, is_publish)] = (span, activation, token)

@@ -11,13 +11,13 @@ class TestTaskiqAutoInstrumentation(TestBase):
     def test_auto_instrument(self) -> None:
         TaskiqInstrumentor().instrument()
 
-        broker = InMemoryBroker(await_inplace=True)
-
-        @broker.task
-        async def task_add(a: float, b: float) -> float:
-            return a + b
-
         async def test() -> None:
+            broker = InMemoryBroker(await_inplace=True)
+
+            @broker.task
+            async def task_add(a: float, b: float) -> float:
+                return a + b
+
             await task_add.kiq(1, 2)
             await broker.wait_all()
 
