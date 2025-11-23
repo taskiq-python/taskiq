@@ -15,7 +15,6 @@ classifiers = [
 	"Programming Language :: Python",
 	"Programming Language :: Python :: 3",
 	"Programming Language :: Python :: 3 :: Only",
-	"Programming Language :: Python :: 3.9",
 	"Programming Language :: Python :: 3.10",
 	"Programming Language :: Python :: 3.11",
 	"Programming Language :: Python :: 3.12",
@@ -26,7 +25,7 @@ classifiers = [
 	"Development Status :: 3 - Alpha",
 ]
 keywords = ["taskiq", "tasks", "distributed", "async"]
-requires-python = ">=3.9,<4"
+requires-python = ">=3.10,<4"
 dependencies = [
 	"typing-extensions>=3.10.0.0; python_version < '3.11'",
 	"pydantic>=1.0,<=3.0",
@@ -54,19 +53,19 @@ opentelemetry = [
 
 [dependency-groups]
 dev = [
-	"pre-commit>=4.3.0",
+	"pre-commit>=4.4.0",
 	# lint
-	"ruff>=0",
-	"black>=22.6.0",
+	"ruff>=0.14.5",
+	"black>=25.11.0",
 	# type check
-	"mypy>=1",
+	"mypy>=1.18.2",
 	# test
-	"pytest>=7.1.2",
-	"pytest-cov>=3.0.0",
-	"coverage>=6.4.2",
-	"pytest-xdist[psutil]>=2.5.0",
-	"tox>=4.6.4",
-	"freezegun>=1.2.2",
+	"pytest>=9.0.1",
+	"pytest-cov>=7.0.0",
+	"coverage>=7.11.3",
+	"pytest-xdist[psutil]>=3.8.0",
+	"tox>=4.32.0",
+	"freezegun>=1.5.5",
 	"tzdata>=2025.2; sys_platform == 'win32'",
 	"opentelemetry-test-utils (>=0.59b0,<1)",
 ]
@@ -89,6 +88,7 @@ scheduler = "taskiq.cli.scheduler.cmd:SchedulerCMD"
 taskiq = "taskiq.instrumentation:TaskiqInstrumentor"
 
 [tool.mypy]
+python_version = "3.10"
 strict = true
 ignore_missing_imports = true
 allow_subclassing_any = true
@@ -121,11 +121,15 @@ omit = [
 ]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.8.14,<0.9.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "taskiq"
+module-root = ""
 
 [tool.ruff]
-target-version = "py39"
+target-version="py310"
 # List of enabled rulsets.
 # See https://docs.astral.sh/ruff/rules/ for more information.
 lint.select = [
@@ -155,6 +159,7 @@ lint.select = [
 	"PL",    # PyLint checks
 	"RUF",   # Specific to Ruff checks
 	"FA102", # Future annotations
+	"UP",    # Pyupgrade
 ]
 lint.ignore = [
 	"D105",    # Missing docstring in magic method
@@ -180,6 +185,14 @@ line-length = 88
 	"S311",   # Standard pseudo-random generators are not suitable for security/cryptographic purposes
 	"D101",   # Missing docstring in public class
 	"D102",   # Missing docstring in public method
+]
+"docs/examples/*" = [
+	"D103",  # Missing docstring in public function
+    "D101",   # Missing docstring in public class
+    "D102",  # Missing docstring in public method
+    "S311",  #  Standard pseudo-random generators
+    "S101",  # use of asserts detected
+    "T201",  # print found
 ]
 
 [tool.ruff.lint.pydocstyle]

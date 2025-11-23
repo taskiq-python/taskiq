@@ -1,5 +1,5 @@
 from logging import getLogger
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
 from taskiq.exceptions import ScheduledTaskCancelledError
 from taskiq.kicker import AsyncKicker
@@ -19,7 +19,7 @@ class TaskiqScheduler:
     def __init__(
         self,
         broker: "AsyncBroker",
-        sources: List["ScheduleSource"],
+        sources: list["ScheduleSource"],
     ) -> None:  # pragma: no cover
         self.broker = broker
         self.sources = sources

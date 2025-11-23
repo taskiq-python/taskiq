@@ -1,15 +1,12 @@
 import sys
-from collections.abc import Coroutine
+from collections.abc import Callable, Coroutine
 from datetime import datetime, timedelta
 from types import CoroutineType
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
     Generic,
-    Optional,
-    Type,
+    ParamSpec,
     TypeVar,
     Union,
     overload,
@@ -18,11 +15,6 @@ from typing import (
 from taskiq.kicker import AsyncKicker
 from taskiq.scheduler.created_schedule import CreatedSchedule
 from taskiq.task import AsyncTaskiqTask
-
-if sys.version_info >= (3, 10):
-    from typing import ParamSpec
-else:
-    from typing_extensions import ParamSpec
 
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.broker import AsyncBroker
@@ -55,8 +47,8 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         broker: "AsyncBroker",
         task_name: str,
         original_func: Callable[_FuncParams, _ReturnType],
-        labels: Dict[str, Any],
-        return_type: Optional[Type[_ReturnType]] = None,
+        labels: dict[str, Any],
+        return_type: type[_ReturnType] | None = None,
     ) -> None:
         self.broker = broker
         self.task_name = task_name
@@ -172,7 +164,7 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
     async def schedule_by_interval(
         self,
         source: "ScheduleSource",
-        interval: Union[int, timedelta],
+        interval: int | timedelta,
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
     ) -> CreatedSchedule[_ReturnType]:

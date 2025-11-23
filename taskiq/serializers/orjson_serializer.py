@@ -1,4 +1,5 @@
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 from taskiq.abc.serializer import TaskiqSerializer
 
@@ -13,8 +14,8 @@ class ORJSONSerializer(TaskiqSerializer):
 
     def __init__(
         self,
-        default: Optional[Callable[[Any], Any]] = None,
-        option: Optional[int] = None,
+        default: Callable[[Any], Any] | None = None,
+        option: int | None = None,
     ) -> None:
         if orjson is None:
             raise ImportError("orjson is not installed")

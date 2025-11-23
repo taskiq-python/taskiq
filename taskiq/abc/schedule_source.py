@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Coroutine
 from types import CoroutineType
-from typing import TYPE_CHECKING, Any, List, Union
+from typing import TYPE_CHECKING, Any, Union
 
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.scheduler.scheduled_task import ScheduledTask
@@ -17,7 +17,7 @@ class ScheduleSource(ABC):
         """Actions to execute during shutdown."""
 
     @abstractmethod
-    async def get_schedules(self) -> List["ScheduledTask"]:
+    async def get_schedules(self) -> list["ScheduledTask"]:
         """Get list of taskiq schedules."""
 
     async def add_schedule(

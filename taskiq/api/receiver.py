@@ -1,7 +1,6 @@
 import asyncio
 from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from logging import getLogger
-from typing import Optional, Type
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.acks import AcknowledgeType
@@ -12,14 +11,14 @@ logger = getLogger("taskiq.receiver")
 
 async def run_receiver_task(
     broker: AsyncBroker,
-    receiver_cls: Type[Receiver] = Receiver,
-    sync_workers: Optional[int] = None,
+    receiver_cls: type[Receiver] = Receiver,
+    sync_workers: int | None = None,
     validate_params: bool = True,
     max_async_tasks: int = 100,
     max_prefetch: int = 0,
     propagate_exceptions: bool = True,
     run_startup: bool = False,
-    ack_time: Optional[AcknowledgeType] = None,
+    ack_time: AcknowledgeType | None = None,
     use_process_pool: bool = False,
 ) -> None:
     """

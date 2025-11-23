@@ -7,7 +7,7 @@ import sys
 from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from multiprocessing import get_start_method, set_start_method
 from sys import platform
-from typing import Any, Optional, Type
+from typing import Any
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.cli.utils import import_object, import_tasks
@@ -56,7 +56,7 @@ async def shutdown_broker(broker: AsyncBroker, timeout: float) -> None:
         )
 
 
-def get_receiver_type(args: WorkerArgs) -> Type[Receiver]:
+def get_receiver_type(args: WorkerArgs) -> type[Receiver]:
     """
     Import Receiver from args.
 
@@ -177,7 +177,7 @@ def start_listen(args: WorkerArgs) -> None:
         loop.run_until_complete(shutdown_broker(broker, args.shutdown_timeout))
 
 
-def run_worker(args: WorkerArgs) -> Optional[int]:
+def run_worker(args: WorkerArgs) -> int | None:
     """
     This function starts worker processes.
 

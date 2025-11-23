@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-from typing import Optional, Union
 
 import pytest
 
@@ -27,9 +26,9 @@ from taskiq.cli.scheduler.run import is_interval_task_now
     ],
 )
 def test_is_interval_task_now(
-    interval_value: Union[int, timedelta],
+    interval_value: int | timedelta,
     now: datetime,
-    last_run: Optional[datetime],
+    last_run: datetime | None,
     expected: bool,
 ) -> None:
     assert is_interval_task_now(interval_value, now, last_run) == expected

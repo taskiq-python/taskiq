@@ -1,7 +1,7 @@
 import logging
 from contextlib import AbstractContextManager
 from importlib.metadata import version
-from typing import Any, Dict, Optional, Tuple, TypeVar
+from typing import Any, TypeVar
 
 from packaging.version import Version, parse
 
@@ -60,7 +60,7 @@ _TASK_RETRY_REASON_KEY = "taskiq.retry.reason"
 _TASK_NAME_KEY = "taskiq.task_name"
 
 
-def set_attributes_from_context(span: Span, context: Dict[str, Any]) -> None:
+def set_attributes_from_context(span: Span, context: dict[str, Any]) -> None:
     """Helper to extract meta values from a Taskiq Context."""
     if not span.is_recording():
         return
@@ -82,10 +82,10 @@ def set_attributes_from_context(span: Span, context: Dict[str, Any]) -> None:
 
 
 def attach_context(
-    message: Optional[TaskiqMessage],
+    message: TaskiqMessage | None,
     span: Span,
     activation: AbstractContextManager[Span],
-    token: Optional[object],
+    token: object | None,
     is_publish: bool = False,
 ) -> None:
     """
@@ -129,7 +129,7 @@ def detach_context(message: TaskiqMessage, is_publish: bool = False) -> None:
 def retrieve_context(
     message: TaskiqMessage,
     is_publish: bool = False,
-) -> Optional[Tuple[Span, AbstractContextManager[Span], Optional[object]]]:
+) -> tuple[Span, AbstractContextManager[Span], object | None] | None:
     """Retrieve context from `TaskiqMessage`."""
     span_dict = getattr(message, CTX_KEY, None)
     if span_dict is None:
@@ -144,10 +144,10 @@ class OpenTelemetryMiddleware(TaskiqMiddleware):
 
     def __init__(
         self,
-        tracer_provider: Optional[TracerProvider] = None,
-        meter_provider: Optional[MeterProvider] = None,
-        tracer: Optional[Tracer] = None,
-        meter: Optional[Meter] = None,
+        tracer_provider: TracerProvider | None = None,
+        meter_provider: MeterProvider | None = None,
+        tracer: Tracer | None = None,
+        meter: Meter | None = None,
     ) -> None:
         super().__init__()
         self._tracer = (

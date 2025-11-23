@@ -1,13 +1,12 @@
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import List, Optional, Sequence, Tuple, Union
 
-from taskiq.abc.broker import AsyncBroker
 from taskiq.acks import AcknowledgeType
 from taskiq.cli.common_args import LogLevel
 
 
-def receiver_arg_type(string: str) -> Tuple[str, str]:
+def receiver_arg_type(string: str) -> tuple[str, str]:
     """
     Parse cli --receiver_arg argument value.
 
@@ -25,9 +24,9 @@ def receiver_arg_type(string: str) -> Tuple[str, str]:
 class WorkerArgs:
     """Taskiq worker CLI arguments."""
 
-    broker: Union[str, AsyncBroker]
-    modules: List[str]
-    app_dir: Optional[str] = None
+    broker: str
+    modules: list[str]
+    app_dir: str | None = None
     tasks_pattern: Sequence[str] = ("**/tasks.py",)
     fs_discover: bool = False
     configure_logging: bool = True
@@ -36,29 +35,29 @@ class WorkerArgs:
         "[%(asctime)s][%(name)s][%(levelname)-7s][%(processName)s] %(message)s"
     )
     workers: int = 2
-    max_threadpool_threads: Optional[int] = None
-    max_process_pool_processes: Optional[int] = None
+    max_threadpool_threads: int | None = None
+    max_process_pool_processes: int | None = None
     no_parse: bool = False
     shutdown_timeout: float = 5
     reload: bool = False
-    reload_dirs: List[str] = field(default_factory=list)
+    reload_dirs: list[str] = field(default_factory=list)
     no_gitignore: bool = False
     max_async_tasks: int = 100
     receiver: str = "taskiq.receiver:Receiver"
-    receiver_arg: List[Tuple[str, str]] = field(default_factory=list)
+    receiver_arg: list[tuple[str, str]] = field(default_factory=list)
     max_prefetch: int = 0
     no_propagate_errors: bool = False
     max_fails: int = -1
     ack_type: AcknowledgeType = AcknowledgeType.WHEN_SAVED
-    max_tasks_per_child: Optional[int] = None
-    wait_tasks_timeout: Optional[float] = None
+    max_tasks_per_child: int | None = None
+    wait_tasks_timeout: float | None = None
     hardkill_count: int = 3
     use_process_pool: bool = False
 
     @classmethod
     def from_cli(
         cls,
-        args: Optional[Sequence[str]] = None,
+        args: Sequence[str] | None = None,
     ) -> "WorkerArgs":
         """
         Construct TaskiqArgs instanc from CLI arguments.

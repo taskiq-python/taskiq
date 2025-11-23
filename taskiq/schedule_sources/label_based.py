@@ -1,6 +1,5 @@
 import uuid
 from logging import getLogger
-from typing import Dict, List
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.schedule_source import ScheduleSource
@@ -14,7 +13,7 @@ class LabelScheduleSource(ScheduleSource):
 
     def __init__(self, broker: AsyncBroker) -> None:
         self.broker = broker
-        self.schedules: Dict[str, ScheduledTask] = {}
+        self.schedules: dict[str, ScheduledTask] = {}
 
     async def startup(self) -> None:
         """
@@ -66,7 +65,7 @@ class LabelScheduleSource(ScheduleSource):
 
         return await super().startup()
 
-    async def get_schedules(self) -> List["ScheduledTask"]:
+    async def get_schedules(self) -> list["ScheduledTask"]:
         """
         Collect schedules for all tasks.
 

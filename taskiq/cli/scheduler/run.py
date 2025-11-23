@@ -3,11 +3,10 @@ import inspect
 import sys
 from datetime import datetime, timedelta, timezone
 from logging import basicConfig, getLogger
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, TypeAlias
 from zoneinfo import ZoneInfo
 
 import pycron
-from typing_extensions import TypeAlias
 
 from taskiq.abc.schedule_source import ScheduleSource
 from taskiq.cli.scheduler.args import SchedulerArgs
@@ -37,7 +36,7 @@ def to_tz_aware(time: datetime) -> datetime:
     return time
 
 
-async def get_schedules(source: ScheduleSource) -> List[ScheduledTask]:
+async def get_schedules(source: ScheduleSource) -> list[ScheduledTask]:
     """
     Get schedules from source.
 
@@ -59,7 +58,7 @@ async def get_schedules(source: ScheduleSource) -> List[ScheduledTask]:
 
 async def get_all_schedules(
     scheduler: TaskiqScheduler,
-) -> List[Tuple[ScheduleSource, List[ScheduledTask]]]:
+) -> list[tuple[ScheduleSource, list[ScheduledTask]]]:
     """
     Task to update all schedules.
 
@@ -71,10 +70,10 @@ async def get_all_schedules(
     :return: list of (source, tasks) pairs.
     """
     logger.debug("Started schedule update.")
-    schedules: List[List[ScheduledTask]] = await asyncio.gather(
+    schedules: list[list[ScheduledTask]] = await asyncio.gather(
         *[get_schedules(source) for source in scheduler.sources],
     )
-    return list(zip(scheduler.sources, schedules))
+    return list(zip(scheduler.sources, schedules, strict=True))
 
 
 class CronValueError(Exception):
@@ -84,8 +83,8 @@ class CronValueError(Exception):
 def is_cron_task_now(
     cron_value: str,
     now: datetime,
-    offset: Union[str, timedelta, None] = None,
-    last_run: Optional[datetime] = None,
+    offset: str | timedelta | None = None,
+    last_run: datetime | None = None,
 ) -> bool:
     """
     Checks whether the cron task should start now.
@@ -115,7 +114,7 @@ def is_cron_task_now(
 def is_time_task_now(
     time_value: datetime,
     now: datetime,
-    last_run: Optional[datetime] = None,
+    last_run: datetime | None = None,
 ) -> bool:
     """Checks whether the time task should start now."""
     if last_run is not None:
@@ -127,9 +126,9 @@ def is_time_task_now(
 
 
 def is_interval_task_now(
-    interval_value: Union[int, timedelta],
+    interval_value: int | timedelta,
     now: datetime,
-    last_run: Optional[datetime] = None,
+    last_run: datetime | None = None,
 ) -> bool:
     """
     Checks whether the interval task should start now.
@@ -186,7 +185,7 @@ class SchedulerLoop:
         self,
         scheduler: TaskiqScheduler,
         *,
-        event_loop: Optional[asyncio.AbstractEventLoop] = None,
+        event_loop: asyncio.AbstractEventLoop | None = None,
     ) -> None:
         self.scheduler = scheduler
         self._event_loop = event_loop or asyncio.get_event_loop()
@@ -196,9 +195,9 @@ class SchedulerLoop:
         self.interval_tasks_last_run: dict[ScheduleId, datetime] = {}
         self.time_tasks_last_run: dict[ScheduleId, datetime] = {}
 
-        self.scheduled_tasks: List[Tuple[ScheduleSource, List[ScheduledTask]]] = []
-        self.scheduled_tasks_updated_at: Optional[datetime] = None
-        self._update_schedules_task_future: Optional[asyncio.Task[Any]] = None
+        self.scheduled_tasks: list[tuple[ScheduleSource, list[ScheduledTask]]] = []
+        self.scheduled_tasks_updated_at: datetime | None = None
+        self._update_schedules_task_future: asyncio.Task[Any] | None = None
 
     def _update_schedules_task_future_callback(self, task_: asyncio.Task[Any]) -> None:
         self.scheduled_tasks = task_.result()
@@ -289,8 +288,8 @@ class SchedulerLoop:
     async def run(
         self,
         *,
-        update_interval: Optional[timedelta] = None,
-        loop_interval: Optional[timedelta] = None,
+        update_interval: timedelta | None = None,
+        loop_interval: timedelta | None = None,
         skip_first_run: bool = False,
     ) -> None:
         """
@@ -309,7 +308,7 @@ class SchedulerLoop:
         if loop_interval is None:
             loop_interval = timedelta(seconds=1)
 
-        running_schedules: Dict[ScheduleId, asyncio.Task[Any]] = {}
+        running_schedules: dict[ScheduleId, asyncio.Task[Any]] = {}
 
         self.scheduled_tasks = await get_all_schedules(self.scheduler)
         self.scheduled_tasks_updated_at = datetime.now(tz=timezone.utc)

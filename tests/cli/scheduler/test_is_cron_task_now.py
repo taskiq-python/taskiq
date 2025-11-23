@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Union
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -66,8 +65,8 @@ def test_should_run_cron_td_offset() -> None:
 def test_is_cron_task_now(
     cron_value: str,
     now: datetime,
-    offset: Union[str, timedelta, None],
-    last_run: Optional[datetime],
+    offset: str | timedelta | None,
+    last_run: datetime | None,
     expected: bool,
 ) -> None:
     assert is_cron_task_now(cron_value, now, offset, last_run) == expected
