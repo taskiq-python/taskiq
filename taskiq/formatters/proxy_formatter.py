@@ -24,6 +24,7 @@ class ProxyFormatter(TaskiqFormatter):
         return BrokerMessage(
             task_id=message.task_id,
             task_name=message.task_name,
+            queue=message.queue,
             message=self.broker.serializer.dumpb(model_dump(message)),
             labels=message.labels,
         )

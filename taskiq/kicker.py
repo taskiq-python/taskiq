@@ -23,6 +23,7 @@ from taskiq.compat import model_dump
 from taskiq.exceptions import SendTaskError
 from taskiq.labels import prepare_label
 from taskiq.message import TaskiqMessage
+from taskiq.queue import DEFAULT_QUEUE, Queue
 from taskiq.scheduler.created_schedule import CreatedSchedule
 from taskiq.scheduler.scheduled_task import CronSpec, ScheduledTask
 from taskiq.task import AsyncTaskiqTask
@@ -52,10 +53,12 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         task_name: str,
         broker: "AsyncBroker",
         labels: Dict[str, Any],
+        queue: Union["Queue", str] = DEFAULT_QUEUE,
         return_type: Optional[Type[_ReturnType]] = None,
     ) -> None:
         self.task_name = task_name
         self.broker = broker
+        self.queue = Queue(queue)
         self.labels = labels
         self.custom_task_id: Optional[str] = None
         self.custom_schedule_id: Optional[str] = None
@@ -117,6 +120,19 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         :return: Kicker with new broker.
         """
         self.broker = broker
+        return self
+
+    def with_queue(
+        self,
+        queue: Union["Queue", str],
+    ) -> "AsyncKicker[_FuncParams, _ReturnType]":
+        """
+        Replace queue for the function.
+
+        :param queue: new queue instance or name.
+        :return: Kicker with new queue.
+        """
+        self.queue = Queue(queue)
         return self
 
     @overload
@@ -338,6 +354,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         return TaskiqMessage(
             task_id=task_id,
             task_name=self.task_name,
+            queue=self.queue.name,
             labels=labels,
             labels_types=labels_types,
             args=formatted_args,
