@@ -10,6 +10,7 @@ from opentelemetry.test.test_base import TestBase
 from opentelemetry.trace import Span, SpanKind, StatusCode
 from wrapt import wrap_function_wrapper
 
+from taskiq import TaskiqResult
 from taskiq.instrumentation import TaskiqInstrumentor
 from taskiq.middlewares import opentelemetry_middleware
 
@@ -26,11 +27,14 @@ class TestTaskiqInstrumentation(TestBase):
         super().tearDown()
         TaskiqInstrumentor().uninstrument_broker(broker)
 
-    async def test_task(self) -> None:
+    def test_task(self) -> None:
         TaskiqInstrumentor().instrument_broker(broker)
 
-        await task_add.kiq(1, 2)
-        await broker.wait_all()
+        async def test() -> None:
+            await task_add.kiq(1, 2)
+            await broker.wait_all()
+
+        asyncio.run(test())
 
         spans = self.sorted_spans(self.memory_exporter.get_finished_spans())
         self.assertEqual(len(spans), 2)
@@ -72,11 +76,14 @@ class TestTaskiqInstrumentation(TestBase):
         self.assertEqual(consumer.parent.span_id, producer.context.span_id)
         self.assertEqual(consumer.context.trace_id, producer.context.trace_id)
 
-    async def test_task_raises(self) -> None:
+    def test_task_raises(self) -> None:
         TaskiqInstrumentor().instrument_broker(broker)
 
-        await task_raises.kiq()
-        await broker.wait_all()
+        async def test() -> None:
+            await task_raises.kiq()
+            await broker.wait_all()
+
+        asyncio.run(test())
 
         spans = self.sorted_spans(self.memory_exporter.get_finished_spans())
         self.assertEqual(len(spans), 2)
@@ -130,7 +137,7 @@ class TestTaskiqInstrumentation(TestBase):
         self.assertEqual(consumer.parent.span_id, producer.context.span_id)
         self.assertEqual(consumer.context.trace_id, producer.context.trace_id)
 
-    async def test_uninstrument(self) -> None:
+    def test_uninstrument(self) -> None:
         TaskiqInstrumentor().instrument_broker(broker)
         TaskiqInstrumentor().uninstrument_broker(broker)
 
@@ -143,18 +150,21 @@ class TestTaskiqInstrumentation(TestBase):
         spans = self.memory_exporter.get_finished_spans()
         self.assertEqual(len(spans), 0)
 
-    async def test_baggage(self) -> None:
+    def test_baggage(self) -> None:
         TaskiqInstrumentor().instrument_broker(broker)
+
+        async def test() -> TaskiqResult[Any]:
+            task = await task_returns_baggage.kiq()
+            return await task.wait_result(timeout=2)
 
         ctx = baggage.set_baggage("key", "value")
         context.attach(ctx)
 
-        task = await task_returns_baggage.kiq()
-        result = await task.wait_result(timeout=2)
+        result = asyncio.run(test())
 
         self.assertEqual(result.return_value, {"key": "value"})
 
-    async def test_task_not_instrumented_does_not_raise(self) -> None:
+    def test_task_not_instrumented_does_not_raise(self) -> None:
         def _retrieve_context_wrapper_none_token(
             wrapped: Callable[
                 [Any],
@@ -178,9 +188,11 @@ class TestTaskiqInstrumentation(TestBase):
 
         TaskiqInstrumentor().instrument_broker(broker)
 
-        task = await task_add.kiq(1, 2)
-        result = await task.wait_result(timeout=2)
+        async def test() -> TaskiqResult[float]:
+            task = await task_add.kiq(1, 2)
+            return await task.wait_result(timeout=2)
 
+        result = asyncio.run(test())
         spans = self.sorted_spans(self.memory_exporter.get_finished_spans())
         self.assertEqual(len(spans), 2)
 

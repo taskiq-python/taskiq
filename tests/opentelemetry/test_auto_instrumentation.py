@@ -1,3 +1,5 @@
+import asyncio
+
 from opentelemetry.test.test_base import TestBase
 from opentelemetry.trace import SpanKind, StatusCode
 
@@ -6,17 +8,20 @@ from taskiq.instrumentation import TaskiqInstrumentor
 
 
 class TestTaskiqAutoInstrumentation(TestBase):
-    async def test_auto_instrument(self) -> None:
+    def test_auto_instrument(self) -> None:
         TaskiqInstrumentor().instrument()
 
-        broker = InMemoryBroker(await_inplace=True)
+        async def test() -> None:
+            broker = InMemoryBroker(await_inplace=True)
 
-        @broker.task
-        async def task_add(a: float, b: float) -> float:
-            return a + b
+            @broker.task
+            async def task_add(a: float, b: float) -> float:
+                return a + b
 
-        await task_add.kiq(1, 2)
-        await broker.wait_all()
+            await task_add.kiq(1, 2)
+            await broker.wait_all()
+
+        asyncio.run(test())
 
         spans = self.sorted_spans(self.memory_exporter.get_finished_spans())
         self.assertEqual(len(spans), 2)
@@ -25,7 +30,7 @@ class TestTaskiqAutoInstrumentation(TestBase):
 
         self.assertEqual(
             consumer.name,
-            "execute/tests.test_auto_instrumentation:task_add",
+            "execute/tests.opentelemetry.test_auto_instrumentation:task_add",
             f"{consumer._end_time}:{producer._end_time}",
         )
         self.assertEqual(consumer.kind, SpanKind.CONSUMER)
@@ -33,7 +38,7 @@ class TestTaskiqAutoInstrumentation(TestBase):
             consumer,
             {
                 "taskiq.action": "execute",
-                "taskiq.task_name": "tests.test_auto_instrumentation:task_add",
+                "taskiq.task_name": "tests.opentelemetry.test_auto_instrumentation:task_add",  # noqa: E501
             },
         )
 
@@ -43,14 +48,14 @@ class TestTaskiqAutoInstrumentation(TestBase):
 
         self.assertEqual(
             producer.name,
-            "send/tests.test_auto_instrumentation:task_add",
+            "send/tests.opentelemetry.test_auto_instrumentation:task_add",
         )
         self.assertEqual(producer.kind, SpanKind.PRODUCER)
         self.assertSpanHasAttributes(
             producer,
             {
                 "taskiq.action": "send",
-                "taskiq.task_name": "tests.test_auto_instrumentation:task_add",
+                "taskiq.task_name": "tests.opentelemetry.test_auto_instrumentation:task_add",  # noqa: E501
             },
         )
 
