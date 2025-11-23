@@ -1,6 +1,9 @@
 import logging
 from contextlib import AbstractContextManager
+from importlib.metadata import version
 from typing import Any, Dict, Optional, Tuple, TypeVar
+
+from packaging.version import Version, parse
 
 try:
     import opentelemetry  # noqa: F401
@@ -9,6 +12,7 @@ except ImportError as exc:
         "Cannot import opentelemetry_middleware. "
         "Please install 'taskiq[opentelemetry]'.",
     ) from exc
+
 
 from opentelemetry import context as context_api
 from opentelemetry import trace
@@ -26,6 +30,14 @@ T = TypeVar("T")
 
 # Taskiq Context key
 CTX_KEY = "__otel_task_span"
+
+PYDANTIC_VER = parse(version("pydantic"))
+IS_PYDANTIC1 = Version("2.0") > PYDANTIC_VER
+if IS_PYDANTIC1:
+    if TaskiqMessage.__exclude_fields__:  # type: ignore[attr-defined]
+        TaskiqMessage.__exclude_fields__.update(CTX_KEY)  # type: ignore
+    else:
+        TaskiqMessage.__exclude_fields__ = {CTX_KEY}  # type: ignore
 
 # Taskiq Context attributes
 TASKIQ_CONTEXT_ATTRIBUTES = [
@@ -95,7 +107,7 @@ def attach_context(
 
     if ctx_dict is None:
         ctx_dict = {}
-        setattr(message, CTX_KEY, ctx_dict)
+        object.__setattr__(message, CTX_KEY, ctx_dict)
 
     ctx_dict[(message.task_id, is_publish)] = (span, activation, token)
 
