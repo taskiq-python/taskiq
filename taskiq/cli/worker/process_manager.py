@@ -159,7 +159,7 @@ class ProcessManager:
         self,
         args: WorkerArgs,
         worker_function: Callable[[WorkerArgs], None],
-        observer: Observer | None = None,  # type: ignore[valid-type]
+        observer: "Observer | None" = None,  # type: ignore[valid-type]
     ) -> None:
         self.worker_function = worker_function
         self.action_queue: Queue[ProcessActionBase] = Queue(-1)
