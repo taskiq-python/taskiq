@@ -25,6 +25,11 @@ class MyScheduleSource(ScheduleSource):
     async def add_schedule(self, schedule: "ScheduledTask") -> None:
         print("New schedule added:", schedule)
 
+    # This method is optional. You may not implement this.
+    # It's just a helper to people to be able to interact with your source.
+    async def update_schedule(self, schedule: "ScheduledTask") -> None:
+        print("Updating schedule:", schedule.schedule_id)
+
     # This method is completely optional, but if you want to support
     # schedule cancelation, you must implement it.
     async def delete_schedule(self, schedule_id: str) -> None:
