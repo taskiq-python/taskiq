@@ -23,4 +23,7 @@ jobs:
           version: "latest"
       - run: uv version "${GITHUB_REF_NAME}"
       - run: uv build
-      - run: uv publish --trusted-publishing always
+      - name: Release package
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
+        run: uv publish
