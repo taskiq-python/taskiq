@@ -21,6 +21,10 @@ jobs:
           enable-cache: false
           python-version: "3.12"
           version: "latest"
-      - run: uv version "${GITHUB_REF_NAME}"
-      - run: uv build
-      - run: uv publish --trusted-publishing always
+      - name: Publish
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
+        run: |
+          uv version "${GITHUB_REF_NAME}"
+          uv build
+          uv publish
