@@ -153,4 +153,4 @@ broker = ZeroMQBroker().with_middlewares(
 
 :::
 
-Autoinstrumentation is also supported.
+Auto-instrumentation is also supported.
