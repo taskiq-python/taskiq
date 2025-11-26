@@ -87,7 +87,7 @@ Use jitter and exponential backoff to avoid repetitive load peaks, especially in
 
 ### Prometheus middleware
 
-You can enable prometheus metrics for workers by adding PrometheusMiddleware.
+You can enable prometheus metrics for workers by adding `PrometheusMiddleware`.
 To do so, you need to install `prometheus_client` package or you can install metrics extras for taskiq.
 
 ::: tabs
@@ -118,3 +118,39 @@ broker = ZeroMQBroker().with_middlewares(
 
 After that, metrics will be available at port 9000. Of course, this parameter can be configured.
 If you have other metrics, they'll be shown as well.
+
+### OpenTelemetry Middleware
+
+You can enable opentelemetry tracing for workers by adding `OpenTelemetryMiddleware` or using `TaskiqInstrumentor` (preferred).
+
+```bash
+pip install "taskiq[opentelemetry]"
+```
+
+::: tabs
+
+
+@tab instrumentor
+
+```python
+from taskiq import ZeroMQBroker
+from taskiq.instrumentation import TaskiqInstrumentor
+
+TaskiqInstrumentor().instrument()
+broker = ZeroMQBroker()
+```
+
+@tab middleware
+
+```python
+from taskiq import ZeroMQBroker
+from taskiq.middlewares.opentelemetry_middleware import OpenTelemetryMiddleware
+
+broker = ZeroMQBroker().with_middlewares(
+   OpenTelemetryMiddleware,
+)
+```
+
+:::
+
+Autoinstrumentation is also supported.
