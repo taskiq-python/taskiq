@@ -12,7 +12,7 @@ Usage
 
     import asyncio
 
-    from taskiq import InMemoryBroker, TaskiqEvents, TaskiqState
+    from taskiq import InMemoryBroker
     from taskiq.instrumentation import TaskiqInstrumentor
 
     broker = InMemoryBroker()
