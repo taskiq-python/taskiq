@@ -1,7 +1,7 @@
 from dataclasses import dataclass
-from typing import TypedDict
 
 import pydantic
+from typing_extensions import TypedDict
 
 
 @dataclass(frozen=True, slots=True)

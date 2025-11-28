@@ -13,7 +13,7 @@ from tests.middlewares.admin_middleware.dto import (
 )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 async def admin_api_server() -> AsyncGenerator[TestServer, None]:
     async def handle_queued(request: web.Request) -> web.Response:
         return web.json_response({"status": "ok"}, status=200)
@@ -31,10 +31,7 @@ async def admin_api_server() -> AsyncGenerator[TestServer, None]:
 
     server = TestServer(app)
     await server.start_server()
-
     yield server
-
-    # Останавливаем сервер после теста
     await server.close()
 
 
@@ -42,7 +39,7 @@ async def admin_api_server() -> AsyncGenerator[TestServer, None]:
 async def broker_with_admin_middleware(
     admin_api_server: TestServer,
 ) -> AsyncGenerator[InMemoryBroker, None]:
-    broker = InMemoryBroker().with_middlewares(
+    broker = InMemoryBroker(await_inplace=True).with_middlewares(
         TaskiqAdminMiddleware(
             str(admin_api_server.make_url("/")),  # URL тестового сервера
             "supersecret",
