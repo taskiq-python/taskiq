@@ -7,18 +7,19 @@
   "scripts": {
     "docs:dev": "vuepress dev docs --clean-cache",
     "docs:build": "vuepress build docs",
-    "docs:serve": "vuepress serve docs"
+    "docs:serve": "serve docs/.vuepress/dist"
   },
   "packageManager": "pnpm@7.22.0",
   "devDependencies": {
-    "@vuepress/bundler-vite": "2.0.0-rc.20",
-    "@vuepress/plugin-search": "2.0.0-rc.87",
+    "@vuepress/bundler-vite": "2.0.0-rc.26",
+    "@vuepress/plugin-search": "2.0.0-rc.120",
     "markdown-it": "14.1.0",
     "mermaid": "11.5.0",
     "sass-embedded": "^1.86.0",
     "sass-loader": "16.0.5",
+    "serve": "^14.2.5",
     "vue": "3.5.13",
-    "vuepress": "2.0.0-rc.20",
-    "vuepress-theme-hope": "2.0.0-rc.75"
+    "vuepress": "2.0.0-rc.26",
+    "vuepress-theme-hope": "2.0.0-rc.98"
   }
 }
