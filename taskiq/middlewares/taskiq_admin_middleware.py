@@ -7,6 +7,7 @@ from urllib.parse import urljoin
 import aiohttp
 
 from taskiq.abc.middleware import TaskiqMiddleware
+from taskiq.compat import model_dump
 from taskiq.message import TaskiqMessage
 from taskiq.result import TaskiqResult
 
@@ -115,12 +116,13 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
 
         :param message: kicked message.
         """
+        dict_message: dict[str, Any] = model_dump(message)
         await self._spawn_request(
             f"/api/tasks/{message.task_id}/queued",
             {
-                "args": message.args,
-                "kwargs": message.kwargs,
-                "labels": message.labels,
+                "args": dict_message["args"],
+                "kwargs": dict_message["kwargs"],
+                "labels": dict_message["labels"],
                 "queuedAt": self._now_iso(),
                 "taskName": message.task_name,
                 "worker": self.__ta_broker_name,
@@ -137,12 +139,13 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
         :param message: incoming parsed taskiq message.
         :return: modified message.
         """
+        dict_message: dict[str, Any] = model_dump(message)
         await self._spawn_request(
             f"/api/tasks/{message.task_id}/started",
             {
-                "args": message.args,
-                "kwargs": message.kwargs,
-                "labels": message.labels,
+                "args": dict_message["args"],
+                "kwargs": dict_message["kwargs"],
+                "labels": dict_message["labels"],
                 "startedAt": self._now_iso(),
                 "taskName": message.task_name,
                 "worker": self.__ta_broker_name,
@@ -164,12 +167,13 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
         :param message: incoming message.
         :param result: result of execution for current task.
         """
+        dict_result: dict[str, Any] = model_dump(result)
         await self._spawn_request(
             f"/api/tasks/{message.task_id}/executed",
             {
                 "finishedAt": self._now_iso(),
                 "executionTime": result.execution_time,
                 "error": None if result.error is None else repr(result.error),
-                "returnValue": {"return_value": result.return_value},
+                "returnValue": {"return_value": dict_result["return_value"]},
             },
         )
