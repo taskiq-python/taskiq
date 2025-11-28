@@ -22,10 +22,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 18
+          node-version: 20
           cache: pnpm
       - name: Install deps
-        run: pnpm install
+        run: pnpm install --prod
       - name: Build
         run: pnpm docs:build -d docs_dist
 
