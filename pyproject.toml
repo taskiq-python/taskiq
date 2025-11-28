@@ -177,6 +177,9 @@ lint.mccabe = { max-complexity = 10 }
 line-length = 88
 
 [tool.ruff.lint.per-file-ignores]
+"taskiq/compat.py" = [
+    "D103",   # Missing docstring in public function
+]
 "tests/*" = [
 	"S101",   # Use of assert detected
 	"S301",   # Use of pickle detected
