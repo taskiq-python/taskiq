@@ -68,6 +68,7 @@ dev = [
 	"freezegun>=1.5.5",
 	"tzdata>=2025.2; sys_platform == 'win32'",
 	"opentelemetry-test-utils (>=0.59b0,<1)",
+	"polyfactory>=3.1.0",
 ]
 
 [project.urls]
@@ -172,11 +173,14 @@ lint.ignore = [
 	"PLR0913", # Too many arguments for function call
 	"D106",    # Missing docstring in public nested class
 ]
-exclude = [".venv/"]
 lint.mccabe = { max-complexity = 10 }
+exclude = [".venv/"]
 line-length = 88
 
 [tool.ruff.lint.per-file-ignores]
+"taskiq/compat.py" = [
+    "D103",   # Missing docstring in public function
+]
 "tests/*" = [
 	"S101",   # Use of assert detected
 	"S301",   # Use of pickle detected
