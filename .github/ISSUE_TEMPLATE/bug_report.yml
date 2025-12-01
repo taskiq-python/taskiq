@@ -65,7 +65,7 @@ body:
     id: broker-init-file
     attributes:
       label: Broker initialization code
-      description: Provide a minimal code from taskiq broker initialization file
+      description: Provide minimal code from the taskiq broker initialization file
       render: python
     validations:
       required: false
