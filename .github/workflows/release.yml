@@ -8,21 +8,22 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: release
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
-      - name: Install poetry
-        run: pipx install poetry
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      - uses: astral-sh/setup-uv@v7
         with:
-          python-version: "3.11"
-      - name: Install deps
-        run: poetry install
-      - name: Set version
-        run: poetry version "${GITHUB_REF_NAME}"
+          enable-cache: false
+          python-version: "3.12"
+          version: "latest"
+      - run: uv version "${GITHUB_REF_NAME}"
+      - run: uv build
       - name: Release package
         env:
-          POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
-        run: poetry publish --build
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
+        run: uv publish

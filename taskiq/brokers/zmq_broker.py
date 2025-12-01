@@ -1,6 +1,7 @@
 import math
+from collections.abc import AsyncGenerator, Callable
 from logging import getLogger
-from typing import AsyncGenerator, Callable, Optional, TypeVar
+from typing import TypeVar
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.result_backend import AsyncResultBackend
@@ -32,8 +33,8 @@ class ZeroMQBroker(AsyncBroker):
         self,
         zmq_pub_host: str = "tcp://0.0.0.0:5555",
         zmq_sub_host: str = "tcp://localhost:5555",
-        result_backend: "Optional[AsyncResultBackend[_T]]" = None,
-        task_id_generator: Optional[Callable[[], str]] = None,
+        result_backend: "AsyncResultBackend[_T] | None" = None,
+        task_id_generator: Callable[[], str] | None = None,
     ) -> None:
         if zmq is None:
             raise RuntimeError(
@@ -61,6 +62,16 @@ class ZeroMQBroker(AsyncBroker):
             self.socket.bind(self.pub_host)
         await super().startup()
 
+    async def shutdown(self) -> None:
+        """
+        Shutdown for zmq broker.
+
+        This function closes actual connections to sockets
+        """
+        if not self.is_worker_process:
+            self.socket.unbind(self.pub_host)
+        return await super().shutdown()
+
     async def kick(self, message: BrokerMessage) -> None:
         """
         Kicking message.
@@ -77,8 +88,7 @@ class ZeroMQBroker(AsyncBroker):
             ]
             for idx in range(math.ceil(len(message.message) / part_len))
         ]
-        with self.socket.connect(self.pub_host) as sock:
-            await sock.send_multipart(parts)
+        await self.socket.send_multipart(parts)
 
     async def listen(self) -> AsyncGenerator[bytes, None]:
         """

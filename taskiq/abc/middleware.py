@@ -1,5 +1,6 @@
+from collections.abc import Coroutine
 from types import CoroutineType
-from typing import TYPE_CHECKING, Any, Coroutine, Union
+from typing import TYPE_CHECKING, Any, Union
 
 if TYPE_CHECKING:  # pragma: no cover  # pragma: no cover
     from taskiq.abc.broker import AsyncBroker
@@ -11,7 +12,7 @@ class TaskiqMiddleware:  # pragma: no cover
     """Base class for middlewares."""
 
     def __init__(self) -> None:
-        self.broker: "AsyncBroker" = None  # type: ignore
+        self.broker: AsyncBroker = None  # type: ignore
 
     def set_broker(self, broker: "AsyncBroker") -> None:
         """

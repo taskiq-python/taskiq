@@ -1,4 +1,5 @@
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 from taskiq.abc.serializer import TaskiqSerializer
 
@@ -13,7 +14,7 @@ class MSGPackSerializer(TaskiqSerializer):
 
     def __init__(
         self,
-        default: Optional[Callable[[Any], Any]] = None,
+        default: Callable[[Any], Any] | None = None,
         use_single_float: bool = False,
         use_bin_type: bool = True,
         datetime: bool = True,

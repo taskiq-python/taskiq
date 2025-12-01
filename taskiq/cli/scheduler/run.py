@@ -3,10 +3,10 @@ import inspect
 import sys
 from datetime import datetime, timedelta, timezone
 from logging import basicConfig, getLogger
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, TypeAlias
+from zoneinfo import ZoneInfo
 
-import pytz
-from pycron import is_now
+import pycron
 
 from taskiq.abc.schedule_source import ScheduleSource
 from taskiq.cli.scheduler.args import SchedulerArgs
@@ -15,6 +15,9 @@ from taskiq.scheduler.scheduled_task import ScheduledTask
 from taskiq.scheduler.scheduler import TaskiqScheduler
 
 logger = getLogger(__name__)
+
+
+ScheduleId: TypeAlias = str
 
 
 def to_tz_aware(time: datetime) -> datetime:
@@ -29,11 +32,11 @@ def to_tz_aware(time: datetime) -> datetime:
     :return: timezone aware time.
     """
     if time.tzinfo is None:
-        return time.replace(tzinfo=pytz.UTC)
+        return time.replace(tzinfo=timezone.utc)
     return time
 
 
-async def get_schedules(source: ScheduleSource) -> List[ScheduledTask]:
+async def get_schedules(source: ScheduleSource) -> list[ScheduledTask]:
     """
     Get schedules from source.
 
@@ -55,86 +58,113 @@ async def get_schedules(source: ScheduleSource) -> List[ScheduledTask]:
 
 async def get_all_schedules(
     scheduler: TaskiqScheduler,
-) -> List[Tuple[ScheduleSource, List[ScheduledTask]]]:
+) -> list[tuple[ScheduleSource, list[ScheduledTask]]]:
     """
     Task to update all schedules.
 
     This function updates all schedules
-    from all sources and returns a dict
-    with source as a key and list of
-    scheduled tasks as a value.
+    from all sources and returns a list
+    of (source, tasks) pairs.
 
     :param scheduler: current scheduler.
-    :return: dict with source as a key and list of scheduled tasks as a value.
+    :return: list of (source, tasks) pairs.
     """
     logger.debug("Started schedule update.")
-    schedules = await asyncio.gather(
+    schedules: list[list[ScheduledTask]] = await asyncio.gather(
         *[get_schedules(source) for source in scheduler.sources],
     )
-    return list(zip(scheduler.sources, schedules))
+    return list(zip(scheduler.sources, schedules, strict=True))
 
 
-def get_task_delay(task: ScheduledTask) -> Optional[int]:
+class CronValueError(Exception):
+    """Raised on invalid cron value."""
+
+
+def is_cron_task_now(
+    cron_value: str,
+    now: datetime,
+    offset: str | timedelta | None = None,
+    last_run: datetime | None = None,
+) -> bool:
     """
-    Get delay of the task in seconds.
+    Checks whether the cron task should start now.
 
-    :param task: task to check.
-    :return: True if task must be sent.
+    :raises CronValueError: On invalid cron value.
     """
-    now = datetime.now(tz=pytz.UTC)
-    if task.cron is not None:
-        # If user specified cron offset we apply it.
-        # If it's timedelta, we simply add the delta to current time.
-        if task.cron_offset and isinstance(task.cron_offset, timedelta):
-            now += task.cron_offset
-        # If timezone was specified as string we convert it timezone
-        # offset and then apply.
-        elif task.cron_offset and isinstance(task.cron_offset, str):
-            now = now.astimezone(pytz.timezone(task.cron_offset))
-        if is_now(task.cron, now):
-            return 0
-        return None
-    if task.time is not None:
-        task_time = to_tz_aware(task.time)
-        if task_time <= now:
-            return 0
-        delay = task_time - now
-        if delay.microseconds:
-            return int(delay.total_seconds()) + 1
-        return int(delay.total_seconds())
-    return None
+    if last_run is not None:
+        seconds_spend = (now - last_run).total_seconds()
+        seconds_should_sped = timedelta(minutes=1).total_seconds()
+        if round(seconds_spend) < round(seconds_should_sped):
+            return False
+    # If user specified cron offset we apply it.
+    # If it's timedelta, we simply add the delta to current time.
+    if offset and isinstance(offset, timedelta):
+        now += offset
+    # If timezone was specified as string we convert it timezone
+    # offset and then apply.
+    elif offset and isinstance(offset, str):
+        now = now.astimezone(ZoneInfo(offset))
+
+    try:
+        return pycron.is_now(cron_value, now)
+    except ValueError as e:
+        raise CronValueError(e) from e
 
 
-async def delayed_send(
+def is_time_task_now(
+    time_value: datetime,
+    now: datetime,
+    last_run: datetime | None = None,
+) -> bool:
+    """Checks whether the time task should start now."""
+    if last_run is not None:
+        return False
+
+    time_value = to_tz_aware(time_value)
+    now = to_tz_aware(now)
+    return time_value <= now
+
+
+def is_interval_task_now(
+    interval_value: int | timedelta,
+    now: datetime,
+    last_run: datetime | None = None,
+) -> bool:
+    """
+    Checks whether the interval task should start now.
+
+    Interval tasks must have a minimum interval of 1 second.
+    Fractional intervals (e.g., 0.5 seconds) are not supported.
+
+    :param interval_value: Interval as int (seconds) or timedelta
+    :param now: Current datetime
+    :param last_run: Last run datetime, None for first run
+    :return: True if task should run now
+    """
+    if last_run is None:
+        return True
+
+    if isinstance(interval_value, int):
+        interval_value = timedelta(seconds=interval_value)
+
+    seconds_passed: float = (now - last_run).total_seconds()
+    interval_seconds: float = interval_value.total_seconds()
+
+    return round(seconds_passed) >= round(interval_seconds)
+
+
+async def send(
     scheduler: TaskiqScheduler,
     source: ScheduleSource,
     task: ScheduledTask,
-    delay: int,
 ) -> None:
     """
-    Send a task with a delay.
-
-    This function waits for some time and then
-    sends a task.
-
-    The main idea is that scheduler gathers
-    tasks every minute and some of them have
-    specific time. To respect the time, we calculate
-    the delay and send the task after some delay.
+    Send a task.
 
     :param scheduler: current scheduler.
     :param source: source of the task.
     :param task: task to send.
-    :param delay: how long to wait.
     """
-    logger.debug(
-        "Waiting %d seconds before sending task %s with schedule_id %s.",
-        delay,
-        task.task_name,
-        task.schedule_id,
-    )
-    if delay > 0:
-        await asyncio.sleep(delay)
     logger.info(
         "Sending task %s with schedule_id %s.",
         task.task_name,
@@ -143,89 +173,187 @@ async def delayed_send(
     await scheduler.on_ready(source, task)
 
 
-async def run_scheduler_loop(  # noqa: C901
-    scheduler: TaskiqScheduler,
-    interval: Optional[timedelta] = None,
-) -> None:
-    """
-    Runs scheduler loop.
+async def _sleep_until_next_second() -> None:
+    now = datetime.now(tz=timezone.utc)
+    await asyncio.sleep(1 - now.microsecond / 1_000_000)
 
-    This function imports taskiq scheduler
-    and runs tasks when needed.
 
-    :param scheduler: current scheduler.
-    :param interval: interval to check for schedule updates.
-    """
-    loop = asyncio.get_event_loop()
-    running_schedules: Dict[str, asyncio.Task[Any]] = {}
-    ran_cron_jobs: Set[str] = set()
-    current_minute = datetime.now(tz=pytz.UTC).minute
-    while True:
-        now = datetime.now(tz=pytz.UTC)
-        # If minute changed, we need to clear
-        # ran_cron_jobs set and update current minute.
-        if now.minute != current_minute:
-            current_minute = now.minute
-            ran_cron_jobs.clear()
-        # If interval is not None, we need to
-        # calculate next run time using it.
-        if interval is not None:
-            next_run = now + interval
-        # otherwise we need assume that
-        # we will run it at the start of the next minute.
-        # as crontab does.
-        else:
-            next_run = (now + timedelta(minutes=1)).replace(second=1, microsecond=0)
-        scheduled_tasks = await get_all_schedules(scheduler)
-        for source, task_list in scheduled_tasks:
+class SchedulerLoop:
+    """Abstraction over scheduler loop."""
+
+    def __init__(
+        self,
+        scheduler: TaskiqScheduler,
+        *,
+        event_loop: asyncio.AbstractEventLoop | None = None,
+    ) -> None:
+        self.scheduler = scheduler
+        self._event_loop = event_loop or asyncio.get_event_loop()
+
+        # Variables for control the last run of schedules.
+        self.cron_tasks_last_run: dict[ScheduleId, datetime] = {}
+        self.interval_tasks_last_run: dict[ScheduleId, datetime] = {}
+        self.time_tasks_last_run: dict[ScheduleId, datetime] = {}
+
+        self.scheduled_tasks: list[tuple[ScheduleSource, list[ScheduledTask]]] = []
+        self.scheduled_tasks_updated_at: datetime | None = None
+        self._update_schedules_task_future: asyncio.Task[Any] | None = None
+
+    def _update_schedules_task_future_callback(self, task_: asyncio.Task[Any]) -> None:
+        self.scheduled_tasks = task_.result()
+
+        new_schedules_ids: set[ScheduleId] = set()
+        for source, task_list in self.scheduled_tasks:
             logger.debug("Got %d schedules from source %s.", len(task_list), source)
+            new_schedules_ids.update({t.schedule_id for t in task_list})
+
+        # Deleting irrelevant scheduled tasks so they don't take up memory.
+        for id_ in self.cron_tasks_last_run.keys() - new_schedules_ids:
+            del self.cron_tasks_last_run[id_]
+        for id_ in self.interval_tasks_last_run.keys() - new_schedules_ids:
+            del self.interval_tasks_last_run[id_]
+        for id_ in self.time_tasks_last_run.keys() - new_schedules_ids:
+            del self.time_tasks_last_run[id_]
+
+    async def _update_scheduled_tasks(self) -> None:
+        if (
+            self._update_schedules_task_future is not None
+            and not self._update_schedules_task_future.done()
+        ):
+            logger.warning(
+                "Schedules getting task started "
+                "before the previous one finished. "
+                "Consider increasing the update_interval.",
+            )
+        else:
+            self._update_schedules_task_future = self._event_loop.create_task(
+                get_all_schedules(self.scheduler),
+            )
+            self._update_schedules_task_future.add_done_callback(
+                self._update_schedules_task_future_callback,
+            )
+
+    def _mark_cron_tasks_as_already_run(self) -> None:
+        current_minute = datetime.now(tz=timezone.utc).replace(second=0, microsecond=0)
+        for _, task_list in self.scheduled_tasks:
             for task in task_list:
-                try:
-                    task_delay = get_task_delay(task)
-                except ValueError:
-                    logger.warning(
-                        "Cannot parse cron: %s for task: %s, schedule_id: %s.",
-                        task.cron,
-                        task.task_name,
-                        task.schedule_id,
-                    )
-                    continue
-                # If task delay is None, we don't need to run it.
-                if task_delay is None:
-                    continue
-                # If task is delayed for more than next_run,
-                # we don't need to run it, because we will
-                # run it in the next iteration.
-                if now + timedelta(seconds=task_delay) >= next_run:
-                    continue
-                # If task is already running, we don't need to run it again.
-                if task.schedule_id in running_schedules and task_delay < 1:
-                    continue
-                # If task is cron job, we need to check if
-                # we already ran it this minute.
                 if task.cron is not None:
-                    if task.schedule_id in ran_cron_jobs:
-                        continue
-                    ran_cron_jobs.add(task.schedule_id)
-                send_task = loop.create_task(
-                    delayed_send(scheduler, source, task, task_delay),
-                    # We need to set the name of the task
-                    # to be able to discard its reference
-                    # after it is done.
-                    name=f"schedule_{task.schedule_id}",
+                    self.cron_tasks_last_run[task.schedule_id] = current_minute
+
+    def _is_schedule_ready_to_send(
+        self,
+        task: ScheduledTask,
+        now: datetime,
+    ) -> bool:
+        is_ready_to_send: bool = False
+
+        if not is_ready_to_send and task.cron is not None:
+            try:
+                is_ready_to_send = is_cron_task_now(
+                    cron_value=task.cron,
+                    now=now,
+                    offset=task.cron_offset,
+                    last_run=self.cron_tasks_last_run.get(task.schedule_id),
                 )
-                running_schedules[task.schedule_id] = send_task
-                send_task.add_done_callback(
-                    lambda task_future: running_schedules.pop(
-                        task_future.get_name().removeprefix("schedule_"),
-                    ),
+            except CronValueError:
+                logger.warning(
+                    "Cannot parse cron: %s for task: %s, schedule_id: %s.",
+                    task.cron,
+                    task.task_name,
+                    task.schedule_id,
                 )
-        delay = next_run - datetime.now(tz=pytz.UTC)
-        logger.debug(
-            "Sleeping for %.2f seconds before getting schedules.",
-            delay.total_seconds(),
-        )
-        await asyncio.sleep(delay.total_seconds())
+            if is_ready_to_send:
+                self.cron_tasks_last_run[task.schedule_id] = now
+
+        if not is_ready_to_send and task.interval is not None:
+            is_ready_to_send = is_interval_task_now(
+                interval_value=task.interval,
+                now=now,
+                last_run=self.interval_tasks_last_run.get(task.schedule_id),
+            )
+            if is_ready_to_send:
+                self.interval_tasks_last_run[task.schedule_id] = now
+
+        if not is_ready_to_send and task.time is not None:
+            is_ready_to_send = is_time_task_now(
+                time_value=task.time,
+                now=now,
+                last_run=self.time_tasks_last_run.get(task.schedule_id),
+            )
+            if is_ready_to_send:
+                self.time_tasks_last_run[task.schedule_id] = now
+
+        return is_ready_to_send
+
+    async def run(
+        self,
+        *,
+        update_interval: timedelta | None = None,
+        loop_interval: timedelta | None = None,
+        skip_first_run: bool = False,
+    ) -> None:
+        """
+        Runs scheduler loop.
+
+        This function imports taskiq scheduler
+        and runs tasks when needed.
+
+        :param update_interval: interval to check for schedule updates.
+        :param loop_interval: interval to check tasks to send.
+        :param skip_first_run: Wait for the beginning of the next minute
+            to skip the first run.
+        """
+        if update_interval is None:
+            update_interval = timedelta(minutes=1)
+        if loop_interval is None:
+            loop_interval = timedelta(seconds=1)
+
+        running_schedules: dict[ScheduleId, asyncio.Task[Any]] = {}
+
+        self.scheduled_tasks = await get_all_schedules(self.scheduler)
+        self.scheduled_tasks_updated_at = datetime.now(tz=timezone.utc)
+
+        if skip_first_run:
+            self._mark_cron_tasks_as_already_run()
+
+        await _sleep_until_next_second()
+
+        while True:
+            now = datetime.now(tz=timezone.utc)
+            next_run = (now + loop_interval).replace(microsecond=0)
+
+            if now - self.scheduled_tasks_updated_at >= update_interval:
+                await self._update_scheduled_tasks()
+                self.scheduled_tasks_updated_at = now
+
+            for source, task_list in self.scheduled_tasks:
+                for task in task_list:
+                    is_ready_to_send: bool = self._is_schedule_ready_to_send(
+                        task=task,
+                        now=now,
+                    )
+
+                    if is_ready_to_send and task.schedule_id not in running_schedules:
+                        send_task = self._event_loop.create_task(
+                            send(self.scheduler, source, task),
+                            # We need to set the name of the task
+                            # to be able to discard its reference
+                            # after it is done.
+                            name=f"schedule_{task.schedule_id}",
+                        )
+                        running_schedules[task.schedule_id] = send_task
+                        send_task.add_done_callback(
+                            lambda task_future: running_schedules.pop(
+                                task_future.get_name().removeprefix("schedule_"),
+                            ),
+                        )
+
+            delay = next_run - datetime.now(tz=timezone.utc)
+            logger.debug(
+                "Sleeping for %.3f seconds before getting schedules.",
+                delay.total_seconds(),
+            )
+            await asyncio.sleep(delay.total_seconds())
 
 
 async def run_scheduler(args: SchedulerArgs) -> None:
@@ -265,27 +393,25 @@ async def run_scheduler(args: SchedulerArgs) -> None:
     for source in scheduler.sources:
         await source.startup()
 
-    interval = None
-    if args.update_interval:
-        interval = timedelta(seconds=args.update_interval)
+    update_interval = timedelta(seconds=60)
+    if args.update_interval is not None:
+        update_interval = timedelta(seconds=args.update_interval)
+
+    loop_interval = timedelta(seconds=1)
+    if args.loop_interval is not None:
+        loop_interval = timedelta(seconds=args.loop_interval)
 
     logger.info("Starting scheduler.")
     await scheduler.startup()
     logger.info("Startup completed.")
-    if args.skip_first_run:
-        next_minute = datetime.now(timezone.utc).replace(
-            second=0,
-            microsecond=0,
-        ) + timedelta(
-            minutes=1,
-        )
-        delay = next_minute - datetime.now(timezone.utc)
-        delay_secs = int(delay.total_seconds())
-        logger.info(f"Skipping first run. Waiting {delay_secs} seconds.")
-        await asyncio.sleep(delay.total_seconds())
-        logger.info("First run skipped. The scheduler is now running.")
+
+    scheduler_loop = SchedulerLoop(scheduler)
     try:
-        await run_scheduler_loop(scheduler, interval)
+        await scheduler_loop.run(
+            update_interval=update_interval,
+            loop_interval=loop_interval,
+            skip_first_run=args.skip_first_run,
+        )
     except asyncio.CancelledError:
         logger.warning("Shutting down scheduler.")
         await scheduler.shutdown()

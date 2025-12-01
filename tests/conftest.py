@@ -1,8 +1,8 @@
 import asyncio
-from typing import Generator
+from collections.abc import Generator
+from unittest.mock import patch
 
 import pytest
-from pytest_mock import MockerFixture
 
 from taskiq.abc.broker import AsyncBroker
 
@@ -33,9 +33,10 @@ def reset_broker() -> Generator[None, None, None]:
 
 
 @pytest.fixture
-def mock_sleep(mocker: MockerFixture) -> None:
+def mock_sleep() -> Generator[None, None, None]:
     async def _fast_sleep(delay: float) -> None:
         await asyncio_sleep(delay / 10000)
 
     asyncio_sleep = asyncio.sleep
-    mocker.patch("asyncio.sleep", _fast_sleep)
+    with patch("asyncio.sleep", _fast_sleep):
+        yield

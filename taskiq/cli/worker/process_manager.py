@@ -2,13 +2,14 @@ import logging
 import os
 import signal
 import sys
+from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
 from multiprocessing import Event, Process, Queue, current_process
 from multiprocessing.synchronize import Event as EventType
 from pathlib import Path
 from time import sleep
-from typing import Any, Callable, List, Optional
+from typing import Any
 
 try:
     from watchdog.observers import Observer
@@ -58,7 +59,7 @@ class ReloadOneAction(ProcessActionBase):
 
     def handle(
         self,
-        workers: List[Process],
+        workers: list[Process],
         args: WorkerArgs,
         worker_func: Callable[[WorkerArgs], None],
     ) -> None:
@@ -158,10 +159,10 @@ class ProcessManager:
         self,
         args: WorkerArgs,
         worker_function: Callable[[WorkerArgs], None],
-        observer: Optional[Observer] = None,  # type: ignore[valid-type]
+        observer: "Observer | None" = None,  # type: ignore[valid-type]
     ) -> None:
         self.worker_function = worker_function
-        self.action_queue: "Queue[ProcessActionBase]" = Queue(-1)
+        self.action_queue: Queue[ProcessActionBase] = Queue(-1)
         self.args = args
         if args.reload and observer is not None:
             watch_paths = args.reload_dirs if args.reload_dirs else ["."]
@@ -187,11 +188,11 @@ class ProcessManager:
                 get_signal_handler(self.action_queue, ReloadAllAction()),
             )
 
-        self.workers: List[Process] = []
+        self.workers: list[Process] = []
 
     def prepare_workers(self) -> None:
         """Spawn multiple processes."""
-        events: List[EventType] = []
+        events: list[EventType] = []
         for process in range(self.args.workers):
             event = Event()
             work_proc = Process(
@@ -210,10 +211,10 @@ class ProcessManager:
             events.append(event)
 
         # Wait for workers startup
-        for worker, event in zip(self.workers, events):
+        for worker, event in zip(self.workers, events, strict=True):
             _wait_for_worker_startup(worker, event)
 
-    def start(self) -> Optional[int]:  # noqa: C901
+    def start(self) -> int | None:  # noqa: C901
         """
         Start managing child processes.
 

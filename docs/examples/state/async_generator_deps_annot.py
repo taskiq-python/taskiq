@@ -1,5 +1,6 @@
 import asyncio
-from typing import Annotated, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Annotated
 
 from taskiq import TaskiqDepends
 

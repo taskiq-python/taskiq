@@ -1,13 +1,20 @@
+import builtins
 import json
 import pickle
+import sys
+from collections.abc import Callable
 from functools import partial
-from typing import Any, Callable, Dict, Generic, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 
 from pydantic import Field
-from typing_extensions import Self
 
 from taskiq.compat import IS_PYDANTIC2
 from taskiq.serialization import exception_to_python, prepare_exception
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 _ReturnType = TypeVar("_ReturnType")
 
@@ -33,12 +40,12 @@ if IS_PYDANTIC2:
         # Log is a deprecated field. It would be removed in future
         # releases of not, if we find a way to capture logs in async
         # environment.
-        log: Optional[str] = None
+        log: str | None = None
         return_value: _ReturnType
         execution_time: float
-        labels: Dict[str, Any] = Field(default_factory=dict)
+        labels: dict[str, Any] = Field(default_factory=dict)
 
-        error: Optional[BaseException] = None
+        error: BaseException | None = None
 
         model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -65,9 +72,9 @@ if IS_PYDANTIC2:
                 raise self.error
             return self
 
-        def __getstate__(self) -> Dict[Any, Any]:
+        def __getstate__(self) -> dict[Any, Any]:
             dict = super().__getstate__()
-            vals: Dict[str, Any] = dict["__dict__"]
+            vals: builtins.dict[str, Any] = dict["__dict__"]
 
             if "error" in vals and vals["error"] is not None:
                 vals["error"] = prepare_exception(
@@ -79,7 +86,7 @@ if IS_PYDANTIC2:
 
         @field_validator("error", mode="before")
         @classmethod
-        def _validate_error(cls, value: Any) -> Optional[BaseException]:
+        def _validate_error(cls, value: Any) -> BaseException | None:
             return exception_to_python(value)
 
 else:
@@ -93,12 +100,12 @@ else:
         # Log is a deprecated field. It would be removed in future
         # releases of not, if we find a way to capture logs in async
         # environment.
-        log: Optional[str] = None
+        log: str | None = None
         return_value: _ReturnType
         execution_time: float
-        labels: Dict[str, Any] = Field(default_factory=dict)
+        labels: dict[str, Any] = Field(default_factory=dict)
 
-        error: Optional[BaseException] = None
+        error: BaseException | None = None
 
         class Config:
             arbitrary_types_allowed = True
@@ -115,9 +122,9 @@ else:
                 raise self.error
             return self
 
-        def __getstate__(self) -> Dict[Any, Any]:
+        def __getstate__(self) -> dict[Any, Any]:
             dict = super().__getstate__()
-            vals: Dict[str, Any] = dict["__dict__"]
+            vals: builtins.dict[str, Any] = dict["__dict__"]
 
             if "error" in vals and vals["error"] is not None:
                 vals["error"] = prepare_exception(
@@ -129,5 +136,5 @@ else:
 
         @validator("error", pre=True)
         @classmethod
-        def _validate_error(cls, value: Any) -> Optional[BaseException]:
+        def _validate_error(cls, value: Any) -> BaseException | None:
             return exception_to_python(value)

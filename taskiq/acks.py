@@ -1,5 +1,5 @@
 import enum
-from typing import Awaitable, Callable, Union
+from collections.abc import Awaitable, Callable
 
 from pydantic import BaseModel
 
@@ -34,4 +34,4 @@ class AckableMessage(BaseModel):
     """
 
     data: bytes
-    ack: Callable[[], Union[None, Awaitable[None]]]
+    ack: Callable[[], None | Awaitable[None]]

@@ -2,10 +2,11 @@ import asyncio
 import contextvars
 import functools
 import inspect
+from collections.abc import Callable
 from concurrent.futures import Executor
 from logging import getLogger
 from time import time
-from typing import Any, Callable, Dict, Optional, Set, Union, get_type_hints
+from typing import Any, get_type_hints
 
 import anyio
 from taskiq_dependencies import DependencyGraph
@@ -31,33 +32,33 @@ class Receiver:
     def __init__(
         self,
         broker: AsyncBroker,
-        executor: Optional[Executor] = None,
+        executor: Executor | None = None,
         validate_params: bool = True,
-        max_async_tasks: "Optional[int]" = None,
+        max_async_tasks: "int | None" = None,
         max_prefetch: int = 0,
         propagate_exceptions: bool = True,
         run_startup: bool = True,
-        ack_type: Optional[AcknowledgeType] = None,
-        on_exit: Optional[Callable[["Receiver"], None]] = None,
-        max_tasks_to_execute: Optional[int] = None,
-        wait_tasks_timeout: Optional[float] = None,
+        ack_type: AcknowledgeType | None = None,
+        on_exit: Callable[["Receiver"], None] | None = None,
+        max_tasks_to_execute: int | None = None,
+        wait_tasks_timeout: float | None = None,
     ) -> None:
         self.broker = broker
         self.executor = executor
         self.run_startup = run_startup
         self.validate_params = validate_params
-        self.task_signatures: Dict[str, inspect.Signature] = {}
-        self.task_hints: Dict[str, Dict[str, Any]] = {}
-        self.dependency_graphs: Dict[str, DependencyGraph] = {}
+        self.task_signatures: dict[str, inspect.Signature] = {}
+        self.task_hints: dict[str, dict[str, Any]] = {}
+        self.dependency_graphs: dict[str, DependencyGraph] = {}
         self.propagate_exceptions = propagate_exceptions
         self.on_exit = on_exit
         self.ack_time = ack_type or AcknowledgeType.WHEN_SAVED
-        self.known_tasks: Set[str] = set()
+        self.known_tasks: set[str] = set()
         self.max_tasks_to_execute = max_tasks_to_execute
         self.wait_tasks_timeout = wait_tasks_timeout
         for task in self.broker.get_all_tasks().values():
             self._prepare_task(task.task_name, task.original_func)
-        self.sem: "Optional[asyncio.Semaphore]" = None
+        self.sem: asyncio.Semaphore | None = None
         if max_async_tasks is not None and max_async_tasks > 0:
             self.sem = asyncio.Semaphore(max_async_tasks)
         else:
@@ -69,7 +70,7 @@ class Receiver:
 
     async def callback(  # noqa: C901, PLR0912
         self,
-        message: Union[bytes, AckableMessage],
+        message: bytes | AckableMessage,
         raise_err: bool = False,
     ) -> None:
         """
@@ -139,7 +140,7 @@ class Receiver:
         ):
             await maybe_awaitable(message.ack())
 
-        for middleware in self.broker.middlewares:
+        for middleware in reversed(self.broker.middlewares):
             if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
                 await maybe_awaitable(middleware.post_execute(taskiq_msg, result))
 
@@ -147,7 +148,7 @@ class Receiver:
             if not isinstance(result.error, NoResultError):
                 await self.broker.result_backend.set_result(taskiq_msg.task_id, result)
 
-                for middleware in self.broker.middlewares:
+                for middleware in reversed(self.broker.middlewares):
                     if middleware.__class__.post_save != TaskiqMiddleware.post_save:
                         await maybe_awaitable(middleware.post_save(taskiq_msg, result))
 
@@ -191,7 +192,7 @@ class Receiver:
         """
         loop = asyncio.get_running_loop()
         returned = None
-        found_exception: "Optional[BaseException]" = None
+        found_exception: BaseException | None = None
         signature = None
         if message.task_name not in self.known_tasks:
             self._prepare_task(message.task_name, target)
@@ -279,7 +280,7 @@ class Receiver:
             await dep_ctx.close(*args)
 
         # Assemble result.
-        result: "TaskiqResult[Any]" = TaskiqResult(
+        result: TaskiqResult[Any] = TaskiqResult(
             is_err=found_exception is not None,
             log=None,
             return_value=returned,
@@ -289,7 +290,7 @@ class Receiver:
         )
         # If exception is found we execute middlewares.
         if found_exception is not None:
-            for middleware in self.broker.middlewares:
+            for middleware in reversed(self.broker.middlewares):
                 if middleware.__class__.on_error != TaskiqMiddleware.on_error:
                     await maybe_awaitable(
                         middleware.on_error(
@@ -314,7 +315,7 @@ class Receiver:
         if self.run_startup:
             await self.broker.startup()
         logger.info("Listening started.")
-        queue: "asyncio.Queue[Union[bytes, AckableMessage]]" = asyncio.Queue()
+        queue: asyncio.Queue[bytes | AckableMessage] = asyncio.Queue()
 
         async with anyio.create_task_group() as gr:
             gr.start_soon(self.prefetcher, queue, finish_event)
@@ -325,7 +326,7 @@ class Receiver:
 
     async def prefetcher(
         self,
-        queue: "asyncio.Queue[Union[bytes, AckableMessage]]",
+        queue: "asyncio.Queue[bytes | AckableMessage]",
         finish_event: asyncio.Event,
     ) -> None:
         """
@@ -336,9 +337,7 @@ class Receiver:
         """
         fetched_tasks: int = 0
         iterator = self.broker.listen()
-        current_message: asyncio.Task[
-            Union[bytes, AckableMessage]
-        ] = asyncio.create_task(
+        current_message: asyncio.Task[bytes | AckableMessage] = asyncio.create_task(
             iterator.__anext__(),  # type: ignore
         )
 
@@ -377,14 +376,14 @@ class Receiver:
 
     async def runner(
         self,
-        queue: "asyncio.Queue[Union[bytes, AckableMessage]]",
+        queue: "asyncio.Queue[bytes | AckableMessage]",
     ) -> None:
         """
         Run tasks.
 
         :param queue: queue with prefetched data.
         """
-        tasks: Set[asyncio.Task[Any]] = set()
+        tasks: set[asyncio.Task[Any]] = set()
 
         def task_cb(task: "asyncio.Task[Any]") -> None:
             """

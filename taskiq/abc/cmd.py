@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
 
 class TaskiqCMD(ABC):  # pragma: no cover
@@ -8,7 +8,7 @@ class TaskiqCMD(ABC):  # pragma: no cover
     short_help = ""
 
     @abstractmethod
-    def exec(self, args: Sequence[str]) -> Optional[int]:
+    def exec(self, args: Sequence[str]) -> int | None:
         """
         Execute the command.
 

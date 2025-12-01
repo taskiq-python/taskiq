@@ -16,15 +16,16 @@ jobs:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
+          fetch-depth: 0
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 18
+          node-version: 22
           cache: pnpm
       - name: Install deps
-        run: pnpm install
+        run: pnpm install --prod
       - name: Build
         run: pnpm docs:build -d docs_dist
 

@@ -1,6 +1,5 @@
-from typing import Any, AsyncGenerator, Optional, TypeVar
-
-from typing_extensions import ParamSpec
+from collections.abc import AsyncGenerator
+from typing import Any, ParamSpec, TypeVar
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.decor import AsyncTaskiqDecoratedTask
@@ -39,7 +38,7 @@ class AsyncSharedBroker(AsyncBroker):
 
     def __init__(self) -> None:
         super().__init__(None)
-        self._default_broker: Optional[AsyncBroker] = None
+        self._default_broker: AsyncBroker | None = None
         self.decorator_class = SharedDecoratedTask
 
     def default_broker(self, new_broker: AsyncBroker) -> None:
