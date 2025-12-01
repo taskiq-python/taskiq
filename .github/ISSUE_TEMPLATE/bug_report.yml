@@ -1,0 +1,71 @@
+name: Bug Report
+description: File a bug report to help us improve
+title: "Short description of the bug"
+labels: ["bug"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+
+  - type: input
+    id: version
+    attributes:
+      label: Taskiq version
+      description: What version of Taskiq are you running?
+      placeholder: e.g., 0.12.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: python-version
+    attributes:
+      label: Python version
+      description: What version of Python are you using?
+      options:
+        - Python 3.9 or lower
+        - Python 3.10
+        - Python 3.11
+        - Python 3.12
+        - Python 3.13
+        - Python 3.14
+        - Python 3.14t
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      description: What OS are you using?
+      placeholder: e.g., Windows, Linux, macOS
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear and concise description of what the bug is.
+      placeholder: Tell us what you see!
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: broker-init-file
+    attributes:
+      label: Broker initialization code
+      description: Provide minimal code from the taskiq broker initialization file
+      render: python
+    validations:
+      required: false
