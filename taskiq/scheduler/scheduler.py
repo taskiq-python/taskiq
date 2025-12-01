@@ -1,5 +1,5 @@
 from logging import getLogger
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
 from taskiq.exceptions import ScheduledTaskCancelledError
 from taskiq.kicker import AsyncKicker
@@ -19,7 +19,7 @@ class TaskiqScheduler:
     def __init__(
         self,
         broker: "AsyncBroker",
-        sources: List["ScheduleSource"],
+        sources: list["ScheduleSource"],
     ) -> None:  # pragma: no cover
         self.broker = broker
         self.sources = sources
@@ -37,7 +37,8 @@ class TaskiqScheduler:
         """
         This method is called when task is ready to be enqueued.
 
-        It's triggered on proper time depending on `task.cron` or `task.time` attribute.
+        It's triggered on proper time depending on `task.cron`, `task.interval`
+        or `task.time` attribute.
         :param source: source that triggered this event.
         :param task: task to send
         """
@@ -46,11 +47,16 @@ class TaskiqScheduler:
         except ScheduledTaskCancelledError:
             logger.info("Scheduled task %s has been cancelled.", task.task_name)
         else:
-            await AsyncKicker(task.task_name, self.broker, task.labels).with_labels(
-                schedule_id=task.schedule_id,
-            ).kiq(
-                *task.args,
-                **task.kwargs,
+            await (
+                AsyncKicker(task.task_name, self.broker, task.labels)
+                .with_labels(
+                    schedule_id=task.schedule_id,
+                )
+                .with_task_id(task_id=task.task_id)
+                .kiq(
+                    *task.args,
+                    **task.kwargs,
+                )
             )
             await maybe_awaitable(source.post_send(task))
 

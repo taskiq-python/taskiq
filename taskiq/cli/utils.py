@@ -1,12 +1,11 @@
 import os
 import sys
+from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from importlib import import_module
 from logging import getLogger
 from pathlib import Path
-from typing import Any, Generator, List, Sequence, Union
-
-from taskiq.utils import remove_suffix
+from typing import Any
 
 logger = getLogger("taskiq.worker")
 
@@ -37,11 +36,12 @@ def add_cwd_in_path() -> Generator[None, None, None]:
                 logger.warning(f"Cannot remove '{cwd}' from sys.path")
 
 
-def import_object(object_spec: str) -> Any:
+def import_object(object_spec: str, app_dir: str | None = None) -> Any:
     """
     It parses python object spec and imports it.
 
     :param object_spec: string in format like `package.module:variable`
+    :param app_dir: directory to add in sys.path for importing.
     :raises ValueError: if spec has unknown format.
     :returns: imported broker.
     """
@@ -49,11 +49,13 @@ def import_object(object_spec: str) -> Any:
     if len(import_spec) != 2:
         raise ValueError("You should provide object path in `module:variable` format.")
     with add_cwd_in_path():
+        if app_dir:
+            sys.path.insert(0, app_dir)
         module = import_module(import_spec[0])
     return getattr(module, import_spec[1])
 
 
-def import_from_modules(modules: List[str]) -> None:
+def import_from_modules(modules: list[str]) -> None:
     """
     Import all modules from modules variable.
 
@@ -70,8 +72,8 @@ def import_from_modules(modules: List[str]) -> None:
 
 
 def import_tasks(
-    modules: List[str],
-    pattern: Union[str, Sequence[str]],
+    modules: list[str],
+    pattern: str | Sequence[str],
     fs_discover: bool,
 ) -> None:
     """
@@ -91,9 +93,16 @@ def import_tasks(
         discovered_modules = set()
         for glob_pattern in pattern:
             for path in Path().glob(glob_pattern):
-                discovered_modules.add(
-                    remove_suffix(str(path), ".py").replace(os.path.sep, "."),
-                )
+                if path.is_file():
+                    if path.suffix in (".py", ".pyc", ".pyd", ".so"):
+                        # remove all suffixes
+                        prefix = path.name.partition(".")[0]
+                        discovered_modules.add(
+                            str(path.with_name(prefix)).replace(os.path.sep, "."),
+                        )
+                    # ignore other files
+                else:
+                    discovered_modules.add(str(path).replace(os.path.sep, "."))
 
         modules.extend(list(discovered_modules))
     import_from_modules(modules)

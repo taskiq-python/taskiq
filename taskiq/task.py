@@ -1,10 +1,9 @@
 import asyncio
-from abc import ABC, abstractmethod
+from logging import getLogger
 from time import time
-from typing import TYPE_CHECKING, Any, Coroutine, Generic, Optional, Union
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
-from typing_extensions import TypeVar
-
+from taskiq.compat import parse_obj_as
 from taskiq.exceptions import (
     ResultGetError,
     ResultIsReadyError,
@@ -16,82 +15,23 @@ if TYPE_CHECKING:  # pragma: no cover
     from taskiq.depends.progress_tracker import TaskProgress
     from taskiq.result import TaskiqResult
 
+logger = getLogger("taskiq.task")
+
 _ReturnType = TypeVar("_ReturnType")
 
 
-class _Task(ABC, Generic[_ReturnType]):
-    """TaskiqTask interface."""
-
-    @abstractmethod
-    def is_ready(self) -> Union[bool, Coroutine[Any, Any, bool]]:
-        """
-        Method to check wether result is ready.
-
-        :return: True if result is ready.
-        """
-
-    @abstractmethod
-    def get_result(
-        self,
-        with_logs: bool = False,
-    ) -> Union[
-        "TaskiqResult[_ReturnType]",
-        Coroutine[Any, Any, "TaskiqResult[_ReturnType]"],
-    ]:
-        """
-        Get actual execution result.
-
-        :param with_logs: wether you want to fetch logs.
-        :return: TaskiqResult.
-        """
-
-    @abstractmethod
-    def wait_result(
-        self,
-        check_interval: float = 0.2,
-        timeout: float = -1.0,
-        with_logs: bool = False,
-    ) -> Union[
-        "TaskiqResult[_ReturnType]",
-        Coroutine[Any, Any, "TaskiqResult[_ReturnType]"],
-    ]:
-        """
-        Wait for result to become ready and get it.
-
-        This function constantly checks whether result is ready
-        and fetches it when it becomes available.
-
-        :param check_interval: how often availability is checked.
-        :param timeout: maximum amount of time it will wait
-            before raising TaskiqResultTimeoutError.
-        :param with_logs: whether you need to download logs.
-        :return: TaskiqResult.
-        """
-
-    @abstractmethod
-    def get_progress(
-        self,
-    ) -> Union[
-        "Optional[TaskProgress[Any]]",
-        Coroutine[Any, Any, "Optional[TaskProgress[Any]]"],
-    ]:
-        """
-        Get task progress.
-
-        :return: task's progress.
-        """
-
-
-class AsyncTaskiqTask(_Task[_ReturnType]):
+class AsyncTaskiqTask(Generic[_ReturnType]):
     """AsyncTask for AsyncResultBackend."""
 
     def __init__(
         self,
         task_id: str,
         result_backend: "AsyncResultBackend[_ReturnType]",
+        return_type: type[_ReturnType] | None = None,
     ) -> None:
         self.task_id = task_id
         self.result_backend = result_backend
+        self.return_type = return_type
 
     async def is_ready(self) -> bool:
         """
@@ -117,10 +57,19 @@ class AsyncTaskiqTask(_Task[_ReturnType]):
         :return: task's return value.
         """
         try:
-            return await self.result_backend.get_result(
+            res = await self.result_backend.get_result(
                 self.task_id,
                 with_logs=with_logs,
             )
+            if self.return_type is not None:
+                try:
+                    res.return_value = parse_obj_as(
+                        self.return_type,
+                        res.return_value,
+                    )
+                except ValueError:
+                    logger.warning("Cannot parse return type into %s", self.return_type)
+            return res
         except Exception as exc:
             raise ResultGetError from exc
 
@@ -137,7 +86,7 @@ class AsyncTaskiqTask(_Task[_ReturnType]):
         ready. And if it is it returns the result.
 
         It may throw TaskiqResultTimeoutError if
-        task didn't became ready in provided
+        task didn't become ready in provided
         period of time.
 
         :param check_interval: How often checks are performed.
@@ -151,10 +100,10 @@ class AsyncTaskiqTask(_Task[_ReturnType]):
         while not await self.is_ready():
             await asyncio.sleep(check_interval)
             if 0 < timeout < time() - start_time:
-                raise TaskiqResultTimeoutError
+                raise TaskiqResultTimeoutError(timeout=timeout)
         return await self.get_result(with_logs=with_logs)
 
-    async def get_progress(self) -> "Optional[TaskProgress[Any]]":
+    async def get_progress(self) -> "TaskProgress[Any] | None":
         """
         Get task progress.
 

@@ -1,0 +1,43 @@
+name: Release docs
+
+on:
+  workflow_dispatch:
+  release:
+    types:
+      - released
+
+permissions:
+  contents: write
+
+jobs:
+  deploy_docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install deps
+        run: pnpm install --prod
+      - name: Build
+        run: pnpm docs:build -d docs_dist
+
+      - name: Setup git
+        run: |
+          git config --global lfs.allowincompletepush true
+
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          personal_token: ${{ secrets.PERSONAL_TOKEN }}
+          external_repository: taskiq-python/taskiq-python.github.io
+          publish_dir: ./docs_dist
+          user_name: "github-actions[bot]"
+          user_email: "github-actions[bot]@users.noreply.github.com"

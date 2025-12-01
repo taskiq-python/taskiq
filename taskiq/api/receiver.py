@@ -1,7 +1,6 @@
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from logging import getLogger
-from typing import Optional, Type
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.acks import AcknowledgeType
@@ -12,14 +11,15 @@ logger = getLogger("taskiq.receiver")
 
 async def run_receiver_task(
     broker: AsyncBroker,
-    receiver_cls: Type[Receiver] = Receiver,
-    sync_workers: int = 4,
+    receiver_cls: type[Receiver] = Receiver,
+    sync_workers: int | None = None,
     validate_params: bool = True,
     max_async_tasks: int = 100,
     max_prefetch: int = 0,
     propagate_exceptions: bool = True,
     run_startup: bool = False,
-    ack_time: Optional[AcknowledgeType] = None,
+    ack_time: AcknowledgeType | None = None,
+    use_process_pool: bool = False,
 ) -> None:
     """
     Function to run receiver programmatically.
@@ -39,15 +39,18 @@ async def run_receiver_task(
 
     :param broker: current broker instance.
     :param receiver_cls: receiver class to use.
-    :param sync_workers: number of threads of a threadpool that runs sync tasks.
+    :param sync_workers: number of threads of a threadpool
+        or processes in processpool that runs sync tasks.
     :param validate_params: whether to validate params or not.
     :param max_async_tasks: maximum number of simultaneous async tasks.
     :param max_prefetch: maximum number of tasks to prefetch.
     :param propagate_exceptions: whether to propagate exceptions in generators or not.
     :param run_startup: whether to run startup function or not.
     :param ack_time: acknowledge type to use.
+    :param use_process_pool: whether to use process pool or threadpool.
     :raises asyncio.CancelledError: if the task was cancelled.
     """
+    finish_event = asyncio.Event()
 
     def on_exit(_: Receiver) -> None:
         """
@@ -58,9 +61,15 @@ async def run_receiver_task(
 
         :raises CancelledError: always.
         """
+        finish_event.set()
         raise asyncio.CancelledError
 
-    with ThreadPoolExecutor(max_workers=sync_workers) as executor:
+    executor: Executor
+    if use_process_pool:
+        executor = ProcessPoolExecutor(max_workers=sync_workers)
+    else:
+        executor = ThreadPoolExecutor(max_workers=sync_workers)
+    with executor as executor:
         broker.is_worker_process = True
         while True:
             try:
@@ -75,7 +84,7 @@ async def run_receiver_task(
                     on_exit=on_exit,
                     ack_type=ack_time,
                 )
-                await receiver.listen()
+                await receiver.listen(finish_event)
             except asyncio.CancelledError:
                 logger.warning("The listenig task was cancelled.")
                 raise

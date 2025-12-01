@@ -74,7 +74,7 @@ After the preparations are done, we need to modify the broker's file in your pro
 
 @[code python](../examples/testing/main_file.py)
 
-As you can see, we added an `if` statement. If the expression is true, we replace our broker with an imemory broker.
+As you can see, we added an `if` statement. If the expression is true, we replace our broker with an inmemory broker.
 The main point here is to not have an actual connection during testing. It's useful because inmemory broker has
 the same interface as a real broker, but it doesn't send tasks actually.
 
@@ -83,7 +83,7 @@ the same interface as a real broker, but it doesn't send tasks actually.
 Let's define a task.
 
 ```python
-from your_project.taskiq import broker
+from your_project.tkq import broker
 
 @broker.task
 async def parse_int(val: str) -> int:
@@ -107,7 +107,7 @@ And that's it. Test should pass.
 What if you want to test a function that uses task. Let's define such function.
 
 ```python
-from your_project.taskiq import broker
+from your_project.tkq import broker
 
 @broker.task
 async def parse_int(val: str) -> int:
@@ -129,6 +129,60 @@ async def test_add_one():
     assert await parse_and_add_one("11") == 12
 ```
 
+### Unawaitable tasks
+
+When a function calls an asynchronous task but doesn't await its result,
+it can be challenging to test.
+
+In such cases, the `InMemoryBroker` provides two convenient ways to help you:
+the `await_inplace` constructor parameter and the `wait_all` method.
+
+Consider the following example where we define a task and a function that calls it:
+
+```python
+from your_project.tkq import broker
+
+@broker.task
+async def parse_int(val: str) -> int:
+    return int(val)
+
+
+async def parse_int_later(val: str) -> int:
+    await parse_int.kiq(val)
+    return 1
+```
+
+To test this function, we can do two things:
+
+1. By setting the `await_inplace=True` parameter when creating the broker.
+In that case all tasks will be automatically awaited as soon as they are called.
+In such a way you don't need to manually call the `wait_result` in your code.
+
+To set it up, define the broker as the following:
+
+```python
+broker = InMemoryBroker(await_inplace=True)
+```
+
+With this setup all `await function.kiq()` calls will behave similarly to `await function()`, but
+with dependency injection and all taskiq-related functionality.
+
+2. Alternatively, you can manually await all tasks after invoking the
+target function by using the `wait_all` method.
+This gives you more control over when to wait for tasks to complete.
+
+```python
+from your_project.tkq import broker
+
+@pytest.mark.anyio
+async def test_add_one():
+    # Call the function that triggers the async task
+    assert await parse_int_later("11") == 1
+    await broker.wait_all()  # Waits for all tasks to complete
+    # At that time we can guarantee that all sent tasks
+    # have been completed and do all the assertions.
+```
+
 ## Dependency injection
 
 If you use dependencies in your tasks, you may think that this can become a problem. But it's not.
@@ -146,7 +200,7 @@ from typing import Annotated
 from pathlib import Path
 from taskiq import TaskiqDepends
 
-from your_project.taskiq import broker
+from your_project.tkq import broker
 
 
 @broker.task
@@ -161,7 +215,7 @@ async def modify_path(some_path: Annotated[Path, TaskiqDepends()]):
 from pathlib import Path
 from taskiq import TaskiqDepends
 
-from your_project.taskiq import broker
+from your_project.tkq import broker
 
 
 @broker.task
@@ -172,12 +226,12 @@ async def modify_path(some_path: Path = TaskiqDepends()):
 
 :::
 
-To test the task itself, it's not different to the example without dependencies, but we jsut need to pass all
+To test the task itself, it's not different to the example without dependencies, but we just need to pass all
 expected dependencies manually as function's arguments or key-word arguments.
 
 ```python
 import pytest
-from your_project.taskiq import broker
+from your_project.tkq import broker
 
 from pathlib import Path
 
@@ -193,7 +247,7 @@ must mutate dependency_context before calling a task. We suggest to do it in fix
 
 ```python
 import pytest
-from your_project.taskiq import broker
+from your_project.tkq import broker
 from pathlib import Path
 
 

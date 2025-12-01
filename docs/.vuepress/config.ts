@@ -14,6 +14,9 @@ export default defineUserConfig({
         content: "https://taskiq-python.github.io/logo.svg",
       },
     ],
+    ["link", { rel: "icon", href: "/favicon.ico", type: "image/x-icon" }],
+    ["link", { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" }],
+    ["link", { rel: "apple-touch-icon", href: "/favicon.png" }],
   ],
 
   bundler: viteBundler(),
@@ -31,24 +34,23 @@ export default defineUserConfig({
 
     pure: true,
 
+    markdown: {
+      tabs: true,
+      mermaid: true
+    },
+
     plugins: {
       readingTime: false,
       copyCode: {
         showInMobile: true,
       },
 
-      mdEnhance: {
-        tabs: true,
-        mermaid: true,
-      },
-
       sitemap: {
         changefreq: "daily",
         sitemapFilename: "sitemap.xml",
       },
-      searchPro: {
-        indexContent: true,
-        autoSuggestions: false,
+      search: {
+        maxSuggestions: 10,
       }
     },
   })

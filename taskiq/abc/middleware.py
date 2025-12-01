@@ -1,4 +1,6 @@
-from typing import TYPE_CHECKING, Any, Coroutine, Union
+from collections.abc import Coroutine
+from types import CoroutineType
+from typing import TYPE_CHECKING, Any, Union
 
 if TYPE_CHECKING:  # pragma: no cover  # pragma: no cover
     from taskiq.abc.broker import AsyncBroker
@@ -10,7 +12,7 @@ class TaskiqMiddleware:  # pragma: no cover
     """Base class for middlewares."""
 
     def __init__(self) -> None:
-        self.broker: "AsyncBroker" = None  # type: ignore
+        self.broker: AsyncBroker = None  # type: ignore
 
     def set_broker(self, broker: "AsyncBroker") -> None:
         """
@@ -20,7 +22,9 @@ class TaskiqMiddleware:  # pragma: no cover
         """
         self.broker = broker
 
-    def startup(self) -> "Union[None, Coroutine[Any, Any, None]]":
+    def startup(
+        self,
+    ) -> Union[None, Coroutine[Any, Any, None], "CoroutineType[Any, Any, None]"]:
         """
         Startup method to perform various action during startup.
 
@@ -30,7 +34,9 @@ class TaskiqMiddleware:  # pragma: no cover
         :returns nothing.
         """
 
-    def shutdown(self) -> "Union[None, Coroutine[Any, Any, None]]":
+    def shutdown(
+        self,
+    ) -> Union[None, Coroutine[Any, Any, None], "CoroutineType[Any, Any, None]"]:
         """
         Shutdown method to perform various action during shutdown.
 
@@ -43,7 +49,11 @@ class TaskiqMiddleware:  # pragma: no cover
     def pre_send(
         self,
         message: "TaskiqMessage",
-    ) -> "Union[TaskiqMessage, Coroutine[Any, Any, TaskiqMessage]]":
+    ) -> Union[
+        "TaskiqMessage",
+        "Coroutine[Any, Any, TaskiqMessage]",
+        "CoroutineType[Any, Any, TaskiqMessage]",
+    ]:
         """
         Hook that executes before sending the task to worker.
 
@@ -58,7 +68,7 @@ class TaskiqMiddleware:  # pragma: no cover
     def post_send(
         self,
         message: "TaskiqMessage",
-    ) -> "Union[None, Coroutine[Any, Any, None]]":
+    ) -> Union[None, Coroutine[Any, Any, None], "CoroutineType[Any, Any, None]"]:
         """
         This hook is executed right after the task is sent.
 
@@ -71,7 +81,11 @@ class TaskiqMiddleware:  # pragma: no cover
     def pre_execute(
         self,
         message: "TaskiqMessage",
-    ) -> "Union[TaskiqMessage, Coroutine[Any, Any, TaskiqMessage]]":
+    ) -> Union[
+        "TaskiqMessage",
+        "Coroutine[Any, Any, TaskiqMessage]",
+        "CoroutineType[Any, Any, TaskiqMessage]",
+    ]:
         """
         This hook is called before executing task.
 
@@ -87,7 +101,7 @@ class TaskiqMiddleware:  # pragma: no cover
         self,
         message: "TaskiqMessage",
         result: "TaskiqResult[Any]",
-    ) -> "Union[None, Coroutine[Any, Any, None]]":
+    ) -> Union[None, Coroutine[Any, Any, None], "CoroutineType[Any, Any, None]"]:
         """
         This hook executes after task is complete.
 
@@ -102,7 +116,7 @@ class TaskiqMiddleware:  # pragma: no cover
         self,
         message: "TaskiqMessage",
         result: "TaskiqResult[Any]",
-    ) -> "Union[None, Coroutine[Any, Any, None]]":
+    ) -> Union[None, Coroutine[Any, Any, None], "CoroutineType[Any, Any, None]"]:
         """
         Post save hook.
 
@@ -118,7 +132,7 @@ class TaskiqMiddleware:  # pragma: no cover
         message: "TaskiqMessage",
         result: "TaskiqResult[Any]",
         exception: BaseException,
-    ) -> "Union[None, Coroutine[Any, Any, None]]":
+    ) -> Union[None, Coroutine[Any, Any, None], "CoroutineType[Any, Any, None]"]:
         """
         This function is called when exception is found.
 

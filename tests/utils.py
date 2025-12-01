@@ -1,7 +1,8 @@
 import asyncio
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 from taskiq import AsyncBroker, BrokerMessage
+from taskiq.acks import AckableMessage
 
 
 class AsyncQueueBroker(AsyncBroker):
@@ -13,7 +14,7 @@ class AsyncQueueBroker(AsyncBroker):
     """
 
     def __init__(self) -> None:
-        self.queue: "asyncio.Queue[bytes]" = asyncio.Queue()
+        self.queue: asyncio.Queue[bytes] = asyncio.Queue()
         super().__init__(None, None)
 
     async def kick(self, message: BrokerMessage) -> None:
@@ -24,10 +25,8 @@ class AsyncQueueBroker(AsyncBroker):
         """Small method to wait for all tasks to be processed."""
         await self.queue.join()
 
-    async def listen(self) -> AsyncGenerator[bytes, None]:
+    async def listen(self) -> AsyncGenerator[AckableMessage, None]:
         """This method returns all tasks from queue."""
         while True:
             task = await self.queue.get()
-            yield task
-            # Notify that task is done.
-            self.queue.task_done()
+            yield AckableMessage(data=task, ack=self.queue.task_done)

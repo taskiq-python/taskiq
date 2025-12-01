@@ -83,7 +83,7 @@ def test_representable(obj: Any, repr: str) -> None:
 def test_unrepresentable() -> None:
     obj = ReprStrException()
     repr = serialization.safe_repr(obj=obj)
-    assert repr.startswith("<Unrepresentable {!r}".format(type(obj)))
+    assert repr.startswith(f"<Unrepresentable {type(obj)!r}")
 
 
 def test_create_exception_cls() -> None:
@@ -278,7 +278,6 @@ def test_exception_to_python_when_type_error() -> None:
 
 def test_json_context() -> None:
     error1 = ValueError("Context")
-    ValueError("Cause")
     error3 = ValueError("Error")
 
     try:
@@ -336,7 +335,6 @@ def test_json_cause() -> None:
 
 def test_pickle_context() -> None:
     error1 = ValueError("Context")
-    ValueError("Cause")
     error3 = ValueError("Error")
 
     try:

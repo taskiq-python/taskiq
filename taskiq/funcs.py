@@ -1,6 +1,6 @@
 import asyncio
 from time import time
-from typing import Any, Tuple
+from typing import Any
 
 from taskiq.exceptions import TaskiqResultTimeoutError
 from taskiq.result import TaskiqResult
@@ -12,7 +12,7 @@ async def gather(
     timeout: float = -1,
     with_logs: bool = False,
     periodicity: float = 0.1,
-) -> Tuple[TaskiqResult[Any], ...]:
+) -> tuple[TaskiqResult[Any], ...]:
     """
     Function to await results of several tasks.
 
@@ -24,7 +24,7 @@ async def gather(
 
     :param tasks: tasks to await.
     :param timeout: timeout of awaiting, defaults to -1
-    :param with_logs: wether you want to fetch logs, defaults to False
+    :param with_logs: whether you want to fetch logs, defaults to False
     :param periodicity: how often to ask for results, defaults to 0.1
     :raises TaskiqResultTimeoutError: if timeout is reached.
     :return: list of TaskiqResults.
@@ -47,7 +47,7 @@ async def gather(
 
     while task_ids:
         if 0 < timeout < time() - start_time:
-            raise TaskiqResultTimeoutError("Timed out")
+            raise TaskiqResultTimeoutError(timeout=timeout)
         check_tasks = []
         for task in tasks:
             check_tasks.append(loop.create_task(check_task(task)))

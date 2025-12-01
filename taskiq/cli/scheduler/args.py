@@ -1,6 +1,6 @@
 from argparse import ZERO_OR_MORE, ArgumentDefaultsHelpFormatter, ArgumentParser
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import List, Optional, Sequence, Union
 
 from taskiq.cli.common_args import LogLevel
 from taskiq.scheduler.scheduler import TaskiqScheduler
@@ -10,16 +10,19 @@ from taskiq.scheduler.scheduler import TaskiqScheduler
 class SchedulerArgs:
     """Arguments for scheduler."""
 
-    scheduler: Union[str, TaskiqScheduler]
-    modules: List[str]
-    log_level: str = LogLevel.INFO.name
+    scheduler: str | TaskiqScheduler
+    modules: list[str]
+    app_dir: str | None = None
+    log_level: LogLevel = LogLevel.INFO
     configure_logging: bool = True
     fs_discover: bool = False
     tasks_pattern: Sequence[str] = ("**/tasks.py",)
     skip_first_run: bool = False
+    update_interval: int | None = None
+    loop_interval: int | None = None
 
     @classmethod
-    def from_cli(cls, args: Optional[Sequence[str]] = None) -> "SchedulerArgs":
+    def from_cli(cls, args: Sequence[str] | None = None) -> "SchedulerArgs":
         """
         Build scheduler args from CLI arguments.
 
@@ -32,11 +35,24 @@ class SchedulerArgs:
             formatter_class=ArgumentDefaultsHelpFormatter,
             description="Subcommand to run scheduler",
         )
-        parser.add_argument("scheduler", help="Path to scheduler")
+        parser.add_argument(
+            "scheduler",
+            help="Path to scheduler or scheduler factory function",
+        )
         parser.add_argument(
             "modules",
             help="List of modules where to look for tasks.",
             nargs=ZERO_OR_MORE,
+        )
+        parser.add_argument(
+            "--app-dir",
+            "-d",
+            default=None,
+            help=(
+                "Path to application directory. "
+                "This path will be used to import tasks modules. "
+                "If not specified, current working directory will be used."
+            ),
         )
         parser.add_argument(
             "--fs-discover",
@@ -77,10 +93,30 @@ class SchedulerArgs:
                 "This option skips running tasks immediately after scheduler start."
             ),
         )
+        parser.add_argument(
+            "--update-interval",
+            type=int,
+            default=None,
+            help=(
+                "Interval in seconds to check for new tasks. "
+                "If not specified, scheduler will run once a minute."
+            ),
+        )
+        parser.add_argument(
+            "--loop-interval",
+            type=int,
+            default=None,
+            help=(
+                "Interval in seconds to check tasks to send. "
+                "If not specified, scheduler will run once a second."
+            ),
+        )
 
         namespace = parser.parse_args(args)
         # If there are any patterns specified, remove default.
         # This is an argparse limitation.
         if len(namespace.tasks_pattern) > 1:
             namespace.tasks_pattern.pop(0)
+        # Convert log_level string to LogLevel enum
+        namespace.log_level = LogLevel[namespace.log_level]
         return cls(**namespace.__dict__)

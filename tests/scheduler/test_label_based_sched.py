@@ -1,6 +1,6 @@
 import asyncio
-from datetime import datetime, timedelta
-from typing import Any, Dict, List
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
 import pytest
 from freezegun import freeze_time
@@ -13,15 +13,22 @@ from taskiq.scheduler.scheduled_task import ScheduledTask
 from taskiq.scheduler.scheduler import TaskiqScheduler
 
 
-@pytest.mark.anyio
 @pytest.mark.parametrize(
     "schedule_label",
     [
         pytest.param([{"cron": "* * * * *"}], id="cron"),
-        pytest.param([{"time": datetime.utcnow()}], id="time"),
+        pytest.param([{"time": datetime.now(timezone.utc)}], id="time"),
+        pytest.param(
+            [{"time": datetime.now(timezone.utc), "labels": {"foo": "bar"}}],
+            id="labels_inside_schedule",
+        ),
+        pytest.param(
+            [{"cron": "*/1 * * * *", "schedule_id": "every_minute"}],
+            id="schedule_with_id",
+        ),
     ],
 )
-async def test_label_discovery(schedule_label: List[Dict[str, Any]]) -> None:
+async def test_label_discovery(schedule_label: list[dict[str, Any]]) -> None:
     broker = InMemoryBroker()
 
     @broker.task(
@@ -31,21 +38,26 @@ async def test_label_discovery(schedule_label: List[Dict[str, Any]]) -> None:
     def task() -> None:
         pass
 
-    schedules = await LabelScheduleSource(broker).get_schedules()
+    source = LabelScheduleSource(broker)
+    await source.startup()
+    schedules = await source.get_schedules()
     assert schedules == [
         ScheduledTask(
-            schedule_id=schedules[0].schedule_id,
+            schedule_id=schedule_label[0].get("schedule_id", schedules[0].schedule_id),
             cron=schedule_label[0].get("cron"),
             time=schedule_label[0].get("time"),
             task_name="test_task",
-            labels={"schedule": schedule_label},
+            labels=schedule_label[0].get("labels", {}),
             args=[],
             kwargs={},
         ),
     ]
 
+    # check that labels of tasks are not changed after startup and discovery process
+    task_from_broker = next(iter(broker.get_all_tasks().values()))
+    assert task_from_broker.labels == {"schedule": schedule_label}
 
-@pytest.mark.anyio
+
 async def test_label_discovery_no_cron() -> None:
     broker = InMemoryBroker()
 
@@ -57,11 +69,11 @@ async def test_label_discovery_no_cron() -> None:
         pass
 
     source = LabelScheduleSource(broker)
+    await source.startup()
     schedules = await source.get_schedules()
     assert schedules == []
 
 
-@pytest.mark.anyio
 async def test_task_scheduled_at_time_runs_only_once(mock_sleep: None) -> None:
     event = asyncio.Event()
     broker = InMemoryBroker()
@@ -69,6 +81,8 @@ async def test_task_scheduled_at_time_runs_only_once(mock_sleep: None) -> None:
         broker=broker,
         sources=[LabelScheduleSource(broker)],
     )
+    for source in scheduler.sources:
+        await source.startup()
 
     # NOTE:
     # freeze time to 00:00, so task won't be scheduled by `cron`, only by `time`
@@ -77,8 +91,8 @@ async def test_task_scheduled_at_time_runs_only_once(mock_sleep: None) -> None:
         @broker.task(
             task_name="test_task",
             schedule=[
-                {"time": datetime.utcnow(), "args": [1]},
-                {"time": datetime.utcnow() + timedelta(days=1), "args": [2]},
+                {"time": datetime.now(timezone.utc), "args": [1]},
+                {"time": datetime.now(timezone.utc) + timedelta(days=1), "args": [2]},
                 {"cron": "1 * * * *", "args": [3]},
             ],
         )

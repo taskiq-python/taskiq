@@ -2,7 +2,7 @@ import os
 from logging import getLogger
 from pathlib import Path
 from tempfile import gettempdir
-from typing import Any, Optional
+from typing import Any
 
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.message import TaskiqMessage
@@ -25,7 +25,7 @@ class PrometheusMiddleware(TaskiqMiddleware):
 
     def __init__(
         self,
-        metrics_path: Optional[Path] = None,
+        metrics_path: Path | None = None,
         server_port: int = 9000,
         server_addr: str = "0.0.0.0",  # noqa: S104
     ) -> None:
@@ -44,7 +44,7 @@ class PrometheusMiddleware(TaskiqMiddleware):
         logger.debug("Initializing metrics")
 
         try:
-            from prometheus_client import Counter, Histogram
+            from prometheus_client import Counter, Histogram  # noqa: PLC0415
         except ImportError as exc:
             raise ImportError(
                 "Cannot initialize metrics. Please install 'taskiq[metrics]'.",
@@ -85,7 +85,7 @@ class PrometheusMiddleware(TaskiqMiddleware):
         This function starts prometheus server.
         It starts it only in case if it's a worker process.
         """
-        from prometheus_client import start_http_server
+        from prometheus_client import start_http_server  # noqa: PLC0415
 
         if self.broker.is_worker_process:
             try:

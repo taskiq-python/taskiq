@@ -1,9 +1,12 @@
 import asyncio
+import contextvars
+import functools
 import inspect
+from collections.abc import Callable
 from concurrent.futures import Executor
 from logging import getLogger
 from time import time
-from typing import Any, Callable, Dict, List, Optional, Set, Union, get_type_hints
+from typing import Any, get_type_hints
 
 import anyio
 from taskiq_dependencies import DependencyGraph
@@ -23,58 +26,39 @@ logger = getLogger(__name__)
 QUEUE_DONE = b"-1"
 
 
-def _run_sync(
-    target: Callable[..., Any],
-    args: List[Any],
-    kwargs: Dict[str, Any],
-) -> Any:
-    """
-    Runs function synchronously.
-
-    We use this function, because
-    we cannot pass kwargs in loop.run_with_executor().
-
-    :param target: function to execute.
-    :param args: list of function's args.
-    :param kwargs: dict of function's kwargs.
-    :return: result of function's execution.
-    """
-    return target(*args, **kwargs)
-
-
 class Receiver:
     """Class that uses as a callback handler."""
 
     def __init__(
         self,
         broker: AsyncBroker,
-        executor: Optional[Executor] = None,
+        executor: Executor | None = None,
         validate_params: bool = True,
-        max_async_tasks: "Optional[int]" = None,
+        max_async_tasks: "int | None" = None,
         max_prefetch: int = 0,
         propagate_exceptions: bool = True,
         run_startup: bool = True,
-        ack_type: Optional[AcknowledgeType] = None,
-        on_exit: Optional[Callable[["Receiver"], None]] = None,
-        max_tasks_to_execute: Optional[int] = None,
-        wait_tasks_timeout: Optional[float] = None,
+        ack_type: AcknowledgeType | None = None,
+        on_exit: Callable[["Receiver"], None] | None = None,
+        max_tasks_to_execute: int | None = None,
+        wait_tasks_timeout: float | None = None,
     ) -> None:
         self.broker = broker
         self.executor = executor
         self.run_startup = run_startup
         self.validate_params = validate_params
-        self.task_signatures: Dict[str, inspect.Signature] = {}
-        self.task_hints: Dict[str, Dict[str, Any]] = {}
-        self.dependency_graphs: Dict[str, DependencyGraph] = {}
+        self.task_signatures: dict[str, inspect.Signature] = {}
+        self.task_hints: dict[str, dict[str, Any]] = {}
+        self.dependency_graphs: dict[str, DependencyGraph] = {}
         self.propagate_exceptions = propagate_exceptions
         self.on_exit = on_exit
         self.ack_time = ack_type or AcknowledgeType.WHEN_SAVED
-        self.known_tasks: Set[str] = set()
+        self.known_tasks: set[str] = set()
         self.max_tasks_to_execute = max_tasks_to_execute
         self.wait_tasks_timeout = wait_tasks_timeout
         for task in self.broker.get_all_tasks().values():
             self._prepare_task(task.task_name, task.original_func)
-        self.sem: "Optional[asyncio.Semaphore]" = None
+        self.sem: asyncio.Semaphore | None = None
         if max_async_tasks is not None and max_async_tasks > 0:
             self.sem = asyncio.Semaphore(max_async_tasks)
         else:
@@ -86,7 +70,7 @@ class Receiver:
 
     async def callback(  # noqa: C901, PLR0912
         self,
-        message: Union[bytes, AckableMessage],
+        message: bytes | AckableMessage,
         raise_err: bool = False,
     ) -> None:
         """
@@ -156,7 +140,7 @@ class Receiver:
         ):
             await maybe_awaitable(message.ack())
 
-        for middleware in self.broker.middlewares:
+        for middleware in reversed(self.broker.middlewares):
             if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
                 await maybe_awaitable(middleware.post_execute(taskiq_msg, result))
 
@@ -164,7 +148,7 @@ class Receiver:
             if not isinstance(result.error, NoResultError):
                 await self.broker.result_backend.set_result(taskiq_msg.task_id, result)
 
-                for middleware in self.broker.middlewares:
+                for middleware in reversed(self.broker.middlewares):
                     if middleware.__class__.post_save != TaskiqMiddleware.post_save:
                         await maybe_awaitable(middleware.post_save(taskiq_msg, result))
 
@@ -208,7 +192,7 @@ class Receiver:
         """
         loop = asyncio.get_running_loop()
         returned = None
-        found_exception: "Optional[BaseException]" = None
+        found_exception: BaseException | None = None
         signature = None
         if message.task_name not in self.known_tasks:
             self._prepare_task(message.task_name, target)
@@ -246,7 +230,7 @@ class Receiver:
             # that happen while resolving dependencies.
             if dep_ctx:
                 kwargs = await dep_ctx.resolve_kwargs()
-            # We udpate kwargs with kwargs from network.
+            # We update kwargs with kwargs from network.
             kwargs.update(message.kwargs)
             is_coroutine = True
             # If the function is a coroutine, we await it.
@@ -255,13 +239,13 @@ class Receiver:
             else:
                 is_coroutine = False
                 # If this is a synchronous function, we
-                # run it in executor.
+                # run it in executor and preserve the context.
+                ctx = contextvars.copy_context()
+                func = functools.partial(target, *message.args, **kwargs)
                 target_future = loop.run_in_executor(
                     self.executor,
-                    _run_sync,
-                    target,
-                    message.args,
-                    kwargs,
+                    ctx.run,
+                    func,
                 )
             timeout = message.labels.get("timeout")
             if timeout is not None:
@@ -306,7 +290,7 @@ class Receiver:
             await dep_ctx.close(*args)
 
         # Assemble result.
-        result: "TaskiqResult[Any]" = TaskiqResult(
+        result: TaskiqResult[Any] = TaskiqResult(
             is_err=found_exception is not None,
             log=None,
             return_value=returned,
@@ -316,7 +300,7 @@ class Receiver:
         )
         # If exception is found we execute middlewares.
         if found_exception is not None:
-            for middleware in self.broker.middlewares:
+            for middleware in reversed(self.broker.middlewares):
                 if middleware.__class__.on_error != TaskiqMiddleware.on_error:
                     await maybe_awaitable(
                         middleware.on_error(
@@ -328,20 +312,23 @@ class Receiver:
 
         return result
 
-    async def listen(self) -> None:  # pragma: no cover
+    async def listen(self, finish_event: asyncio.Event) -> None:  # pragma: no cover
         """
         This function iterates over tasks asynchronously.
 
         It uses listen() method of an AsyncBroker
         to get new messages from queues.
+
+        Also it has a finish_event, that indicates that
+        we need to stop listening for new tasks and shutdown.
         """
         if self.run_startup:
             await self.broker.startup()
         logger.info("Listening started.")
-        queue: "asyncio.Queue[Union[bytes, AckableMessage]]" = asyncio.Queue()
+        queue: asyncio.Queue[bytes | AckableMessage] = asyncio.Queue()
 
         async with anyio.create_task_group() as gr:
-            gr.start_soon(self.prefetcher, queue)
+            gr.start_soon(self.prefetcher, queue, finish_event)
             gr.start_soon(self.runner, queue)
 
         if self.on_exit is not None:
@@ -349,17 +336,24 @@ class Receiver:
 
     async def prefetcher(
         self,
-        queue: "asyncio.Queue[Union[bytes, AckableMessage]]",
+        queue: "asyncio.Queue[bytes | AckableMessage]",
+        finish_event: asyncio.Event,
     ) -> None:
         """
         Prefetch tasks data.
 
         :param queue: queue for prefetched data.
+        :param finish_event: event to indicate that we need to stop prefetching.
         """
         fetched_tasks: int = 0
         iterator = self.broker.listen()
+        current_message: asyncio.Task[bytes | AckableMessage] = asyncio.create_task(
+            iterator.__anext__(),  # type: ignore
+        )
 
         while True:
+            if finish_event.is_set():
+                break
             try:
                 await self.sem_prefetch.acquire()
                 if (
@@ -368,26 +362,38 @@ class Receiver:
                 ):
                     logger.info("Max number of tasks executed.")
                     break
-                message = await iterator.__anext__()
+                # Here we wait for the message to be fetched,
+                # but we make it with timeout so it can be interrupted
+                done, _ = await asyncio.wait({current_message}, timeout=0.3)
+                # If the message is not fetched, we release the semaphore
+                # and continue the loop. So it will check if finished event was set.
+                if not done:
+                    self.sem_prefetch.release()
+                    continue
+                # We're done, so now we need to check
+                # whether task has returned an error.
+                message = current_message.result()
+                current_message = asyncio.create_task(iterator.__anext__())  # type: ignore
                 fetched_tasks += 1
                 await queue.put(message)
-            except asyncio.CancelledError:
+            except (asyncio.CancelledError, StopAsyncIteration):
                 break
-            except StopAsyncIteration:
-                break
-
+        # We don't want to fetch new messages if we are shutting down.
+        logger.info("Stopping prefetching messages...")
+        current_message.cancel()
         await queue.put(QUEUE_DONE)
+        self.sem_prefetch.release()
 
     async def runner(
         self,
-        queue: "asyncio.Queue[Union[bytes, AckableMessage]]",
+        queue: "asyncio.Queue[bytes | AckableMessage]",
     ) -> None:
         """
         Run tasks.
 
         :param queue: queue with prefetched data.
         """
-        tasks: Set[asyncio.Task[Any]] = set()
+        tasks: set[asyncio.Task[Any]] = set()
 
         def task_cb(task: "asyncio.Task[Any]") -> None:
             """
@@ -404,31 +410,39 @@ class Receiver:
                 self.sem.release()
 
         while True:
-            # Waits for semaphore to be released.
-            if self.sem is not None:
-                await self.sem.acquire()
+            try:
+                # Waits for semaphore to be released.
+                if self.sem is not None:
+                    await self.sem.acquire()
 
-            self.sem_prefetch.release()
-            message = await queue.get()
-            if message is QUEUE_DONE:
-                # asyncio.wait will throw an error if there is nothing to wait for
-                if tasks:
-                    logger.info("Waiting for running tasks to complete.")
-                    await asyncio.wait(tasks, timeout=self.wait_tasks_timeout)
+                self.sem_prefetch.release()
+                message = await queue.get()
+                if message is QUEUE_DONE:
+                    # asyncio.wait will throw an error if there is nothing to wait for
+                    if tasks:
+                        logger.info(
+                            f"Waiting for {len(tasks)} running tasks to complete...",
+                        )
+                        await asyncio.wait(tasks, timeout=self.wait_tasks_timeout)
+                        logger.info("No more tasks to wait for. Shutting down.")
+                    break
+
+                task = asyncio.create_task(
+                    self.callback(message=message, raise_err=False),
+                )
+                tasks.add(task)
+
+                # We want the task to remove itself from the set when it's done.
+                #
+                # Because if we won't save it anywhere,
+                # python's GC can silently cancel task
+                # and this behaviour considered to be a Hisenbug.
+                # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
+                task.add_done_callback(task_cb)
+
+            except asyncio.CancelledError:
                 break
-
-            task = asyncio.create_task(
-                self.callback(message=message, raise_err=False),
-            )
-            tasks.add(task)
-
-            # We want the task to remove itself from the set when it's done.
-            #
-            # Because if we won't save it anywhere,
-            # python's GC can silently cancel task
-            # and this behaviour considered to be a Hisenbug.
-            # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
-            task.add_done_callback(task_cb)
+        logger.info("The runner is stopped.")
 
     def _prepare_task(self, name: str, handler: Callable[..., Any]) -> None:
         """
@@ -439,7 +453,7 @@ class Receiver:
 
         It's useful for dynamic dependency resolution,
         because sometimes the receiver can get
-        funcion that is defined in runtime. We need
+        function that is defined in runtime. We need
         to be aware of that.
 
         :param name: task name.

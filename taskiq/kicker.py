@@ -1,20 +1,19 @@
+from collections.abc import Coroutine
 from dataclasses import asdict, is_dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from logging import getLogger
+from types import CoroutineType
 from typing import (
     TYPE_CHECKING,
     Any,
-    Coroutine,
-    Dict,
     Generic,
-    Optional,
+    ParamSpec,
     TypeVar,
     Union,
     overload,
 )
 
 from pydantic import BaseModel
-from typing_extensions import ParamSpec
 
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.compat import model_dump
@@ -44,16 +43,19 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         self,
         task_name: str,
         broker: "AsyncBroker",
-        labels: Dict[str, Any],
+        labels: dict[str, Any],
+        return_type: type[_ReturnType] | None = None,
     ) -> None:
         self.task_name = task_name
         self.broker = broker
         self.labels = labels
-        self.custom_task_id: Optional[str] = None
+        self.custom_task_id: str | None = None
+        self.custom_schedule_id: str | None = None
+        self.return_type = return_type
 
     def with_labels(
         self,
-        **labels: Union[str, float],
+        **labels: str | float,
     ) -> "AsyncKicker[_FuncParams, _ReturnType]":
         """
         Update function's labels before sending.
@@ -64,7 +66,10 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         self.labels.update(labels)
         return self
 
-    def with_task_id(self, task_id: str) -> "AsyncKicker[_FuncParams, _ReturnType]":
+    def with_task_id(
+        self,
+        task_id: str | None,
+    ) -> "AsyncKicker[_FuncParams, _ReturnType]":
         """
         Set task_id for current execution.
 
@@ -75,6 +80,19 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         :return: kicker with custom task id.
         """
         self.custom_task_id = task_id
+        return self
+
+    def with_schedule_id(
+        self,
+        schedule_id: str,
+    ) -> "AsyncKicker[_FuncParams, _ReturnType]":
+        """
+        Set schedule_id for current execution.
+
+        :param schedule_id: custom schedule id.
+        :return: kicker with custom schedule id.
+        """
+        self.custom_schedule_id = schedule_id
         return self
 
     def with_broker(
@@ -92,6 +110,14 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         """
         self.broker = broker
         return self
+
+    @overload
+    async def kiq(
+        self: "AsyncKicker[_FuncParams, CoroutineType[Any, Any, _T]]",
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> AsyncTaskiqTask[_T]:  # pragma: no cover
+        ...
 
     @overload
     async def kiq(
@@ -139,13 +165,14 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         except Exception as exc:
             raise SendTaskError from exc
 
-        for middleware in self.broker.middlewares:
+        for middleware in reversed(self.broker.middlewares):
             if middleware.__class__.post_send != TaskiqMiddleware.post_send:
                 await maybe_awaitable(middleware.post_send(message))
 
         return AsyncTaskiqTask(
             task_id=message.task_id,
             result_backend=self.broker.result_backend,
+            return_type=self.return_type,  # type: ignore # (pyright issue)
         )
 
     async def schedule_by_cron(
@@ -161,12 +188,13 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         :param source: schedule source.
         :param cron: cron expression.
         :param args: function's args.
-        :param cron_offset: cron offset.
         :param kwargs: function's kwargs.
 
         :return: schedule id.
         """
-        schedule_id = self.broker.id_generator()
+        schedule_id = self.custom_schedule_id
+        if schedule_id is None:
+            schedule_id = self.broker.id_generator()
         message = self._prepare_message(*args, **kwargs)
         cron_offset = None
         if isinstance(cron, CronSpec):
@@ -180,8 +208,41 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
             labels=message.labels,
             args=message.args,
             kwargs=message.kwargs,
+            task_id=self.custom_task_id,
             cron=cron_str,
             cron_offset=cron_offset,
+        )
+        await source.add_schedule(scheduled)
+        return CreatedSchedule(self, source, scheduled)
+
+    async def schedule_by_interval(
+        self,
+        source: "ScheduleSource",
+        interval: int | timedelta,
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> CreatedSchedule[_ReturnType]:
+        """
+        Function to schedule task using an interval.
+
+        :param source: schedule source.
+        :param interval: interval in seconds or timedelta instance.
+        :param args: function's args.
+        :param kwargs: function's kwargs.
+
+        :return: schedule id.
+        """
+        schedule_id = self.custom_schedule_id
+        if schedule_id is None:
+            schedule_id = self.broker.id_generator()
+        message = self._prepare_message(*args, **kwargs)
+        scheduled = ScheduledTask(
+            schedule_id=schedule_id,
+            task_name=message.task_name,
+            labels=message.labels,
+            args=message.args,
+            kwargs=message.kwargs,
+            interval=interval,
         )
         await source.add_schedule(scheduled)
         return CreatedSchedule(self, source, scheduled)
@@ -201,7 +262,9 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         :param args: function's args.
         :param kwargs: function's kwargs.
         """
-        schedule_id = self.broker.id_generator()
+        schedule_id = self.custom_schedule_id
+        if schedule_id is None:
+            schedule_id = self.broker.id_generator()
         message = self._prepare_message(*args, **kwargs)
         scheduled = ScheduledTask(
             schedule_id=schedule_id,
@@ -209,6 +272,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
             labels=message.labels,
             args=message.args,
             kwargs=message.kwargs,
+            task_id=self.custom_task_id,
             time=time,
         )
         await source.add_schedule(scheduled)
@@ -228,6 +292,10 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         if isinstance(arg, BaseModel):
             arg = model_dump(arg)
         if is_dataclass(arg):
+            if isinstance(arg, type):
+                raise ValueError(
+                    f"Cannot serialize types. The {arg} is not serializable.",
+                )
             arg = asdict(arg)
         return arg
 

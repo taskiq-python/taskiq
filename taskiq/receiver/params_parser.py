@@ -1,6 +1,6 @@
 import inspect
 from logging import getLogger
-from typing import Any, Dict, Optional
+from typing import Any
 
 from taskiq.compat import parse_obj_as
 from taskiq.message import TaskiqMessage
@@ -9,8 +9,8 @@ logger = getLogger(__name__)
 
 
 def parse_params(
-    signature: Optional[inspect.Signature],
-    type_hints: Dict[str, Any],
+    signature: inspect.Signature | None,
+    type_hints: dict[str, Any],
     message: TaskiqMessage,
 ) -> None:
     """
@@ -76,7 +76,13 @@ def parse_params(
                 # trying to parse found value as in type annotation.
                 message.args[argnum] = parse_obj_as(annot, value)
             except (ValueError, RuntimeError) as exc:
-                logger.debug(exc, exc_info=True)
+                logger.warning(
+                    "Can't parse argument %d for task %s. Reason: %s",
+                    argnum,
+                    message.task_name,
+                    exc,
+                    exc_info=True,
+                )
         else:
             # We try to get this parameter from kwargs.
             value = message.kwargs.get(param_name)
@@ -86,4 +92,10 @@ def parse_params(
                 # trying to parse found value as in type annotation.
                 message.kwargs[param_name] = parse_obj_as(annot, value)
             except (ValueError, RuntimeError) as exc:
-                logger.debug(exc, exc_info=True)
+                logger.warning(
+                    "Can't parse argument %s for task %s. Reason: %s",
+                    param_name,
+                    message.task_name,
+                    exc,
+                    exc_info=True,
+                )

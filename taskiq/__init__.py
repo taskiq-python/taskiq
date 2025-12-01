@@ -1,4 +1,5 @@
 """Distributed task manager."""
+
 from importlib.metadata import version
 
 from taskiq_dependencies import Depends as TaskiqDepends
@@ -25,8 +26,11 @@ from taskiq.exceptions import (
 )
 from taskiq.funcs import gather
 from taskiq.message import BrokerMessage, TaskiqMessage
-from taskiq.middlewares.prometheus_middleware import PrometheusMiddleware
-from taskiq.middlewares.retry_middleware import SimpleRetryMiddleware
+from taskiq.middlewares import (
+    PrometheusMiddleware,
+    SimpleRetryMiddleware,
+    SmartRetryMiddleware,
+)
 from taskiq.result import TaskiqResult
 from taskiq.scheduler.scheduled_task import ScheduledTask
 from taskiq.scheduler.scheduler import TaskiqScheduler
@@ -34,36 +38,38 @@ from taskiq.state import TaskiqState
 from taskiq.task import AsyncTaskiqTask
 
 __version__ = version("taskiq")
+
 __all__ = [
-    "__version__",
-    "gather",
-    "Context",
-    "AsyncBroker",
-    "TaskiqError",
-    "TaskiqState",
-    "TaskiqResult",
-    "ZeroMQBroker",
-    "TaskiqEvents",
-    "SecurityError",
-    "TaskiqMessage",
-    "BrokerMessage",
-    "ResultGetError",
-    "ScheduledTask",
-    "TaskiqDepends",
-    "NoResultError",
-    "SendTaskError",
     "AckableMessage",
-    "InMemoryBroker",
-    "ScheduleSource",
-    "TaskiqScheduler",
-    "TaskiqFormatter",
-    "AsyncTaskiqTask",
-    "TaskiqMiddleware",
-    "ResultIsReadyError",
+    "AsyncBroker",
     "AsyncResultBackend",
-    "async_shared_broker",
-    "PrometheusMiddleware",
-    "SimpleRetryMiddleware",
     "AsyncTaskiqDecoratedTask",
+    "AsyncTaskiqTask",
+    "BrokerMessage",
+    "Context",
+    "InMemoryBroker",
+    "NoResultError",
+    "PrometheusMiddleware",
+    "ResultGetError",
+    "ResultIsReadyError",
+    "ScheduleSource",
+    "ScheduledTask",
+    "SecurityError",
+    "SendTaskError",
+    "SimpleRetryMiddleware",
+    "SmartRetryMiddleware",
+    "TaskiqDepends",
+    "TaskiqError",
+    "TaskiqEvents",
+    "TaskiqFormatter",
+    "TaskiqMessage",
+    "TaskiqMiddleware",
+    "TaskiqResult",
     "TaskiqResultTimeoutError",
+    "TaskiqScheduler",
+    "TaskiqState",
+    "ZeroMQBroker",
+    "__version__",
+    "async_shared_broker",
+    "gather",
 ]

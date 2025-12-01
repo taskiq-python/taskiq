@@ -1,5 +1,6 @@
 import datetime
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 from taskiq.abc.serializer import TaskiqSerializer
 
@@ -19,15 +20,15 @@ class CBORSerializer(TaskiqSerializer):
     def __init__(
         self,
         datetime_as_timestamp: bool = True,
-        timezone: Optional[datetime.tzinfo] = None,
+        timezone: datetime.tzinfo | None = None,
         value_sharing: bool = False,
-        default: Optional[Callable[[Any, Any], Any]] = None,
+        default: Callable[[Any, Any], Any] | None = None,
         canonical: bool = False,
         date_as_datetime: bool = True,
         string_referencing: bool = True,
         # Decoder options
-        tag_hook: "Optional[Callable[[cbor2.CborDecoder, Any], Any]]" = None,
-        object_hook: Optional[Callable[[Any], Any]] = None,
+        tag_hook: Callable[["cbor2.CBORDecoder", Any], Any] | None = None,
+        object_hook: Callable[["cbor2.CBORDecoder", dict[Any, Any]], Any] | None = None,
     ) -> None:
         if cbor2 is None:
             raise ImportError("cbor2 is not installed")
@@ -43,7 +44,7 @@ class CBORSerializer(TaskiqSerializer):
 
     def dumpb(self, value: Any) -> bytes:
         """Dump value to bytes."""
-        return cbor2.dumps(
+        return cbor2.dumps(  # type: ignore
             value,
             datetime_as_timestamp=self.datetime_as_timestamp,
             timezone=self.timezone,
@@ -56,7 +57,7 @@ class CBORSerializer(TaskiqSerializer):
 
     def loadb(self, value: bytes) -> Any:
         """Load value from bytes."""
-        return cbor2.loads(
+        return cbor2.loads(  # type: ignore
             value,
             tag_hook=self.tag_hook,
             object_hook=self.object_hook,

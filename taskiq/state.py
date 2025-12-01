@@ -1,7 +1,7 @@
 from collections import UserDict
 from typing import TYPE_CHECKING, Any
 
-if TYPE_CHECKING:  # pragma: no cover  # noqa: SIM108
+if TYPE_CHECKING:  # pragma: no cover
     _Base = UserDict[str, Any]
 else:
     _Base = UserDict
@@ -40,4 +40,4 @@ class TaskiqState(_Base):
             ) from exc
 
     def __str__(self) -> str:
-        return "TaskiqState(%s)" % super().__str__()
+        return f"TaskiqState({super().__str__()})"

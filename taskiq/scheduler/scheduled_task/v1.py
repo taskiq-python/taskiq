@@ -1,30 +1,40 @@
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel, Field, root_validator
+
+from taskiq.scheduler.scheduled_task.validators import validate_interval_value
 
 
 class ScheduledTask(BaseModel):
     """Abstraction over task schedule."""
 
     task_name: str
-    labels: Dict[str, Any]
-    args: List[Any]
-    kwargs: Dict[str, Any]
+    labels: dict[str, Any]
+    args: list[Any]
+    kwargs: dict[str, Any]
+    task_id: str | None = None
     schedule_id: str = Field(default_factory=lambda: uuid.uuid4().hex)
-    cron: Optional[str] = None
-    cron_offset: Optional[Union[str, timedelta]] = None
-    time: Optional[datetime] = None
+    cron: str | None = None
+    cron_offset: str | timedelta | None = None
+    time: datetime | None = None
+    interval: int | timedelta | None = None
 
     @root_validator(pre=False)  # type: ignore
     @classmethod
-    def __check(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        This method validates, that either `cron` or `time` field is present.
+    def __check(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Validate.
 
-        :raises ValueError: if cron and time are none.
+        This method validates,
+        that either `cron`, `interval` or `time` field is present.
+        For interval tasks, validates that interval is at least 1 second
+        and has no fractional seconds.
+
+        :raises ValueError: if cron, interval and time are none, or interval is invalid.
         """
-        if values.get("cron") is None and values.get("time") is None:
-            raise ValueError("Either cron or datetime must be present.")
+        if all(values.get(key) is None for key in ("cron", "interval", "time")):
+            raise ValueError("Either cron, interval, or datetime must be present.")
+
+        validate_interval_value(values.get("interval"))
         return values

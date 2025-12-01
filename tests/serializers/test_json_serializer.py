@@ -1,9 +1,6 @@
-import pytest
-
 from taskiq.serializers.json_serializer import JSONSerializer
 
 
-@pytest.mark.anyio
 async def test_json_dumpb() -> None:
     serizalizer = JSONSerializer()
     assert serizalizer.dumpb(None) == b"null"  # noqa: PLR2004
@@ -13,7 +10,6 @@ async def test_json_dumpb() -> None:
     assert serizalizer.dumpb({"a": "b"}) == b'{"a": "b"}'  # noqa: PLR2004
 
 
-@pytest.mark.anyio
 async def test_json_loadb() -> None:
     serizalizer = JSONSerializer()
     assert serizalizer.loadb(b"null") is None

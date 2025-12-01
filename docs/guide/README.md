@@ -21,18 +21,18 @@ We created this project because we couldn't find any project that can execute an
 
 You might have seen projects built on top of asyncio that solve a similar problem, but here's a comparison table of the taskiq and other projects.
 
-|                Feature name | Taskiq |  Arq  | AioTasks |
-| --------------------------: | :----: | :---: | :------: |
-|         Actively maintained |   ✅    |   ✅   |    ❌     |
-|    Multiple broker backends |   ✅    |   ❌   |    ✅     |
-|    Multiple result backends |   ✅    |   ❌   |    ❌     |
-|  Have a rich documentation  |   ✅    |   ❌   |    ❌     |
-|   Startup & Shutdown events |   ✅    |   ✅   |    ❌     |
-| Have ability to abort tasks |   ❌    |   ✅   |    ❌     |
-|          Custom serializers |   ✅    |   ✅   |    ❌     |
-|        Dependency injection |   ✅    |   ❌   |    ❌     |
-|              Task pipelines |   ✅    |   ✅   |    ❌     |
-|              Task schedules |   ✅    |   ✅   |    ❌     |
-|          Global middlewares |   ✅    |   ❌   |    ❌     |
+|                Feature name | Taskiq |  Arq  | AioTasks | streaQ |
+| --------------------------: | :----: | :---: | :------: | :----: |
+|         Actively maintained |   ✅    |   ❌   |    ❌     |   ✅   |
+|    Multiple broker backends |   ✅    |   ❌   |    ✅     |   ❌   |
+|    Multiple result backends |   ✅    |   ❌   |    ❌     |   ❌   |
+|  Have a rich documentation  |   ✅    |   ❌   |    ❌     |   ✅   |
+|   Startup & Shutdown events |   ✅    |   ✅   |    ❌     |   ✅   |
+| Have ability to abort tasks |   ❌    |   ✅   |    ❌     |   ✅   |
+|          Custom serializers |   ✅    |   ✅   |    ❌     |   ✅   |
+|        Dependency injection |   ✅    |   ❌   |    ❌     |   ❌   |
+|              Task pipelines |   ✅    |   ✅   |    ❌     |   ✅   |
+|              Task schedules |   ✅    |   ✅   |    ❌     |   ✅   |
+|          Global middlewares |   ✅    |   ❌   |    ❌     |   ✅   |
 
 If you have a fully synchronous project, consider using celery or dramatiq instead.

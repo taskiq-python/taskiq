@@ -1,4 +1,6 @@
-from typing import TYPE_CHECKING, Any, Coroutine, Generic, TypeVar, overload
+from collections.abc import Coroutine
+from types import CoroutineType
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload
 
 from taskiq.abc.schedule_source import ScheduleSource
 from taskiq.scheduler.scheduled_task import ScheduledTask
@@ -27,13 +29,18 @@ class CreatedSchedule(Generic[_ReturnType]):
 
     @overload
     async def kiq(
-        self: "CreatedSchedule[Coroutine[Any,Any, _T]]",
-    ) -> AsyncTaskiqTask[_T]:
-        ...
+        self: "CreatedSchedule[CoroutineType[Any,Any, _T]]",
+    ) -> AsyncTaskiqTask[_T]: ...
 
     @overload
-    async def kiq(self: "CreatedSchedule[_ReturnType]") -> AsyncTaskiqTask[_ReturnType]:
-        ...
+    async def kiq(
+        self: "CreatedSchedule[Coroutine[Any,Any, _T]]",
+    ) -> AsyncTaskiqTask[_T]: ...
+
+    @overload
+    async def kiq(
+        self: "CreatedSchedule[_ReturnType]",
+    ) -> AsyncTaskiqTask[_ReturnType]: ...
 
     async def kiq(self) -> Any:
         """Kick the task as if you were not scheduling it."""
@@ -48,12 +55,13 @@ class CreatedSchedule(Generic[_ReturnType]):
 
     def __str__(self) -> str:
         return (
-            "CreatedSchedule("
+            "CreatedSchedule<"
             f"id={self.schedule_id}, "
             f"time={self.task.time}, "
+            f"interval={self.task.interval}, "
             f"cron={self.task.cron}, "
             f"cron_offset={self.task.cron_offset or 'UTC'}, "
             f"task_name={self.task.task_name}, "
             f"args={self.task.args}, "
-            f"kwargs={self.task.kwargs})"
+            f"kwargs={self.task.kwargs}>"
         )

@@ -3,7 +3,7 @@ import pytest
 from taskiq.scheduler.scheduled_task import ScheduledTask
 
 
-def test_scheduled_task_paramters() -> None:
+def test_scheduled_task_parameters() -> None:
     with pytest.raises(ValueError):
         ScheduledTask(
             task_name="a",
@@ -11,4 +11,16 @@ def test_scheduled_task_paramters() -> None:
             args=[],
             kwargs={},
             schedule_id="b",
+        )
+
+
+def test_scheduled_task_interval() -> None:
+    with pytest.raises(ValueError):
+        ScheduledTask(
+            task_name="a",
+            labels={},
+            args=[],
+            kwargs={},
+            schedule_id="b",
+            interval=-1,
         )

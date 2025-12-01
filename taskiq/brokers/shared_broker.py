@@ -1,10 +1,9 @@
-from typing import Any, AsyncGenerator, Optional, TypeVar
-
-from typing_extensions import ParamSpec
+from collections.abc import AsyncGenerator
+from typing import Any, ParamSpec, TypeVar
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.decor import AsyncTaskiqDecoratedTask
-from taskiq.exceptions import TaskiqError
+from taskiq.exceptions import SharedBrokerListenError, SharedBrokerSendTaskError
 from taskiq.kicker import AsyncKicker
 from taskiq.message import BrokerMessage
 
@@ -30,6 +29,7 @@ class SharedDecoratedTask(AsyncTaskiqDecoratedTask[_Params, _ReturnType]):
             task_name=self.task_name,
             broker=broker,
             labels=self.labels,
+            return_type=self.return_type,
         )
 
 
@@ -38,7 +38,7 @@ class AsyncSharedBroker(AsyncBroker):
 
     def __init__(self) -> None:
         super().__init__(None)
-        self._default_broker: Optional[AsyncBroker] = None
+        self._default_broker: AsyncBroker | None = None
         self.decorator_class = SharedDecoratedTask
 
     def default_broker(self, new_broker: AsyncBroker) -> None:
@@ -56,10 +56,7 @@ class AsyncSharedBroker(AsyncBroker):
         :param message: message to send.
         :raises TaskiqError: if called.
         """
-        raise TaskiqError(
-            "You cannot use kiq directly on shared task "
-            "without setting the default_broker.",
-        )
+        raise SharedBrokerSendTaskError
 
     async def listen(self) -> AsyncGenerator[bytes, None]:  # type: ignore
         """
@@ -69,7 +66,7 @@ class AsyncSharedBroker(AsyncBroker):
 
         :raises TaskiqError: if called.
         """
-        raise TaskiqError("Shared broker cannot listen")
+        raise SharedBrokerListenError
 
     def _register_task(
         self,

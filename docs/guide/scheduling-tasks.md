@@ -53,6 +53,12 @@ The scheduler doesn't execute tasks. It only sends them.
 
 You can check list of available schedule sources in the [Available schedule sources](../available-components/schedule-sources.md) section.
 
+::: tip Cool tip!
+
+To specify schedules (cron or time-based) in the labels of a task definition, you must include **LabelScheduleSource** along with any other sources you use (e.g., **ListRedisScheduleSource**).
+
+:::
+
 ## Multiple sources
 
 Sometimes you may want to use multiple sources to assemble a schedule for tasks. The `TaskiqScheduler` can do so.
@@ -74,7 +80,7 @@ Every time we update schedule it gets task from the source and executes this fun
 Sometimes, you want to be specific in terms of time zones. We have you covered.
 Our `ScheduledTask` model has fields for that. Use these fields or not, it's up to the specific schedule source.
 
-Taskiq scheduler assumes that if time has no specific timezone, it's in [UTC](https://www.wikiwand.com/en/Coordinated_Universal_Time). Sometimes, this behavior might not be convinient for developers.
+Taskiq scheduler assumes that if time has no specific timezone, it's in [UTC](https://www.wikiwand.com/en/Coordinated_Universal_Time). Sometimes, this behavior might not be convenient for developers.
 
 For the `time` field of `ScheduledTask` we use timezone information from datetime to check if a task should run.
 
@@ -85,7 +91,7 @@ an offset of the cron task. An offset can be a string like `Europe/Berlin` or an
 
 By default, when you start the scheduler it will get all tasks from the schedule source and check whether they should have been executed in this minute. If tasks should have been executed, they will be executed.
 
-This behaviour might be not convinient for some developers. For example, if you have a task that should be executed on every minute, it will be executed once you start the scheduler, even if it was executed a few seconds ago.
+This behaviour might be not convenient for some developers. For example, if you have a task that should be executed on every minute, it will be executed once you start the scheduler, even if it was executed a few seconds ago.
 
 To avoid this behaviour, you can pass the `--skip-first-run` flag to the `taskiq scheduler` command. In this case, the scheduler will wait until the start of the next minute and then start executing tasks.
 
@@ -96,7 +102,7 @@ taskiq scheduler module:scheduler --skip-first-run
 
 ## Dynamic scheduling
 
-Sometimes you may want to add new schedules to the scheduler on the fly. For example, you may want to run a specific function in several minutes from now. You can easily do it with ScheduleSources that support dynamic scheduling. Currently we suggest to use the `RedisScheduleSource` for that purpose. List of schedulers with dynamic task addition will be extended in the future.
+Sometimes you may want to add new schedules to the scheduler on the fly. For example, you may want to run a specific function in several minutes from now. You can easily do it with ScheduleSources that support dynamic scheduling. Currently we suggest to use the `ListRedisScheduleSource` for that purpose. List of schedulers with dynamic task addition will be extended in the future.
 For list of available schedule sources see [Available schedule sources](../available-components/schedule-sources.md).
 
 Here's an example of using redis schedule source:
@@ -111,19 +117,28 @@ Now we can use this source to add new schedules in runtime. Here's an example:
     await my_task.schedule_by_time(
         redis_source,
         # It's better to use UTC time, or add tzinfo to datetime.
-        datetime.datetime.utcnow() + datetime.timedelta(minutes=1, seconds=5),
+        datetime.datetime.now(datetime.UTC) + datetime.timedelta(minutes=1, seconds=5),
         # You can pass args and kwargs here as usual
         11,
         arg2="arg2",
     )
 ```
 
-Or if you want to use cron schedules instead, just use `schedule_by_cron` method.
+You can also use cron or interval scheduling, just use the `schedule_by_cron` or `schedule_by_interval` methods
 
 ```python
     await my_task.schedule_by_cron(
         redis_source,
         "*/5 * * * *",
+        11,
+        arg2="arg2",
+    )
+```
+
+```python
+    await my_task.schedule_by_interval(
+        redis_source,
+        datetime.timedelta(seconds=5),
         11,
         arg2="arg2",
     )
@@ -137,7 +152,7 @@ If you want to pass additional labels, you can call these methods on the `Kicker
         .with_labels(label1="value")
         .schedule_by_time(
             redis_source,
-            datetime.datetime.utcnow() + datetime.timedelta(seconds=10),
+            datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=10),
             11,
             arg2="arg2",
         )
@@ -155,7 +170,7 @@ Each of these methods return you an instance of the `CreatedSchedule` class. Thi
 ```python
     schedule = await my_task.schedule_by_time(
         redis_source,
-        datetime.datetime.utcnow() + datetime.timedelta(minutes=1, seconds=5),
+        datetime.datetime.now(datetime.UTC) + datetime.timedelta(minutes=1, seconds=5),
         11,
         arg2="arg2",
     )
@@ -163,7 +178,7 @@ Each of these methods return you an instance of the `CreatedSchedule` class. Thi
     await schedule.unschedule()
 ```
 
-Or it can be done manually, by calling `delete_schedule` on schedule source providing it whith `schedule_id`.
+Or it can be done manually, by calling `delete_schedule` on schedule source providing it with `schedule_id`.
 
 ```python
     await redis_source.delete_schedule(schedule.schedule_id)

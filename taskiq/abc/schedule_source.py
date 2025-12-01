@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Coroutine, List, Union
+from collections.abc import Coroutine
+from types import CoroutineType
+from typing import TYPE_CHECKING, Any, Union
 
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.scheduler.scheduled_task import ScheduledTask
@@ -15,7 +17,7 @@ class ScheduleSource(ABC):
         """Actions to execute during shutdown."""
 
     @abstractmethod
-    async def get_schedules(self) -> List["ScheduledTask"]:
+    async def get_schedules(self) -> list["ScheduledTask"]:
         """Get list of taskiq schedules."""
 
     async def add_schedule(
@@ -56,7 +58,7 @@ class ScheduleSource(ABC):
     def pre_send(  # noqa: B027
         self,
         task: "ScheduledTask",
-    ) -> Union[None, Coroutine[Any, Any, None]]:
+    ) -> Union[None, "CoroutineType[Any, Any, None]", Coroutine[Any, Any, None]]:
         """
         Actions to execute before task will be sent to broker.
 
@@ -69,7 +71,7 @@ class ScheduleSource(ABC):
     def post_send(  # noqa: B027
         self,
         task: "ScheduledTask",
-    ) -> Union[None, Coroutine[Any, Any, None]]:
+    ) -> Union[None, "CoroutineType[Any, Any, None]", Coroutine[Any, Any, None]]:
         """
         Actions to execute after task was sent to broker.
 

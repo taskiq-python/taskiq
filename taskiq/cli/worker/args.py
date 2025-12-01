@@ -1,12 +1,12 @@
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import List, Optional, Sequence, Tuple
 
 from taskiq.acks import AcknowledgeType
 from taskiq.cli.common_args import LogLevel
 
 
-def receiver_arg_type(string: str) -> Tuple[str, str]:
+def receiver_arg_type(string: str) -> tuple[str, str]:
     """
     Parse cli --receiver_arg argument value.
 
@@ -25,31 +25,39 @@ class WorkerArgs:
     """Taskiq worker CLI arguments."""
 
     broker: str
-    modules: List[str]
+    modules: list[str]
+    app_dir: str | None = None
     tasks_pattern: Sequence[str] = ("**/tasks.py",)
     fs_discover: bool = False
     configure_logging: bool = True
     log_level: LogLevel = LogLevel.INFO
+    log_format: str = (
+        "[%(asctime)s][%(name)s][%(levelname)-7s][%(processName)s] %(message)s"
+    )
     workers: int = 2
-    max_threadpool_threads: int = 10
+    max_threadpool_threads: int | None = None
+    max_process_pool_processes: int | None = None
     no_parse: bool = False
     shutdown_timeout: float = 5
     reload: bool = False
+    reload_dirs: list[str] = field(default_factory=list)
     no_gitignore: bool = False
     max_async_tasks: int = 100
     receiver: str = "taskiq.receiver:Receiver"
-    receiver_arg: List[Tuple[str, str]] = field(default_factory=list)
+    receiver_arg: list[tuple[str, str]] = field(default_factory=list)
     max_prefetch: int = 0
     no_propagate_errors: bool = False
     max_fails: int = -1
     ack_type: AcknowledgeType = AcknowledgeType.WHEN_SAVED
-    max_tasks_per_child: Optional[int] = None
-    wait_tasks_timeout: Optional[float] = None
+    max_tasks_per_child: int | None = None
+    wait_tasks_timeout: float | None = None
+    hardkill_count: int = 3
+    use_process_pool: bool = False
 
     @classmethod
     def from_cli(
         cls,
-        args: Optional[Sequence[str]] = None,
+        args: Sequence[str] | None = None,
     ) -> "WorkerArgs":
         """
         Construct TaskiqArgs instanc from CLI arguments.
@@ -61,9 +69,19 @@ class WorkerArgs:
         parser.add_argument(
             "broker",
             help=(
-                "Where to search for broker. "
+                "Where to search for broker or broker factory function. "
                 "This string must be specified in "
                 "'module.module:variable' format."
+            ),
+        )
+        parser.add_argument(
+            "--app-dir",
+            "-d",
+            default=None,
+            help=(
+                "Path to application directory. "
+                "This path will be used to import tasks modules. "
+                "If not specified, current working directory will be used."
             ),
         )
         parser.add_argument(
@@ -116,6 +134,12 @@ class WorkerArgs:
             help="worker log level",
         )
         parser.add_argument(
+            "--log-format",
+            default="[%(asctime)s][%(name)s][%(levelname)-7s]"
+            "[%(processName)s] %(message)s",
+            help="worker log format",
+        )
+        parser.add_argument(
             "--workers",
             "-w",
             type=int,
@@ -144,6 +168,7 @@ class WorkerArgs:
         parser.add_argument(
             "--max-threadpool-threads",
             type=int,
+            default=None,
             help="Maximum number of threads for executing sync functions.",
         )
         parser.add_argument(
@@ -158,6 +183,16 @@ class WorkerArgs:
             action="store_true",
             help="Reload workers if file is changed. "
             "`reload` extra is required for this option.",
+        )
+        parser.add_argument(
+            "--reload-dir",
+            action="append",
+            dest="reload_dirs",
+            default=[],
+            help=(
+                "Specify a directory to watch for changes. Can be specified "
+                "multiple times. Defaults to the current working directory."
+            ),
         )
         parser.add_argument(
             "--do-not-use-gitignore",
@@ -209,8 +244,27 @@ class WorkerArgs:
             "--wait-tasks-timeout",
             type=float,
             default=None,
-            help="Maximum time to wait for all current tasks "
-            "to finish before exiting.",
+            help="Maximum time to wait for all current tasks to finish before exiting.",
+        )
+        parser.add_argument(
+            "--hardkill-count",
+            type=int,
+            default=3,
+            help="Number of termination signals to the main "
+            "process before performing a hardkill.",
+        )
+        parser.add_argument(
+            "--use-process-pool",
+            action="store_true",
+            dest="use_process_pool",
+            help="Use process pool instead of thread pool for sync tasks.",
+        )
+        parser.add_argument(
+            "--max-process-pool-processes",
+            type=int,
+            dest="max_process_pool_processes",
+            default=None,
+            help="Maximum number of processes in process pool.",
         )
 
         namespace = parser.parse_args(args)
@@ -218,4 +272,6 @@ class WorkerArgs:
         # This is an argparse limitation.
         if len(namespace.tasks_pattern) > 1:
             namespace.tasks_pattern.pop(0)
+        # Convert log_level string to LogLevel enum
+        namespace.log_level = LogLevel[namespace.log_level]
         return WorkerArgs(**namespace.__dict__)

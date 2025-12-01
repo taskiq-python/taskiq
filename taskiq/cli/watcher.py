@@ -1,6 +1,7 @@
+from collections.abc import Callable
 from logging import getLogger
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from gitignore_parser import parse_gitignore
 from watchdog.events import FileSystemEvent
@@ -14,12 +15,13 @@ class FileWatcher:  # pragma: no cover
     def __init__(
         self,
         callback: Callable[..., None],
+        path: Path,
         use_gitignore: bool = True,
         **callback_kwargs: Any,
     ) -> None:
         self.callback = callback
         self.gitignore = None
-        gpath = Path("./.gitignore")
+        gpath = path / ".gitignore"
         if use_gitignore and gpath.exists():
             self.gitignore = parse_gitignore(gpath)
         self.callback_kwargs = callback_kwargs
@@ -28,7 +30,7 @@ class FileWatcher:  # pragma: no cover
         """
         React to event.
 
-        This function checks wether we need to
+        This function checks whether we need to
         react to event and calls callback if we do.
 
         :param event: incoming fs event.
@@ -44,7 +46,7 @@ class FileWatcher:  # pragma: no cover
                 return
         except Exception as exc:
             logger.info(
-                f"Cannot check path `{event.src_path}` in gitignore. Cause: {exc}",
+                f"Cannot check path `{event.src_path!r}` in gitignore. Cause: {exc}",
             )
             return
 

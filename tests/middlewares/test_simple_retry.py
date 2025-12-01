@@ -1,11 +1,11 @@
 import uuid
+from unittest.mock import AsyncMock
 
 import pytest
-from mock import AsyncMock
 
 from taskiq.formatters.json_formatter import JSONFormatter
 from taskiq.message import TaskiqMessage
-from taskiq.middlewares.retry_middleware import SimpleRetryMiddleware
+from taskiq.middlewares.simple_retry_middleware import SimpleRetryMiddleware
 from taskiq.result import TaskiqResult
 
 
@@ -17,7 +17,6 @@ def broker() -> AsyncMock:
     return mocked_broker
 
 
-@pytest.mark.anyio
 async def test_successful_retry(broker: AsyncMock) -> None:
     middleware = SimpleRetryMiddleware()
     middleware.set_broker(broker)
@@ -39,7 +38,6 @@ async def test_successful_retry(broker: AsyncMock) -> None:
     assert resend.labels["_retries"] == "1"
 
 
-@pytest.mark.anyio
 async def test_no_retry(broker: AsyncMock) -> None:
     middleware = SimpleRetryMiddleware()
     middleware.set_broker(broker)
@@ -57,7 +55,6 @@ async def test_no_retry(broker: AsyncMock) -> None:
     broker.kick.assert_not_called()
 
 
-@pytest.mark.anyio
 async def test_max_retries(broker: AsyncMock) -> None:
     middleware = SimpleRetryMiddleware(default_retry_count=3)
     middleware.set_broker(broker)

@@ -1,88 +1,95 @@
-[tool.poetry]
+[project]
 name = "taskiq"
-version = "0.11.6"
+version = "0.0.0"
 description = "Distributed task queue with full async support"
-authors = ["Pavel Kirilin <win10@list.ru>"]
-maintainers = ["Pavel Kirilin <win10@list.ru>"]
+authors = [{ name = "Pavel Kirilin", email = "<win10@list.ru>" }]
+maintainers = [{ name = "Pavel Kirilin", email = "<win10@list.ru>" }]
 readme = "README.md"
 repository = "https://github.com/taskiq-python/taskiq"
 homepage = "https://taskiq-python.github.io/"
 documentation = "https://taskiq-python.github.io/"
-license = "LICENSE"
+license = "MIT"
+license-files = ["LICENSE"]
 classifiers = [
-    "Typing :: Typed",
-    "Programming Language :: Python",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Operating System :: OS Independent",
-    "Intended Audience :: Developers",
-    "Topic :: System :: Networking",
-    "Development Status :: 3 - Alpha",
+	"Typing :: Typed",
+	"Programming Language :: Python",
+	"Programming Language :: Python :: 3",
+	"Programming Language :: Python :: 3 :: Only",
+	"Programming Language :: Python :: 3.10",
+	"Programming Language :: Python :: 3.11",
+	"Programming Language :: Python :: 3.12",
+	"Programming Language :: Python :: 3.13",
+	"Operating System :: OS Independent",
+	"Intended Audience :: Developers",
+	"Topic :: System :: Networking",
+	"Development Status :: 3 - Alpha",
 ]
 keywords = ["taskiq", "tasks", "distributed", "async"]
+requires-python = ">=3.10,<4"
+dependencies = [
+	"typing-extensions>=3.10.0.0; python_version < '3.11'",
+	"pydantic>=1.0,<=3.0",
+	"pycron>=3.0.0",
+	"taskiq_dependencies>=1.3.1,<2",
+	"anyio>=4",
+	"packaging>=19",
+	"izulu==0.50.0",
+	"aiohttp>=3",
+]
 
-[tool.poetry.dependencies]
-python = "^3.8.1"
-typing-extensions = ">=3.10.0.0"
-pydantic = ">=1.0,<=3.0"
-importlib-metadata = "*"
-pycron = "^3.0.0"
-taskiq_dependencies = ">=1.3.1,<2"
-anyio = ">=3"
-packaging = ">=19"
-# For prometheus metrics
-prometheus_client = { version = "^0", optional = true }
-# For ZMQBroker
-pyzmq = { version = "^23.2.0", optional = true, markers = "python_version < '3.12'"}
-# For speed
-uvloop = { version = ">=0.16.0,<1", optional = true, markers = "sys_platform != 'win32'" }
-# For hot-reload.
-watchdog = { version = "^2.1.9", optional = true }
-gitignore-parser = { version = "^0", optional = true }
-pytz = "*"
-orjson = { version = "^3.9.9", optional = true }
-msgpack = { version = "^1.0.7", optional = true }
-cbor2 = { version = "^5.4.6", optional = true }
+[project.optional-dependencies]
+zmq = ["pyzmq>=26"]
+uv = ["uvloop>=0.16.0,<1; sys_platform != 'win32'"]
+metrics = ["prometheus_client>=0"]
+reload = ["watchdog>=4", "gitignore-parser>=0"]
+orjson = ["orjson>=3"]
+msgpack = ["msgpack>=1.0.7"]
+cbor = ["cbor2>=5"]
+opentelemetry = [
+	"opentelemetry-api (>=1.38.0,<2.0.0)",
+	"opentelemetry-instrumentation (>=0.59b0,<1)",
+	"opentelemetry-semantic-conventions (>=0.59b0,<1)",
+]
 
-[tool.poetry.dev-dependencies]
-pytest = "^7.1.2"
-ruff = "^0.0.291"
-black = { version = "^22.6.0", allow-prereleases = true }
-mypy = "^1"
-pre-commit = "^2.20.0"
-coverage = "^6.4.2"
-pytest-cov = "^3.0.0"
-mock = "^4.0.3"
-pytest-xdist = { version = "^2.5.0", extras = ["psutil"] }
-types-mock = "^4.0.15"
-tox = "^4.6.4"
-freezegun = "^1.2.2"
-pytest-mock = "^3.11.1"
-tzlocal = "^5.0.1"
-types-tzlocal = "^5.0.1.1"
-types-pytz = "^2023.3.1.1"
+[dependency-groups]
+dev = [
+	"pre-commit>=4.4.0",
+	# lint
+	"ruff>=0.14.5",
+	"black>=25.11.0",
+	# type check
+	"mypy>=1.18.2",
+	# test
+	"pytest>=9.0.1",
+	"pytest-cov>=7.0.0",
+	"coverage>=7.11.3",
+	"pytest-xdist[psutil]>=3.8.0",
+	"tox>=4.32.0",
+	"freezegun>=1.5.5",
+	"tzdata>=2025.2; sys_platform == 'win32'",
+	"opentelemetry-test-utils (>=0.59b0,<1)",
+	"polyfactory>=3.1.0",
+]
 
-[tool.poetry.extras]
-zmq = ["pyzmq"]
-uv = ["uvloop"]
-metrics = ["prometheus_client"]
-reload = ["watchdog", "gitignore-parser"]
-orjson = ["orjson"]
-msgpack = ["msgpack"]
-cbor = ["cbor2"]
+[project.urls]
+Homepage = "https://taskiq-python.github.io/"
+Documentation = "https://taskiq-python.github.io/"
+Repository = "https://github.com/taskiq-python/taskiq"
+"Bug Tracker" = "https://github.com/taskiq-python/taskiq/issues"
+Changelog = "https://github.com/taskiq-python/taskiq/releases"
 
-[tool.poetry.scripts]
+[project.scripts]
 taskiq = "taskiq.__main__:main"
 
-[tool.poetry.plugins.taskiq_cli]
+[project.entry-points.taskiq_cli]
 worker = "taskiq.cli.worker.cmd:WorkerCMD"
 scheduler = "taskiq.cli.scheduler.cmd:SchedulerCMD"
 
+[project.entry-points.opentelemetry_instrumentor]
+taskiq = "taskiq.instrumentation:TaskiqInstrumentor"
+
 [tool.mypy]
+python_version = "3.10"
 strict = true
 ignore_missing_imports = true
 allow_subclassing_any = true
@@ -100,86 +107,109 @@ multi_line_output = 3
 
 [tool.pytest.ini_options]
 log_level = 'INFO'
+anyio_mode = "auto"
 
 [tool.coverage.run]
 omit = [
-    "taskiq/__main__.py",
-    "taskiq/abc/cmd.py",
-    "taskiq/cli/scheduler/args.py",
-    "taskiq/cli/scheduler/cmd.py",
-    "taskiq/cli/utils.py",
-    "taskiq/cli/worker/args.py",
-    "taskiq/cli/worker/async_task_runner.py",
-    "taskiq/cli/worker/cmd.py",
+	"taskiq/__main__.py",
+	"taskiq/abc/cmd.py",
+	"taskiq/cli/scheduler/args.py",
+	"taskiq/cli/scheduler/cmd.py",
+	"taskiq/cli/utils.py",
+	"taskiq/cli/worker/args.py",
+	"taskiq/cli/worker/async_task_runner.py",
+	"taskiq/cli/worker/cmd.py",
 ]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.8.14,<0.9.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "taskiq"
+module-root = ""
 
 [tool.ruff]
+target-version="py310"
 # List of enabled rulsets.
 # See https://docs.astral.sh/ruff/rules/ for more information.
-select = [
-    "E",   # Error
-    "F",   # Pyflakes
-    "W",   # Pycodestyle
-    "C90", # McCabe complexity
-    "I",   # Isort
-    "N",   # pep8-naming
-    "D",   # Pydocstyle
-    "ANN", # Pytype annotations
-    "S",   # Bandit
-    "B",   # Bugbear
-    "COM", # Commas
-    "C4",  # Comprehensions
-    "ISC", # Implicit string concat
-    "PIE", # Unnecessary code
-    "T20", # Catch prints
-    "PYI", # validate pyi files
-    "Q",   # Checks for quotes
-    "RSE", # Checks raise statements
-    "RET", # Checks return statements
-    "SLF", # Self checks
-    "SIM", # Simplificator
-    "PTH", # Pathlib checks
-    "ERA", # Checks for commented out code
-    "PL",  # PyLint checks
-    "RUF", # Specific to Ruff checks
+lint.select = [
+	"E",     # Error
+	"F",     # Pyflakes
+	"W",     # Pycodestyle
+	"C90",   # McCabe complexity
+	"I",     # Isort
+	"N",     # pep8-naming
+	"D",     # Pydocstyle
+	"ANN",   # Pytype annotations
+	"S",     # Bandit
+	"B",     # Bugbear
+	"COM",   # Commas
+	"C4",    # Comprehensions
+	"ISC",   # Implicit string concat
+	"PIE",   # Unnecessary code
+	"T20",   # Catch prints
+	"PYI",   # validate pyi files
+	"Q",     # Checks for quotes
+	"RSE",   # Checks raise statements
+	"RET",   # Checks return statements
+	"SLF",   # Self checks
+	"SIM",   # Simplificator
+	"PTH",   # Pathlib checks
+	"ERA",   # Checks for commented out code
+	"PL",    # PyLint checks
+	"RUF",   # Specific to Ruff checks
+	"FA102", # Future annotations
+	"UP",    # Pyupgrade
 ]
-ignore = [
-    "D105",    # Missing docstring in magic method
-    "D107",    # Missing docstring in __init__
-    "D212",    # Multi-line docstring summary should start at the first line
-    "D401",    # First line should be in imperative mood
-    "D104",    # Missing docstring in public package
-    "D100",    # Missing docstring in public module
-    "ANN102",  # Missing type annotation for self in method
-    "ANN101",  # Missing type annotation for argument
-    "ANN401",  # typing.Any are disallowed in `**kwargs
-    "PLR0913", # Too many arguments for function call
-    "D106",    # Missing docstring in public nested class
+lint.ignore = [
+	"D105",    # Missing docstring in magic method
+	"D107",    # Missing docstring in __init__
+	"D212",    # Multi-line docstring summary should start at the first line
+	"D401",    # First line should be in imperative mood
+	"D104",    # Missing docstring in public package
+	"D100",    # Missing docstring in public module
+	"ANN401",  # typing.Any are disallowed in `**kwargs
+	"PLR0913", # Too many arguments for function call
+	"D106",    # Missing docstring in public nested class
 ]
+lint.mccabe = { max-complexity = 10 }
 exclude = [".venv/"]
-mccabe = { max-complexity = 10 }
 line-length = 88
 
-[tool.ruff.per-file-ignores]
-"tests/*" = [
-    "S101",   # Use of assert detected
-    "S301",   # Use of pickle detected
+[tool.ruff.lint.per-file-ignores]
+"taskiq/compat.py" = [
     "D103",   # Missing docstring in public function
-    "SLF001", # Private member accessed
-    "S311",   # Standard pseudo-random generators are not suitable for security/cryptographic purposes
+]
+"tests/*" = [
+	"S101",   # Use of assert detected
+	"S301",   # Use of pickle detected
+	"D103",   # Missing docstring in public function
+	"SLF001", # Private member accessed
+	"S311",   # Standard pseudo-random generators are not suitable for security/cryptographic purposes
+	"D101",   # Missing docstring in public class
+	"D102",   # Missing docstring in public method
+]
+"docs/examples/*" = [
+	"D103",  # Missing docstring in public function
     "D101",   # Missing docstring in public class
+    "D102",  # Missing docstring in public method
+    "S311",  #  Standard pseudo-random generators
+    "S101",  # use of asserts detected
+    "T201",  # print found
 ]
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "pep257"
 ignore-decorators = ["typing.overload"]
 
-[tool.ruff.pylint]
+[tool.ruff.lint.pylint]
 allow-magic-value-types = ["int", "str", "float"]
 
-[tool.ruff.flake8-bugbear]
+[tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = ["taskiq_dependencies.Depends", "taskiq.TaskiqDepends"]
+
+[tool.typos.files]
+extend-exclude = [
+	"docs/README.md", # because of identifier in head section
+]

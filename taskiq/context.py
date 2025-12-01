@@ -14,14 +14,14 @@ class Context:
     def __init__(self, message: TaskiqMessage, broker: AsyncBroker) -> None:
         self.message = message
         self.broker = broker
-        self.state: "TaskiqState" = None  # type: ignore
+        self.state: TaskiqState = None  # type: ignore
         self.state = broker.state
 
     async def requeue(self) -> None:
         """
         Requeue task.
 
-        This fuction creates a task with
+        This function creates a task with
         the same message and sends it using
         current broker.
 

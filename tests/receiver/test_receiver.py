@@ -1,9 +1,11 @@
 import asyncio
+import contextvars
 import random
 import time
+from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
 from functools import wraps
-from typing import Any, ClassVar, List, Optional
+from typing import Any, ClassVar
 
 import pytest
 from taskiq_dependencies import Depends
@@ -19,9 +21,9 @@ from tests.utils import AsyncQueueBroker
 
 
 def get_receiver(
-    broker: Optional[AsyncBroker] = None,
+    broker: AsyncBroker | None = None,
     no_parse: bool = False,
-    max_async_tasks: Optional[int] = None,
+    max_async_tasks: int | None = None,
 ) -> Receiver:
     """
     Returns receiver with custom broker and args.
@@ -41,8 +43,7 @@ def get_receiver(
     )
 
 
-@pytest.mark.anyio
-async def test_run_task_successfull_async() -> None:
+async def test_run_task_successful_async() -> None:
     """Tests that run_task can run async tasks."""
 
     async def test_func(param: int) -> int:
@@ -64,7 +65,6 @@ async def test_run_task_successfull_async() -> None:
     assert result.return_value == 1
 
 
-@pytest.mark.anyio
 async def test_run_task_successful_sync() -> None:
     """Tests that run_task can run sync tasks."""
 
@@ -86,7 +86,6 @@ async def test_run_task_successful_sync() -> None:
     assert result.return_value == 1
 
 
-@pytest.mark.anyio
 async def test_run_task_exception() -> None:
     """Tests that run_task can run sync tasks."""
 
@@ -109,7 +108,6 @@ async def test_run_task_exception() -> None:
     assert result.is_err
 
 
-@pytest.mark.anyio
 async def test_run_timeouts() -> None:
     async def test_func() -> None:
         await asyncio.sleep(2)
@@ -131,7 +129,6 @@ async def test_run_timeouts() -> None:
     assert result.is_err
 
 
-@pytest.mark.anyio
 async def test_run_timeouts_sync() -> None:
     def test_func() -> None:
         time.sleep(2)
@@ -153,12 +150,11 @@ async def test_run_timeouts_sync() -> None:
     assert result.is_err
 
 
-@pytest.mark.anyio
 async def test_run_task_exception_middlewares() -> None:
     """Tests that run_task can run sync tasks."""
 
     class _TestMiddleware(TaskiqMiddleware):
-        found_exceptions: ClassVar[List[BaseException]] = []
+        found_exceptions: ClassVar[list[BaseException]] = []
 
         def on_error(
             self,
@@ -187,10 +183,9 @@ async def test_run_task_exception_middlewares() -> None:
     assert result.return_value is None
     assert result.is_err
     assert len(_TestMiddleware.found_exceptions) == 1
-    assert _TestMiddleware.found_exceptions[0].__class__ == ValueError
+    assert _TestMiddleware.found_exceptions[0].__class__ is ValueError
 
 
-@pytest.mark.anyio
 async def test_callback_success() -> None:
     """Test that callback function works well."""
     broker = InMemoryBroker()
@@ -218,7 +213,6 @@ async def test_callback_success() -> None:
     assert called_times == 1
 
 
-@pytest.mark.anyio
 async def test_callback_no_dep_info() -> None:
     """Test that callback function works well."""
     broker = InMemoryBroker()
@@ -253,7 +247,6 @@ async def test_callback_no_dep_info() -> None:
     assert ret_val == expected
 
 
-@pytest.mark.anyio
 async def test_callback_success_ackable() -> None:
     """Test that acking works."""
     broker = InMemoryBroker()
@@ -292,7 +285,6 @@ async def test_callback_success_ackable() -> None:
     assert acked
 
 
-@pytest.mark.anyio
 async def test_callback_success_ackable_async() -> None:
     """Test that acks work with async functions."""
     broker = InMemoryBroker()
@@ -331,9 +323,8 @@ async def test_callback_success_ackable_async() -> None:
     assert acked
 
 
-@pytest.mark.anyio
 async def test_callback_wrong_format() -> None:
-    """Test that wrong format of a message won't thow an error."""
+    """Test that wrong format of a message won't throw an error."""
     receiver = get_receiver()
 
     await receiver.callback(
@@ -341,7 +332,6 @@ async def test_callback_wrong_format() -> None:
     )
 
 
-@pytest.mark.anyio
 async def test_callback_unknown_task() -> None:
     """Tests that running an unknown task won't throw an error."""
     broker = InMemoryBroker()
@@ -360,7 +350,6 @@ async def test_callback_unknown_task() -> None:
     await receiver.callback(broker_message.message)
 
 
-@pytest.mark.anyio
 async def test_custom_ctx() -> None:
     """Tests that run_task can run sync tasks."""
 
@@ -400,7 +389,6 @@ async def test_custom_ctx() -> None:
     assert not result.is_err
 
 
-@pytest.mark.anyio
 async def test_callback_semaphore() -> None:
     """Test that callback function semaphore works well."""
     max_async_tasks = 3
@@ -418,7 +406,7 @@ async def test_callback_semaphore() -> None:
         await task_sem.kiq()
     receiver = get_receiver(broker, max_async_tasks=max_async_tasks)
 
-    listen_task = asyncio.create_task(receiver.listen())
+    listen_task = asyncio.create_task(receiver.listen(asyncio.Event()))
     await asyncio.sleep(0.3)
     assert sem_num == max_async_tasks
     await broker.wait_tasks()
@@ -426,7 +414,6 @@ async def test_callback_semaphore() -> None:
     listen_task.cancel()
 
 
-@pytest.mark.anyio
 async def test_no_result_error() -> None:
     broker = InMemoryBroker()
     executed = asyncio.Event()
@@ -444,7 +431,6 @@ async def test_no_result_error() -> None:
     assert not broker._running_tasks
 
 
-@pytest.mark.anyio
 async def test_result() -> None:
     broker = InMemoryBroker()
 
@@ -459,7 +445,6 @@ async def test_result() -> None:
     assert not broker._running_tasks
 
 
-@pytest.mark.anyio
 async def test_error_result() -> None:
     broker = InMemoryBroker()
 
@@ -475,7 +460,65 @@ async def test_error_result() -> None:
     assert isinstance(resp.error, ValueError)
 
 
-@pytest.mark.anyio
+EXPECTED_CTX_VALUE = 42
+
+
+@pytest.fixture()
+def ctxvar() -> Generator[contextvars.ContextVar[int], None, None]:
+    _ctx_variable: contextvars.ContextVar[int] = contextvars.ContextVar(
+        "taskiq_test_ctx_var",
+    )
+    token = _ctx_variable.set(EXPECTED_CTX_VALUE)
+    yield _ctx_variable
+    _ctx_variable.reset(token)
+
+
+async def test_run_task_successful_sync_preserve_contextvars(
+    ctxvar: contextvars.ContextVar[int],
+) -> None:
+    """Running sync tasks should preserve context vars."""
+
+    def test_func() -> int:
+        return ctxvar.get()
+
+    receiver = get_receiver()
+
+    result = await receiver.run_task(
+        test_func,
+        TaskiqMessage(
+            task_id="",
+            task_name="",
+            labels={},
+            args=[],
+            kwargs={},
+        ),
+    )
+    assert result.return_value == EXPECTED_CTX_VALUE
+
+
+async def test_run_task_successful_async_preserve_contextvars(
+    ctxvar: contextvars.ContextVar[int],
+) -> None:
+    """Running async tasks should preserve context vars."""
+
+    async def test_func() -> int:
+        return ctxvar.get()
+
+    receiver = get_receiver()
+
+    result = await receiver.run_task(
+        test_func,
+        TaskiqMessage(
+            task_id="",
+            task_name="",
+            labels={},
+            args=[],
+            kwargs={},
+        ),
+    )
+    assert result.return_value == EXPECTED_CTX_VALUE
+
+
 async def test_sync_decorator_on_async_function() -> None:
     broker = InMemoryBroker()
     wrapper_call = False
@@ -500,40 +543,4 @@ async def test_sync_decorator_on_async_function() -> None:
 
     assert resp.return_value == "some value"
     assert not broker._running_tasks
-    assert wrapper_call is True
-
-
-@pytest.mark.anyio
-async def test_sync_decorator_on_async_function_with_timeout() -> None:
-    wrapper_call = False
-
-    def wrapper(f: Any) -> Any:
-        @wraps(f)
-        def wrapper_impl(*args: Any, **kwargs: Any) -> Any:
-            nonlocal wrapper_call
-
-            wrapper_call = True
-            return f(*args, **kwargs)
-
-        return wrapper_impl
-
-    @wrapper
-    async def test_func() -> None:
-        await asyncio.sleep(2)
-
-    receiver = get_receiver()
-
-    result = await receiver.run_task(
-        test_func,
-        TaskiqMessage(
-            task_id="",
-            task_name="",
-            labels={"timeout": "0.3"},
-            args=[],
-            kwargs={},
-        ),
-    )
-    assert result.return_value is None
-    assert result.execution_time < 2
-    assert result.is_err
     assert wrapper_call is True

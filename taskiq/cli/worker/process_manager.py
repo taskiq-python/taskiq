@@ -1,12 +1,15 @@
 import logging
+import os
 import signal
 import sys
+from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
 from multiprocessing import Event, Process, Queue, current_process
 from multiprocessing.synchronize import Event as EventType
+from pathlib import Path
 from time import sleep
-from typing import Any, Callable, List, Optional
+from typing import Any
 
 try:
     from watchdog.observers import Observer
@@ -56,7 +59,7 @@ class ReloadOneAction(ProcessActionBase):
 
     def handle(
         self,
-        workers: List[Process],
+        workers: list[Process],
         args: WorkerArgs,
         worker_func: Callable[[WorkerArgs], None],
     ) -> None:
@@ -82,7 +85,7 @@ class ReloadOneAction(ProcessActionBase):
             target=worker_func,
             kwargs={"args": args},
             name=f"worker-{self.worker_num}",
-            daemon=True,
+            daemon=False,
         )
         new_process.start()
         logger.info(f"Process {new_process.name} restarted with pid {new_process.pid}")
@@ -156,21 +159,25 @@ class ProcessManager:
         self,
         args: WorkerArgs,
         worker_function: Callable[[WorkerArgs], None],
-        observer: Optional[Observer] = None,  # type: ignore[valid-type]
+        observer: "Observer | None" = None,  # type: ignore[valid-type]
     ) -> None:
         self.worker_function = worker_function
-        self.action_queue: "Queue[ProcessActionBase]" = Queue(-1)
+        self.action_queue: Queue[ProcessActionBase] = Queue(-1)
         self.args = args
         if args.reload and observer is not None:
-            observer.schedule(
-                FileWatcher(
-                    callback=schedule_workers_reload,
-                    use_gitignore=not args.no_gitignore,
-                    action_queue=self.action_queue,
-                ),
-                path=".",
-                recursive=True,
-            )
+            watch_paths = args.reload_dirs if args.reload_dirs else ["."]
+            for path_to_watch in watch_paths:
+                logger.debug(f"Watching directory: {path_to_watch}")
+                observer.schedule(
+                    FileWatcher(
+                        callback=schedule_workers_reload,
+                        path=Path(path_to_watch),
+                        use_gitignore=not args.no_gitignore,
+                        action_queue=self.action_queue,
+                    ),
+                    path=path_to_watch,
+                    recursive=True,
+                )
 
         shutdown_handler = get_signal_handler(self.action_queue, ShutdownAction())
         signal.signal(signal.SIGINT, shutdown_handler)
@@ -181,18 +188,18 @@ class ProcessManager:
                 get_signal_handler(self.action_queue, ReloadAllAction()),
             )
 
-        self.workers: List[Process] = []
+        self.workers: list[Process] = []
 
     def prepare_workers(self) -> None:
         """Spawn multiple processes."""
-        events: List[EventType] = []
+        events: list[EventType] = []
         for process in range(self.args.workers):
             event = Event()
             work_proc = Process(
                 target=self.worker_function,
                 kwargs={"args": self.args},
                 name=f"worker-{process}",
-                daemon=True,
+                daemon=False,
             )
             work_proc.start()
             logger.info(
@@ -204,10 +211,10 @@ class ProcessManager:
             events.append(event)
 
         # Wait for workers startup
-        for worker, event in zip(self.workers, events):
+        for worker, event in zip(self.workers, events, strict=True):
             _wait_for_worker_startup(worker, event)
 
-    def start(self) -> Optional[int]:  # noqa: C901
+    def start(self) -> int | None:  # noqa: C901
         """
         Start managing child processes.
 
@@ -265,7 +272,10 @@ class ProcessManager:
                     action.handle(self.workers, self.args, self.worker_function)
                     reloaded_workers.add(action.worker_num)
                 elif isinstance(action, ShutdownAction):
-                    logger.debug("Process manager closed.")
+                    logger.debug("Process manager closed, killing workers.")
+                    for worker in self.workers:
+                        if worker.pid:
+                            os.kill(worker.pid, signal.SIGINT)
                     return None
 
             for worker_num, worker in enumerate(self.workers):

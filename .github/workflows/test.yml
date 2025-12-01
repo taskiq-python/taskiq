@@ -2,65 +2,70 @@ name: Testing taskiq
 
 on:
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
   push:
-    branches:
-      - develop
-      - master
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
 
 jobs:
   lint:
     strategy:
       matrix:
-        cmd:
-          - black
-          - ruff
-          - mypy
+        cmd: ["black", "ruff", "mypy"]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Install poetry
-        run: pipx install poetry
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v5
         with:
-          python-version: "3.11"
-          cache: "poetry"
+          persist-credentials: false
+      - id: setup-uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-suffix: 3.11
+          version: "latest"
+          python-version: 3.11
       - name: Install deps
-        run: poetry install --all-extras
+        run: uv sync --all-extras
       - name: Run lint check
-        run: poetry run pre-commit run -a ${{ matrix.cmd }}
+        run: uv run pre-commit run -a ${{ matrix.cmd }}
   pytest:
-    permissions:
-      checks: write
-      pull-requests: write
-      contents: write
     strategy:
       matrix:
-        py_version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        py_version: ["3.10", "3.11", "3.12", "3.13"]
         pydantic_ver: ["<2", ">=2.5,<3"]
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: "${{ matrix.os }}"
     steps:
-      - uses: actions/checkout@v2
-      - name: Install poetry
-        run: pipx install poetry
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v5
         with:
-          python-version: "${{ matrix.py_version }}"
-          cache: "poetry"
+          persist-credentials: false
+      - id: setup-uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-suffix: ${{ matrix.py_version }}
+          version: "latest"
+          python-version: ${{ matrix.py_version }}
       - name: Install deps
-        run: poetry install --all-extras
+        run: uv sync --all-extras
       - name: Setup pydantic version
-        run: poetry run pip install "pydantic ${{ matrix.pydantic_ver }}"
+        run: uv pip install "pydantic ${{ matrix.pydantic_ver }}"
       - name: Run pytest check
-        run: poetry run pytest -vv -n auto --cov="taskiq" .
+        run: uv run pytest -vv -n auto --cov="taskiq" .
       - name: Generate report
-        run: poetry run coverage xml
+        run: uv run coverage xml
       - name: Upload coverage reports to Codecov with GitHub Action
-        uses: codecov/codecov-action@v3
-        if: matrix.os == 'ubuntu-latest' && matrix.py_version == '3.9'
+        uses: codecov/codecov-action@v5
+        if: matrix.os == 'ubuntu-latest' && matrix.py_version == '3.10'
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
