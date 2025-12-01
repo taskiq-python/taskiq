@@ -1,6 +1,7 @@
-from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
+from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from typing import Any
 
 from taskiq.acks import AcknowledgeType
 from taskiq.cli.common_args import LogLevel
@@ -58,11 +59,13 @@ class WorkerArgs:
     def from_cli(
         cls,
         args: Sequence[str] | None = None,
+        defaults: dict[str, Any] | None = None,
     ) -> "WorkerArgs":
         """
         Construct TaskiqArgs instanc from CLI arguments.
 
         :param args: list of args as for cli.
+        :param defaults: default worker arguments.
         :return: TaskiqArgs instance.
         """
         parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
@@ -267,7 +270,10 @@ class WorkerArgs:
             help="Maximum number of processes in process pool.",
         )
 
-        namespace = parser.parse_args(args)
+        namespace = parser.parse_args(
+            args,
+            namespace=None if defaults is None else Namespace(**defaults),
+        )
         # If there are any patterns specified, remove default.
         # This is an argparse limitation.
         if len(namespace.tasks_pattern) > 1:
