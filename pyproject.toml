@@ -189,6 +189,7 @@ line-length = 88
 	"S311",   # Standard pseudo-random generators are not suitable for security/cryptographic purposes
 	"D101",   # Missing docstring in public class
 	"D102",   # Missing docstring in public method
+	"PLR2004",  # Magic value
 ]
 "docs/examples/*" = [
 	"D103",  # Missing docstring in public function

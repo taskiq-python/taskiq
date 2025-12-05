@@ -8,8 +8,13 @@ from taskiq.abc.serializer import TaskiqSerializer
 class JSONSerializer(TaskiqSerializer):
     """Default taskiq serializer."""
 
-    def __init__(self, default: Callable[..., None] | None = None) -> None:
+    def __init__(
+        self,
+        default: Callable[..., None] | None = None,
+        ensure_ascii: bool = True,
+    ) -> None:
         self.default = default
+        self.ensure_ascii = ensure_ascii
 
     def dumpb(self, value: Any) -> bytes:
         """
@@ -21,6 +26,7 @@ class JSONSerializer(TaskiqSerializer):
         return dumps(
             value,
             default=self.default,
+            ensure_ascii=self.ensure_ascii,
         ).encode()
 
     def loadb(self, value: bytes) -> Any:
