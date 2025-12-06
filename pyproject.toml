@@ -19,6 +19,7 @@ classifiers = [
 	"Programming Language :: Python :: 3.11",
 	"Programming Language :: Python :: 3.12",
 	"Programming Language :: Python :: 3.13",
+	"Programming Language :: Python :: 3.14",
 	"Operating System :: OS Independent",
 	"Intended Audience :: Developers",
 	"Topic :: System :: Networking",
@@ -189,6 +190,7 @@ line-length = 88
 	"S311",   # Standard pseudo-random generators are not suitable for security/cryptographic purposes
 	"D101",   # Missing docstring in public class
 	"D102",   # Missing docstring in public method
+	"PLR2004",  # Magic value
 ]
 "docs/examples/*" = [
 	"D103",  # Missing docstring in public function
