@@ -124,7 +124,7 @@ omit = [
 ]
 
 [build-system]
-requires = ["uv_build>=0.8.14,<0.9.0"]
+requires = ["uv_build>=0.9.16,<0.10.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
@@ -214,4 +214,17 @@ extend-immutable-calls = ["taskiq_dependencies.Depends", "taskiq.TaskiqDepends"]
 [tool.typos.files]
 extend-exclude = [
 	"docs/README.md", # because of identifier in head section
+]
+
+[tool.tox]
+requires = ["tox>=4"]
+isolated_build = true
+env_list = ["3.13", "3.12", "3.11", "3.10"]
+
+[tool.tox.env_run_base]
+description = "Run tests with Python {base_python}"
+runner = "uv-venv-lock-runner"
+uv_sync_flags = ["--all-extras"]
+commands = [
+    ["pytest", "-vv", "-n", "auto"]
 ]
