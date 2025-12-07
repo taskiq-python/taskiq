@@ -4,6 +4,7 @@ import random
 import time
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
+from functools import wraps
 from typing import Any, ClassVar
 
 import pytest
@@ -516,3 +517,30 @@ async def test_run_task_successful_async_preserve_contextvars(
         ),
     )
     assert result.return_value == EXPECTED_CTX_VALUE
+
+
+async def test_sync_decorator_on_async_function() -> None:
+    broker = InMemoryBroker()
+    wrapper_call = False
+
+    def wrapper(f: Any) -> Any:
+        @wraps(f)
+        def wrapper_impl(*args: Any, **kwargs: Any) -> Any:
+            nonlocal wrapper_call
+
+            wrapper_call = True
+            return f(*args, **kwargs)
+
+        return wrapper_impl
+
+    @broker.task
+    @wrapper
+    async def task_no_result() -> str:
+        return "some value"
+
+    task = await task_no_result.kiq()
+    resp = await task.wait_result(timeout=1)
+
+    assert resp.return_value == "some value"
+    assert not broker._running_tasks
+    assert wrapper_call is True
