@@ -2,6 +2,7 @@ import asyncio
 import contextvars
 import functools
 import inspect
+import sys
 from collections.abc import Callable
 from concurrent.futures import Executor
 from logging import getLogger
@@ -23,6 +24,7 @@ from taskiq.state import TaskiqState
 from taskiq.utils import maybe_awaitable
 
 logger = getLogger(__name__)
+PY_VERSION = sys.version_info
 QUEUE_DONE = b"-1"
 
 
@@ -224,6 +226,11 @@ class Receiver:
         # Start a timer.
         start_time = time()
 
+        check_coroutine_func = (
+            asyncio.iscoroutinefunction
+            if PY_VERSION <= (3, 13)
+            else inspect.iscoroutinefunction
+        )
         try:
             # We put kwargs resolving here,
             # to be able to catch any exception (for example ),
@@ -234,7 +241,7 @@ class Receiver:
             kwargs.update(message.kwargs)
             is_coroutine = True
             # If the function is a coroutine, we await it.
-            if asyncio.iscoroutinefunction(target):
+            if check_coroutine_func(target):
                 target_future = target(*message.args, **kwargs)
             else:
                 is_coroutine = False

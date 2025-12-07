@@ -39,7 +39,7 @@ jobs:
   pytest:
     strategy:
       matrix:
-        py_version: ["3.10", "3.11", "3.12", "3.13"]
+        py_version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
         pydantic_ver: ["<2", ">=2.5,<3"]
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: "${{ matrix.os }}"
