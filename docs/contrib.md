@@ -21,16 +21,7 @@ We use uv for managing dependencies. To install it, please follow the official g
 After you have cloned the taskiq repo, install dependencies using this command:
 
 ```bash
-uv sync
-```
-
-It will install all required dependencies.
-If you want to run pytest against different python environments, please install `pyenv` using instructions from its [readme](https://github.com/pyenv/pyenv).
-
-After pyenv is ready, you can install all python versions using this command:
-
-```bash
-pyenv install
+uv sync --all-extras
 ```
 
 ## Linting
@@ -42,7 +33,6 @@ But even without installation, you can run all lints manually:
 ```bash
 pre-commit run -a
 ```
-
 
 ## Testing
 
@@ -61,9 +51,29 @@ pytest -n 2
 Also we use `tox` to test against different environments. You can publish a PR to run pytest with different
 python versions, but if you want to do it locally, just run `tox` command.
 
-
 ```bash
 tox
 ```
 
-Tox assumes that you've installed python versions using pyenv with command above.
+## Working with documentation
+
+For documentation we use [VuePress 2](https://vuepress.vuejs.org/). To run documentation locally, use steps below.
+
+First of all, install dependencies for documentation. We recommend to use `pnpm` for managing dependencies, but `package.json` is compatible with `npm` and `bun` for example as well:
+
+```bash
+pnpm i
+```
+
+After that, you can run documentation server with hot-reloading using:
+
+```bash
+pnpm docs:dev
+```
+
+If you want to check how documentation looks like in production mode, you can build it and then serve using:
+
+```bash
+pnpm docs:build
+pnpm docs:serve
+```
