@@ -214,6 +214,23 @@ class ProcessManager:
         for worker, event in zip(self.workers, events, strict=True):
             _wait_for_worker_startup(worker, event)
 
+    def _shutdown_workers(self) -> None:
+        for worker in self.workers:
+            if worker.pid:
+                try:
+                    os.kill(worker.pid, signal.SIGINT)
+                    logger.info(
+                        "Stopped process %s with pid %s",
+                        worker.name,
+                        worker.pid,
+                    )
+                except ProcessLookupError:
+                    logger.info(
+                        "Process %s (pid %s) already terminated",
+                        worker.name,
+                        worker.pid,
+                    )
+
     def start(self) -> int | None:  # noqa: C901
         """
         Start managing child processes.
@@ -273,9 +290,7 @@ class ProcessManager:
                     reloaded_workers.add(action.worker_num)
                 elif isinstance(action, ShutdownAction):
                     logger.debug("Process manager closed, killing workers.")
-                    for worker in self.workers:
-                        if worker.pid:
-                            os.kill(worker.pid, signal.SIGINT)
+                    self._shutdown_workers()
                     return None
 
             for worker_num, worker in enumerate(self.workers):
