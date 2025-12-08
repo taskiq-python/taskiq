@@ -275,7 +275,19 @@ class ProcessManager:
                     logger.debug("Process manager closed, killing workers.")
                     for worker in self.workers:
                         if worker.pid:
-                            os.kill(worker.pid, signal.SIGINT)
+                            try:
+                                os.kill(worker.pid, signal.SIGINT)
+                                logger.info(
+                                    "Stopped process %s with pid %s",
+                                    worker.name,
+                                    worker.pid,
+                                )
+                            except ProcessLookupError:
+                                logger.info(
+                                    "Process %s (pid %s) already terminated",
+                                    worker.name,
+                                    worker.pid,
+                                )
                     return None
 
             for worker_num, worker in enumerate(self.workers):
