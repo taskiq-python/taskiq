@@ -127,6 +127,7 @@ class InMemoryBroker(AsyncBroker):
         max_stored_results: int = 100,
         cast_types: bool = True,
         max_async_tasks: int = 30,
+        max_async_tasks_jitter: int = 0,
         propagate_exceptions: bool = True,
         await_inplace: bool = False,
     ) -> None:
@@ -140,6 +141,7 @@ class InMemoryBroker(AsyncBroker):
             executor=self.executor,
             validate_params=cast_types,
             max_async_tasks=max_async_tasks,
+            max_async_tasks_jitter=max_async_tasks_jitter,
             propagate_exceptions=propagate_exceptions,
         )
         self.await_inplace = await_inplace
