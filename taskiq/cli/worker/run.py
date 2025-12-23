@@ -165,6 +165,7 @@ def start_listen(args: WorkerArgs) -> None:
                 executor=pool,
                 validate_params=not args.no_parse,
                 max_async_tasks=args.max_async_tasks,
+                max_async_tasks_jitter=args.max_async_tasks_jitter,
                 max_prefetch=args.max_prefetch,
                 propagate_exceptions=not args.no_propagate_errors,
                 ack_type=args.ack_type,
