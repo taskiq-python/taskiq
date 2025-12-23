@@ -67,7 +67,11 @@ class Receiver:
             # Apply jitter to prevent all workers from hitting the limit simultaneously
             actual_limit = max_async_tasks
             if max_async_tasks_jitter > 0:
-                actual_limit = max_async_tasks + random.randint(0, max_async_tasks_jitter)
+                # Using standard random for load distribution, not cryptography
+                actual_limit = max_async_tasks + random.randint(  # noqa: S311
+                    0,
+                    max_async_tasks_jitter,
+                )
             self.sem = asyncio.Semaphore(actual_limit)
         else:
             logger.warning(
