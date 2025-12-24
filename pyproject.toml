@@ -24,6 +24,7 @@ classifiers = [
 	"Intended Audience :: Developers",
 	"Topic :: System :: Networking",
 	"Development Status :: 3 - Alpha",
+	"License :: OSI Approved :: MIT License",
 ]
 keywords = ["taskiq", "tasks", "distributed", "async"]
 requires-python = ">=3.10,<4"
