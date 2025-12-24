@@ -150,7 +150,7 @@ The number of signals before a hard kill can be configured with the `--hardkill-
 * `--shutdown-timeout` - maximum amount of time for graceful broker's shutdown in seconds (default 5).
 * `--wait-tasks-timeout` - if cannot read new messages from the broker or maximum number of tasks is reached, worker will wait for all current tasks to finish. This parameter sets the maximum amount of time to wait until shutdown.
 * `--hardkill-count` - Number of termination signals to the main process before performing a hardkill.
-* 
+
 ## Scheduler
 
 Scheduler is used to schedule tasks as described in [Scheduling tasks](./scheduling-tasks.md) section.
