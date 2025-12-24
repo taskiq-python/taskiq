@@ -44,6 +44,7 @@ class WorkerArgs:
     reload_dirs: list[str] = field(default_factory=list)
     no_gitignore: bool = False
     max_async_tasks: int = 100
+    max_async_tasks_jitter: int = 0
     receiver: str = "taskiq.receiver:Receiver"
     receiver_arg: list[tuple[str, str]] = field(default_factory=list)
     max_prefetch: int = 0
@@ -209,6 +210,14 @@ class WorkerArgs:
             dest="max_async_tasks",
             default=100,
             help="Maximum simultaneous async tasks per worker process. ",
+        )
+        parser.add_argument(
+            "--max-async-tasks-jitter",
+            type=int,
+            dest="max_async_tasks_jitter",
+            default=0,
+            help="Add random jitter (0 to this value) to max-async-tasks to prevent "
+            "all workers from closing at the same time. ",
         )
         parser.add_argument(
             "--max-prefetch",

@@ -15,6 +15,7 @@ async def run_receiver_task(
     sync_workers: int | None = None,
     validate_params: bool = True,
     max_async_tasks: int = 100,
+    max_async_tasks_jitter: int = 0,
     max_prefetch: int = 0,
     propagate_exceptions: bool = True,
     run_startup: bool = False,
@@ -43,6 +44,7 @@ async def run_receiver_task(
         or processes in processpool that runs sync tasks.
     :param validate_params: whether to validate params or not.
     :param max_async_tasks: maximum number of simultaneous async tasks.
+    :param max_async_tasks_jitter: random jitter to add to max_async_tasks.
     :param max_prefetch: maximum number of tasks to prefetch.
     :param propagate_exceptions: whether to propagate exceptions in generators or not.
     :param run_startup: whether to run startup function or not.
@@ -79,6 +81,7 @@ async def run_receiver_task(
                     run_startup=run_startup,
                     validate_params=validate_params,
                     max_async_tasks=max_async_tasks,
+                    max_async_tasks_jitter=max_async_tasks_jitter,
                     max_prefetch=max_prefetch,
                     propagate_exceptions=propagate_exceptions,
                     on_exit=on_exit,
