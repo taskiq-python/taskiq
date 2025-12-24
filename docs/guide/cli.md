@@ -138,6 +138,7 @@ The number of signals before a hard kill can be configured with the `--hardkill-
 * `--log-level` is used to set a log level (default `INFO`).
 * `--log-format` is used to set a log format (default `%(asctime)s][%(name)s][%(levelname)-7s][%(processName)s] %(message)s`).
 * `--max-async-tasks` - maximum number of simultaneously running async tasks.
+* `--max-async-tasks-jitter` – Randomly varies the max async task limit between --max-async-tasks and a jittered value, helping prevent simultaneous worker restarts.
 * `--max-prefetch` - number of tasks to be prefetched before execution. (Useful for systems with high message rates, but brokers should support acknowledgements).
 * `--max-threadpool-threads` - number of threads for sync function execution.
 * `--no-propagate-errors` - if this parameter is enabled, exceptions won't be thrown in generator dependencies.
@@ -149,7 +150,7 @@ The number of signals before a hard kill can be configured with the `--hardkill-
 * `--shutdown-timeout` - maximum amount of time for graceful broker's shutdown in seconds (default 5).
 * `--wait-tasks-timeout` - if cannot read new messages from the broker or maximum number of tasks is reached, worker will wait for all current tasks to finish. This parameter sets the maximum amount of time to wait until shutdown.
 * `--hardkill-count` - Number of termination signals to the main process before performing a hardkill.
-
+* 
 ## Scheduler
 
 Scheduler is used to schedule tasks as described in [Scheduling tasks](./scheduling-tasks.md) section.
