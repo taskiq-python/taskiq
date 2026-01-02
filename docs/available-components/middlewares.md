@@ -34,7 +34,7 @@ async def test():
 
 `retry_on_error` enables retries for a task. `max_retries` is the maximum number of times,.
 
-## Smart Retry Middleware
+## Smart retry middleware
 
 The `SmartRetryMiddleware` automatically retries tasks with flexible delay settings and retry strategies when errors occur. This is particularly useful when tasks fail due to temporary issues, such as network errors or temporary unavailability of external services.
 
