@@ -7,7 +7,7 @@ order: 5
 Middlewares allow you to execute code when specific event occurs.
 Taskiq has several default middlewares.
 
-### Simple retry middleware
+## Simple retry middleware
 
 This middleware allows you to restart functions on errors. If exception was raised during task execution,
 the task would be resent with same parameters.
@@ -38,7 +38,7 @@ async def test():
 
 The `SmartRetryMiddleware` automatically retries tasks with flexible delay settings and retry strategies when errors occur. This is particularly useful when tasks fail due to temporary issues, such as network errors or temporary unavailability of external services.
 
-### Key Features:
+### Key Features
 
 * **Retry Limits**: Set the maximum number of retry attempts (`max_retries`).
 * **Delay Before Retry**: Define a fixed delay or use additional strategies.
@@ -85,7 +85,7 @@ Use jitter and exponential backoff to avoid repetitive load peaks, especially in
 
 
 
-### Prometheus middleware
+## Prometheus middleware
 
 You can enable prometheus metrics for workers by adding `PrometheusMiddleware`.
 To do so, you need to install `prometheus_client` package or you can install metrics extras for taskiq.
@@ -119,7 +119,7 @@ broker = ZeroMQBroker().with_middlewares(
 After that, metrics will be available at port 9000. Of course, this parameter can be configured.
 If you have other metrics, they'll be shown as well.
 
-### OpenTelemetry Middleware
+## OpenTelemetry Middleware
 
 You can enable opentelemetry tracing for workers by adding `OpenTelemetryMiddleware` or using `TaskiqInstrumentor` (preferred).
 
