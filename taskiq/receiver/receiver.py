@@ -2,6 +2,7 @@ import asyncio
 import contextvars
 import functools
 import inspect
+import random
 import sys
 from collections.abc import Callable
 from concurrent.futures import Executor
@@ -37,6 +38,7 @@ class Receiver:
         executor: Executor | None = None,
         validate_params: bool = True,
         max_async_tasks: "int | None" = None,
+        max_async_tasks_jitter: int = 0,
         max_prefetch: int = 0,
         propagate_exceptions: bool = True,
         run_startup: bool = True,
@@ -62,7 +64,15 @@ class Receiver:
             self._prepare_task(task.task_name, task.original_func)
         self.sem: asyncio.Semaphore | None = None
         if max_async_tasks is not None and max_async_tasks > 0:
-            self.sem = asyncio.Semaphore(max_async_tasks)
+            # Apply jitter to prevent all workers from hitting the limit simultaneously
+            actual_limit = max_async_tasks
+            if max_async_tasks_jitter > 0:
+                # Using standard random for load distribution, not cryptography
+                actual_limit = max_async_tasks + random.randint(  # noqa: S311
+                    0,
+                    max_async_tasks_jitter,
+                )
+            self.sem = asyncio.Semaphore(actual_limit)
         else:
             logger.warning(
                 "Setting unlimited number of async tasks "
