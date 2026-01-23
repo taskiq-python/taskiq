@@ -40,7 +40,7 @@ class FileWatcher:  # pragma: no cover
         if event.event_type in {"opened", "closed", "closed_no_write"}:
             return
 
-        if ".git" in event.src_path:
+        if ".git" in event.src_path or "__pycache__" in event.src_path:
             return
 
         try:
