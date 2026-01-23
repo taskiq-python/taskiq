@@ -48,11 +48,12 @@ async def get_schedules(source: ScheduleSource) -> list[ScheduledTask]:
     try:
         return await source.get_schedules()
     except Exception as exc:
-        logger.warning(
-            "Cannot update schedules with source: %s",
+        logger.error(
+            "Cannot update schedules with source: %s\n%s{}",
             source,
+            exc,
+            exc_info=True,
         )
-        logger.debug(exc, exc_info=True)
         return []
 
 
