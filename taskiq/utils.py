@@ -29,16 +29,3 @@ async def maybe_awaitable(
     if inspect.isawaitable(possible_coroutine):
         return await possible_coroutine
     return possible_coroutine  # type: ignore
-
-
-def remove_suffix(text: str, suffix: str) -> str:
-    """
-    Removing a Suffix from a String with a Custom Function.
-
-    :param text: String
-    :param suffix: Removing a Suffix
-    :return: value.
-    """
-    if text.endswith(suffix):
-        return text[: -len(suffix)]
-    return text
