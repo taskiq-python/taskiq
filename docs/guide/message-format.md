@@ -91,16 +91,41 @@ To install taskiq with libraries for non-JSON serializers, you should install ta
 pip install "taskiq[orjson]"
 ```
 
+```python
+# broker.py
+from taskiq import InMemoryBroker
+from taskiq.serializers import ORJSONSerializer 
+
+broker = InMemoryBroker().with_serializer(ORJSONSerializer())
+```
+
+
 @tab msgpack
 
 ```bash
 pip install "taskiq[msgpack]"
 ```
 
+```python
+# broker.py
+from taskiq import InMemoryBroker
+from taskiq.serializers import MSGPackSerializer 
+
+broker = InMemoryBroker().with_serializer(MSGPackSerializer())
+```
+
 @tab cbor
 
 ```bash
 pip install "taskiq[cbor]"
+```
+
+```python
+# broker.py
+from taskiq import InMemoryBroker
+from taskiq.serializers import CBORSerializer 
+
+broker = InMemoryBroker().with_serializer(CBORSerializer())
 ```
 
 :::
