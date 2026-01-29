@@ -73,11 +73,11 @@ But this can be easily changed by creating your own implementation of the Taskiq
 
 Serializers define the format of the message but not the structure. For example, if you want to use msgpack or ORJson to serialize your message, you should update the serializer of your broker.
 
-Be default, Taskiq uses JSON serializer. But we also have some implementations of other serializers:
+By default, Taskiq uses JSON serializer. But we also have some implementations of other serializers:
 
 * ORJSONSerializer - faster [JSON implementation](https://pypi.org/project/orjson/). Also, it supports datetime and UUID serialization.
 * MSGPackSerializer - [MsgPack](https://pypi.org/project/msgpack/) format serializer. It might be useful to send less data over the network.
-* CBORSerializer - [CBOR](https://pypi.org/project/cbor2/) format serializer. It is also has a smaller size than JSON.
+* CBORSerializer - [CBOR](https://pypi.org/project/cbor2/) format serializer. It also has a smaller size than JSON.
 
 To define your own serializer, you have to subclass the TaskiqSerializer class and implement `dumpb` and `loadb` methods. You can take a look at the existing implementations from the `taskiq.serializers` module.
 
@@ -91,27 +91,10 @@ To install taskiq with libraries for non-JSON serializers, you should install ta
 pip install "taskiq[orjson]"
 ```
 
-```python
-# broker.py
-from taskiq import InMemoryBroker
-from taskiq.serializers import ORJSONSerializer 
-
-broker = InMemoryBroker().with_serializer(ORJSONSerializer())
-```
-
-
 @tab msgpack
 
 ```bash
 pip install "taskiq[msgpack]"
-```
-
-```python
-# broker.py
-from taskiq import InMemoryBroker
-from taskiq.serializers import MSGPackSerializer 
-
-broker = InMemoryBroker().with_serializer(MSGPackSerializer())
 ```
 
 @tab cbor
@@ -120,8 +103,34 @@ broker = InMemoryBroker().with_serializer(MSGPackSerializer())
 pip install "taskiq[cbor]"
 ```
 
+:::
+
+
+After that, you can use your preferred serializer in your project like this:
+
+::: tabs
+
+@tab orjson
+
 ```python
-# broker.py
+from taskiq import InMemoryBroker
+from taskiq.serializers import ORJSONSerializer 
+
+broker = InMemoryBroker().with_serializer(ORJSONSerializer())
+```
+
+@tab msgpack
+
+```python
+from taskiq import InMemoryBroker
+from taskiq.serializers import MSGPackSerializer 
+
+broker = InMemoryBroker().with_serializer(MSGPackSerializer())
+```
+
+@tab cbor
+
+```python
 from taskiq import InMemoryBroker
 from taskiq.serializers import CBORSerializer 
 
@@ -130,9 +139,11 @@ broker = InMemoryBroker().with_serializer(CBORSerializer())
 
 :::
 
+
+
 ### Formatters
 
-Formatters define the format of the message. It might be useful if you'd like to send a task to a celery worker for a different project. You can do it in seriazier as well, but formatters give you correct type hints.
+Formatters define the format of the message. It might be useful if you'd like to send a task to a celery worker for a different project. You can do it in serializer as well, but formatters give you correct type hints.
 
 By default we use a formatter that dumps the message to dict and serializes it using serializer. But you can define your own formatter to send a message in any format you want. To define a new formatter, you have to subclass the TaskiqFormatter class and implement `dumps` and `loads` methods.
 As an example, you can take a look at the `JSONFormatter` from `taskiq.formatters` implementation.
