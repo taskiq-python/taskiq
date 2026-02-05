@@ -19,6 +19,7 @@ import taskiq_fastapi
 broker = ZeroMQBroker()
 
 taskiq_fastapi.init(broker, "my_package.application:app")
+
 ```
 
 There are two rules to make everything work as you expect:
@@ -42,6 +43,7 @@ from typing import Any
 
 def get_redis_pool(request: Request) -> Any:
     return request.app.state.redis_pool
+
 ```
 
 To make it resolvable in taskiq, people should mark default fastapi dependencies (such as `Request` and `HTTPConnection`) with `TaskiqDepends`. Like this:
@@ -59,6 +61,7 @@ from taskiq import TaskiqDepends
 
 async def get_redis_pool(request: Annotated[Request, TaskiqDepends()]):
     return request.app.state.redis_pool
+
 ```
 
 @tab default values
@@ -70,6 +73,7 @@ from taskiq import TaskiqDepends
 
 async def get_redis_pool(request: Request = TaskiqDepends()):
     return request.app.state.redis_pool
+
 ```
 
 :::
@@ -111,7 +115,7 @@ app = FastAPI()
 
 
 @app.on_event("startup")
-asynchronous def app_startup():
+async def app_startup():
     if not broker.is_worker_process:
         await broker.startup()
 
@@ -120,6 +124,7 @@ asynchronous def app_startup():
 async def app_shutdown():
     if not broker.is_worker_process:
         await broker.shutdown()
+
 ```
 
 :::
@@ -137,6 +142,7 @@ Let's imagine that you have a fixture of your application. It returns a new fast
 @pytest.fixture
 def fastapi_app() -> FastAPI:
     return get_app()
+
 ```
 
 Right after this fixture, we define another one.
@@ -155,6 +161,7 @@ def init_taskiq_deps(fastapi_app: FastAPI):
     yield
 
     broker.custom_dependency_context = {}
+
 ```
 
 This fixture has autouse flag, which means it would run on every test automatically.
