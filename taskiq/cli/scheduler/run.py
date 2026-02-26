@@ -414,7 +414,7 @@ async def run_scheduler(args: SchedulerArgs) -> None:
             skip_first_run=args.skip_first_run,
         )
     except asyncio.CancelledError:
-        logger.warning("Shutting down scheduler.")
+        logger.info("Shutting down scheduler.")
         await scheduler.shutdown()
         for source in scheduler.sources:
             await source.shutdown()
