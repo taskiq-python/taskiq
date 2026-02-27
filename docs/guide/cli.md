@@ -138,6 +138,7 @@ The number of signals before a hard kill can be configured with the `--hardkill-
 * `--log-level` is used to set a log level (default `INFO`).
 * `--log-format` is used to set a log format (default `%(asctime)s][%(name)s][%(levelname)-7s][%(processName)s] %(message)s`).
 * `--max-async-tasks` - maximum number of simultaneously running async tasks.
+* `--max-async-tasks-jitter` – Randomly varies the max async task limit between --max-async-tasks and a jittered value, helping prevent simultaneous worker restarts.
 * `--max-prefetch` - number of tasks to be prefetched before execution. (Useful for systems with high message rates, but brokers should support acknowledgements).
 * `--max-threadpool-threads` - number of threads for sync function execution.
 * `--no-propagate-errors` - if this parameter is enabled, exceptions won't be thrown in generator dependencies.
