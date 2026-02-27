@@ -59,6 +59,7 @@ jobs:
         with:
           enable-cache: true
           cache-suffix: ${{ matrix.py_version }}
+          github-token: ${{ github.token }}
           version: "latest"
       - name: Install deps
         run: uv sync --all-extras

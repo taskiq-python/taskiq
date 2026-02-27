@@ -28,6 +28,7 @@ jobs:
         with:
           enable-cache: true
           cache-suffix: '3.14'
+          github-token: ${{ github.token }}
           version: "3.14"
       - run: uv version "${GITHUB_REF_NAME}"
       - run: uv build
