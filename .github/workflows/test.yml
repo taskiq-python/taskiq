@@ -43,17 +43,23 @@ jobs:
         pydantic_ver: ["<2", ">=2.5,<3"]
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: "${{ matrix.os }}"
+    env:
+      UV_SYSTEM_PYTHON: 1
     steps:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
+      - name: Setup python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '${{ matrix.py_version }}' 
       - id: setup-uv
+        name: Setup UV
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
           cache-suffix: ${{ matrix.py_version }}
           version: "latest"
-          python-version: ${{ matrix.py_version }}
       - name: Install deps
         run: uv sync --all-extras
       - name: Setup pydantic version
