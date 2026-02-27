@@ -81,6 +81,32 @@ async def get_redis_pool(request: Request = TaskiqDepends()):
 
 Also you want to call startup of your brokers somewhere.
 
+::: tabs
+
+@tab Lifespan (Recommended)
+
+```python
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from your_project.taskiq import broker
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    if not broker.is_worker_process:
+        await broker.startup()
+    yield
+    # Shutdown
+    if not broker.is_worker_process:
+        await broker.shutdown()
+
+
+app = FastAPI(lifespan=lifespan)
+```
+
+@tab on_event (Deprecated)
+
 ```python
 from fastapi import FastAPI
 from your_project.taskiq import broker
@@ -100,6 +126,8 @@ async def app_shutdown():
         await broker.shutdown()
 
 ```
+
+:::
 
 And that's it. Now you can use your taskiq tasks with functions and classes that depend on FastAPI dependencies. You can find bigger examples in the [examples repo](https://github.com/taskiq-python/examples/).
 
