@@ -160,10 +160,28 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         for middleware in self.broker.middlewares:
             if middleware.__class__.pre_send != TaskiqMiddleware.pre_send:
                 message = await maybe_awaitable(middleware.pre_send(message))
+
+        broker_message = self.broker.formatter.dumps(message)
         try:
-            await self.broker.kick(self.broker.formatter.dumps(message))
+            await self.broker.kick(broker_message)
         except Exception as exc:
-            raise SendTaskError from exc
+            omitting = False
+            for middleware in reversed(self.broker.middlewares):
+                if middleware.__class__.on_send_error != TaskiqMiddleware.on_send_error:
+                    omitting = (
+                        bool(
+                            await maybe_awaitable(
+                                middleware.on_send_error(
+                                    message,
+                                    broker_message,
+                                    exc,
+                                ),
+                            ),
+                        )
+                        or omitting
+                    )
+            if not omitting:
+                raise SendTaskError from exc
 
         for middleware in reversed(self.broker.middlewares):
             if middleware.__class__.post_send != TaskiqMiddleware.post_send:
