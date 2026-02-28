@@ -21,9 +21,17 @@ class FileWatcher:  # pragma: no cover
     ) -> None:
         self.callback = callback
         self.gitignore = None
-        gpath = path / ".gitignore"
-        if use_gitignore and gpath.exists():
-            self.gitignore = parse_gitignore(gpath)
+        project_root = Path().resolve()
+        path = path.resolve()
+
+        if use_gitignore:
+            while path != project_root.parent:
+                gpath = path / ".gitignore"
+                if gpath.exists():
+                    self.gitignore = parse_gitignore(gpath)
+                    break
+                path = path.parent
+
         self.callback_kwargs = callback_kwargs
 
     def dispatch(self, event: FileSystemEvent) -> None:
