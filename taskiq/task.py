@@ -98,9 +98,9 @@ class AsyncTaskiqTask(Generic[_ReturnType]):
         """
         start_time = time()
         while not await self.is_ready():
-            await asyncio.sleep(check_interval)
             if 0 < timeout < time() - start_time:
                 raise TaskiqResultTimeoutError(timeout=timeout)
+            await asyncio.sleep(check_interval)
         return await self.get_result(with_logs=with_logs)
 
     async def get_progress(self) -> "TaskProgress[Any] | None":
