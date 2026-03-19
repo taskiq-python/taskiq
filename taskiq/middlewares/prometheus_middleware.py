@@ -4,10 +4,11 @@ from logging import getLogger
 from pathlib import Path
 from tempfile import gettempdir
 from typing import Any
+
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.message import TaskiqMessage
-from taskiq.result import TaskiqResult
 from taskiq.receiver.observer import ReceiverObserver
+from taskiq.result import TaskiqResult
 
 logger = getLogger("taskiq.prometheus")
 
@@ -21,7 +22,7 @@ class PrometheusMiddleware(TaskiqMiddleware):
 
     :param server_port: The port to listen on.
     :param server_addr: The address to listen on.
-    :paam metrics_path: The path to store metrics for multiproc env.
+    :param metrics_path: The path to store metrics for multiproc env.
     """
 
     def __init__(
@@ -44,7 +45,7 @@ class PrometheusMiddleware(TaskiqMiddleware):
         logger.debug("Initializing metrics")
 
         try:
-            from prometheus_client import Counter, Histogram, Gauge  # noqa: PLC0415
+            from prometheus_client import Counter, Histogram  # noqa: PLC0415
         except ImportError as exc:
             raise ImportError(
                 "Cannot initialize metrics. Please install 'taskiq[metrics]'.",
@@ -199,9 +200,14 @@ class PrometheusMiddleware(TaskiqMiddleware):
             self.success_tasks.labels(message.task_name).inc()
         self.execution_time.labels(message.task_name).observe(result.execution_time)
 
-    def set_broker(self, broker: "AsyncBroker") -> None:  # noqa: F821 pyright: ignore[reportUnknownVariableType]
+    def set_broker(self, broker: "AsyncBroker") -> None:  # noqa: F821
+        """
+        Set broker and attach receiver observer.
+
+        :param broker: broker to set.
+        """
         super().set_broker(broker)
-        broker._receiver_observer = PrometheusReceiverObserver()
+        broker._receiver_observer = PrometheusReceiverObserver()  # noqa: SLF001
 
     def post_save(
         self,
@@ -250,20 +256,25 @@ class PrometheusReceiverObserver(ReceiverObserver):
         )
         self.deserialize_error = Counter(
             "deserialize_error_count",
-            "Number of times broker faced a desrialization error",
+            "Number of times broker faced a deserialization error",
         )
 
     def on_prefetch_queue_size(self, size: int) -> None:
+        """Record current prefetch queue depth."""
         self.prefetch_queue_size.set(size)
 
     def on_semaphore_status(self, available: int) -> None:
+        """Record available semaphore slots."""
         self.semaphore_available.set(available)
 
     def on_active_tasks_count(self, count: int) -> None:
+        """Record number of currently executing tasks."""
         self.active_tasks_count.set(count)
 
     def on_task_not_found(self, task_name: str) -> None:
+        """Increment counter for unregistered task lookups."""
         self.task_not_found_total.labels(task_name).inc()
 
     def on_deserialize_error(self, raw: bytes, error: Exception) -> None:
+        """Increment counter for message deserialization failures."""
         self.deserialize_error.inc()

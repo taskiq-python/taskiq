@@ -13,7 +13,7 @@ from taskiq.abc.broker import AsyncBroker
 from taskiq.cli.utils import import_object, import_tasks
 from taskiq.cli.worker.args import WorkerArgs
 from taskiq.cli.worker.process_manager import ProcessManager
-from taskiq.receiver import Receiver, ReceiverObserver
+from taskiq.receiver import Receiver
 
 try:
     import uvloop

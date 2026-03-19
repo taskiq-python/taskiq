@@ -412,7 +412,7 @@ class Receiver:
         await queue.put(QUEUE_DONE)
         self.sem_prefetch.release()
 
-    async def runner(
+    async def runner(  # noqa: C901
         self,
         queue: "asyncio.Queue[bytes | AckableMessage]",
     ) -> None:
@@ -443,9 +443,7 @@ class Receiver:
                 self.sem.release()
 
                 if self.observer is not None:
-                    self.observer.on_semaphore_status(
-                        self.sem._value  # noqa
-                    )
+                    self.observer.on_semaphore_status(self.sem._value)  # noqa
 
         while True:
             try:
@@ -453,16 +451,12 @@ class Receiver:
                 if self.sem is not None:
                     await self.sem.acquire()
                     if self.observer is not None:
-                        self.observer.on_semaphore_status(
-                            self.sem._value  # noqa
-                        )
+                        self.observer.on_semaphore_status(self.sem._value)  # noqa
 
                 self.sem_prefetch.release()
                 message = await queue.get()
                 if self.observer is not None:
-                    self.observer.on_prefetch_queue_size(
-                        queue.qsize()  # noqa
-                    )
+                    self.observer.on_prefetch_queue_size(queue.qsize())
                 if message is QUEUE_DONE:
                     # asyncio.wait will throw an error if there is nothing to wait for
                     if tasks:
