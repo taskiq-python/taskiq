@@ -1,9 +1,9 @@
+import datetime
 import os
 from logging import getLogger
 from pathlib import Path
 from tempfile import gettempdir
 from typing import Any
-
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.message import TaskiqMessage
 from taskiq.result import TaskiqResult
@@ -43,7 +43,7 @@ class PrometheusMiddleware(TaskiqMiddleware):
         logger.debug("Initializing metrics")
 
         try:
-            from prometheus_client import Counter, Histogram  # noqa: PLC0415
+            from prometheus_client import Counter, Histogram, Gauge  # noqa: PLC0415
         except ImportError as exc:
             raise ImportError(
                 "Cannot initialize metrics. Please install 'taskiq[metrics]'.",
@@ -74,6 +74,24 @@ class PrometheusMiddleware(TaskiqMiddleware):
             "Time of function execution",
             ["task_name"],
         )
+
+        self.in_flight_tasks = Gauge(
+            "in_flight_tasks",
+            "Number of tasks in flight",
+            ["task_name"],
+            multiprocess_mode="livesum",
+        )
+        self.queue_wait_seconds = Histogram(
+            "queue_wait_seconds",
+            "time task spent in message queue",
+            ["task_name"],
+        )
+        self.task_errors_by_type = Counter(
+            "task_errors_by_type",
+            "Number of errors raised in tasks by their type",
+            ["task_name", "error_type"],
+        )
+
         self.server_port = server_port
         self.server_addr = server_addr
 
@@ -104,6 +122,24 @@ class PrometheusMiddleware(TaskiqMiddleware):
             except OSError as exc:
                 logger.debug("Cannot start prometheus server: %s", exc)
 
+    def pre_send(
+        self,
+        message: "TaskiqMessage",
+    ) -> "TaskiqMessage":
+        """
+        Function to track the time a task spend in queue.
+
+        This function tracks the time a task spends in a queue until it is executed.
+
+        :param message: current message.
+        :return: message
+        """
+        if not message.labels.get("_taskiq_enqueue_timestamp"):
+            message.labels["_taskiq_enqueue_timestamp"] = datetime.datetime.now(
+                datetime.UTC,
+            ).isoformat()  # Might conside using timezones too
+        return message
+
     def pre_execute(
         self,
         message: "TaskiqMessage",
@@ -117,8 +153,40 @@ class PrometheusMiddleware(TaskiqMiddleware):
         :param message: current message.
         :return: message
         """
+        if message.labels.get(
+            "_taskiq_enqueue_timestamp",
+        ):  # Handle case where the sender doesn't use the prometheus middleware
+            time_delta = datetime.datetime.now(
+                datetime.UTC,
+            ) - datetime.datetime.fromisoformat(
+                message.labels["_taskiq_enqueue_timestamp"],
+            )
+            time_delta = max(0, time_delta.total_seconds())
+            self.queue_wait_seconds.labels(message.task_name).observe(
+                time_delta,
+            )
+
+        self.in_flight_tasks.labels(message.task_name).inc()
         self.received_tasks.labels(message.task_name).inc()
         return message
+
+    def on_error(
+        self,
+        message: TaskiqMessage,
+        result: TaskiqResult[Any],  # pylint: disable=unused-argument
+        exception: BaseException,
+    ) -> None:
+        """
+        This function tracks the number of errors raised by tasks.
+
+        :param message: the received task message
+        :param result: the result of task
+        :param exception: exception raised
+        """
+        self.task_errors_by_type.labels(
+            message.task_name,
+            type(exception).__name__,
+        ).inc()
 
     def post_execute(
         self,
@@ -135,6 +203,7 @@ class PrometheusMiddleware(TaskiqMiddleware):
             self.found_errors.labels(message.task_name).inc()
         else:
             self.success_tasks.labels(message.task_name).inc()
+        self.in_flight_tasks.labels(message.task_name).dec()
         self.execution_time.labels(message.task_name).observe(result.execution_time)
 
     def post_save(

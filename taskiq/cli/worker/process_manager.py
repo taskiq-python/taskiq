@@ -169,7 +169,7 @@ class ProcessManager:
             for path_to_watch in watch_paths:
                 logger.debug(f"Watching directory: {path_to_watch}")
                 observer.schedule(
-                    FileWatcher(
+                    FileWatcher(  # type: ignore
                         callback=schedule_workers_reload,
                         path=Path(path_to_watch),
                         use_gitignore=not args.no_gitignore,

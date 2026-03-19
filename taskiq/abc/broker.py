@@ -32,10 +32,13 @@ from taskiq.state import TaskiqState
 from taskiq.utils import maybe_awaitable
 from taskiq.warnings import TaskiqDeprecationWarning
 
-if sys.version_info >= (3, 11):
+if sys.version_info >= (
+    3,
+    11,
+):  # Check which python version are we running to import correctly
     from typing import Self
 else:
-    from typing_extensions import Self
+    from typing_extensions import Self  # pragma: no cover
 
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -46,6 +49,7 @@ _T = TypeVar("_T")
 _FuncParams = ParamSpec("_FuncParams")
 _ReturnType = TypeVar("_ReturnType")
 
+# an event handler can be either a sync or an async function that has one parameter of type TaskiqState
 EventHandler: TypeAlias = Callable[[TaskiqState], Awaitable[None] | None]
 
 logger = getLogger("taskiq")
