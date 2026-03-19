@@ -7,6 +7,7 @@ from typing import Any
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.message import TaskiqMessage
 from taskiq.result import TaskiqResult
+from taskiq.receiver.observer import ReceiverObserver
 
 logger = getLogger("taskiq.prometheus")
 
@@ -75,12 +76,6 @@ class PrometheusMiddleware(TaskiqMiddleware):
             ["task_name"],
         )
 
-        self.in_flight_tasks = Gauge(
-            "in_flight_tasks",
-            "Number of tasks in flight",
-            ["task_name"],
-            multiprocess_mode="livesum",
-        )
         self.queue_wait_seconds = Histogram(
             "queue_wait_seconds",
             "time task spent in message queue",
@@ -166,7 +161,6 @@ class PrometheusMiddleware(TaskiqMiddleware):
                 time_delta,
             )
 
-        self.in_flight_tasks.labels(message.task_name).inc()
         self.received_tasks.labels(message.task_name).inc()
         return message
 
@@ -203,8 +197,11 @@ class PrometheusMiddleware(TaskiqMiddleware):
             self.found_errors.labels(message.task_name).inc()
         else:
             self.success_tasks.labels(message.task_name).inc()
-        self.in_flight_tasks.labels(message.task_name).dec()
         self.execution_time.labels(message.task_name).observe(result.execution_time)
+
+    def set_broker(self, broker: "AsyncBroker") -> None:  # noqa: F821 pyright: ignore[reportUnknownVariableType]
+        super().set_broker(broker)
+        broker._receiver_observer = PrometheusReceiverObserver()
 
     def post_save(
         self,
@@ -218,3 +215,55 @@ class PrometheusMiddleware(TaskiqMiddleware):
         :param result: result of execution.
         """
         self.saved_results.labels(message.task_name).inc()
+
+
+class PrometheusReceiverObserver(ReceiverObserver):
+    """Receiver observer implementation for prometheus."""
+
+    def __init__(self) -> None:
+        try:
+            from prometheus_client import Counter, Gauge  # noqa: PLC0415
+        except ImportError as exc:
+            raise ImportError(
+                "Cannot initialize metrics. Please install 'taskiq[metrics]'.",
+            ) from exc
+
+        self.prefetch_queue_size = Gauge(
+            "prefetch_queue_size",
+            "The number of task in the prefetch queue.",
+            multiprocess_mode="livesum",
+        )
+        self.semaphore_available = Gauge(
+            "semaphore_available",
+            "Number of semaphore slots available in broker",
+            multiprocess_mode="livesum",
+        )
+        self.active_tasks_count = Gauge(
+            "worker_active_tasks_count",
+            "Number of active tasks in worker",
+            multiprocess_mode="livesum",
+        )
+        self.task_not_found_total = Counter(
+            "task_not_found_total",
+            "Number of times the worker got a task not registered",
+            ["task_name"],
+        )
+        self.deserialize_error = Counter(
+            "deserialize_error_count",
+            "Number of times broker faced a desrialization error",
+        )
+
+    def on_prefetch_queue_size(self, size: int) -> None:
+        self.prefetch_queue_size.set(size)
+
+    def on_semaphore_status(self, available: int) -> None:
+        self.semaphore_available.set(available)
+
+    def on_active_tasks_count(self, count: int) -> None:
+        self.active_tasks_count.set(count)
+
+    def on_task_not_found(self, task_name: str) -> None:
+        self.task_not_found_total.labels(task_name).inc()
+
+    def on_deserialize_error(self, raw: bytes, error: Exception) -> None:
+        self.deserialize_error.inc()

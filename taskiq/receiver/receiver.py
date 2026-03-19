@@ -18,6 +18,7 @@ from taskiq.acks import AcknowledgeType
 from taskiq.context import Context
 from taskiq.exceptions import NoResultError
 from taskiq.message import TaskiqMessage
+from taskiq.receiver.observer import ReceiverObserver
 from taskiq.receiver.params_parser import parse_params
 from taskiq.result import TaskiqResult
 from taskiq.state import TaskiqState
@@ -35,6 +36,7 @@ class Receiver:
         self,
         broker: AsyncBroker,
         executor: Executor | None = None,
+        observer: ReceiverObserver | None = None,
         validate_params: bool = True,
         max_async_tasks: "int | None" = None,
         max_prefetch: int = 0,
@@ -54,6 +56,7 @@ class Receiver:
         self.dependency_graphs: dict[str, DependencyGraph] = {}
         self.propagate_exceptions = propagate_exceptions
         self.on_exit = on_exit
+        self.observer = observer
         self.ack_time = ack_type or AcknowledgeType.WHEN_SAVED
         self.known_tasks: set[str] = set()
         self.max_tasks_to_execute = max_tasks_to_execute
@@ -92,6 +95,11 @@ class Receiver:
             taskiq_msg = self.broker.formatter.loads(message=message_data)
             taskiq_msg.parse_labels()
         except Exception as exc:
+            if self.observer is not None:
+                self.observer.on_deserialize_error(
+                    raw=message_data,
+                    error=exc,
+                )
             logger.warning(
                 "Cannot parse message: %s. Skipping execution.\n %s",
                 message_data,
@@ -102,6 +110,11 @@ class Receiver:
         logger.debug(f"Received message: {taskiq_msg}")
         task = self.broker.find_task(taskiq_msg.task_name)
         if task is None:
+            if self.observer is not None:
+                self.observer.on_task_not_found(
+                    taskiq_msg.task_name,
+                )
+
             logger.warning(
                 'task "%s" is not found. Maybe you forgot to import it?',
                 taskiq_msg.task_name,
@@ -363,6 +376,7 @@ class Receiver:
                 break
             try:
                 await self.sem_prefetch.acquire()
+
                 if (
                     self.max_tasks_to_execute
                     and fetched_tasks >= self.max_tasks_to_execute
@@ -376,6 +390,7 @@ class Receiver:
                 # and continue the loop. So it will check if finished event was set.
                 if not done:
                     self.sem_prefetch.release()
+
                     continue
                 # We're done, so now we need to check
                 # whether task has returned an error.
@@ -383,6 +398,12 @@ class Receiver:
                 current_message = asyncio.create_task(iterator.__anext__())  # type: ignore
                 fetched_tasks += 1
                 await queue.put(message)
+
+                if self.observer is not None:
+                    self.observer.on_prefetch_queue_size(
+                        queue.qsize(),
+                    )
+
             except (asyncio.CancelledError, StopAsyncIteration):
                 break
         # We don't want to fetch new messages if we are shutting down.
@@ -413,17 +434,35 @@ class Receiver:
             :param task: finished task
             """
             tasks.discard(task)
+            if self.observer is not None:
+                self.observer.on_active_tasks_count(
+                    len(tasks),
+                )
+
             if self.sem is not None:
                 self.sem.release()
+
+                if self.observer is not None:
+                    self.observer.on_semaphore_status(
+                        self.sem._value  # noqa
+                    )
 
         while True:
             try:
                 # Waits for semaphore to be released.
                 if self.sem is not None:
                     await self.sem.acquire()
+                    if self.observer is not None:
+                        self.observer.on_semaphore_status(
+                            self.sem._value  # noqa
+                        )
 
                 self.sem_prefetch.release()
                 message = await queue.get()
+                if self.observer is not None:
+                    self.observer.on_prefetch_queue_size(
+                        queue.qsize()  # noqa
+                    )
                 if message is QUEUE_DONE:
                     # asyncio.wait will throw an error if there is nothing to wait for
                     if tasks:
@@ -438,7 +477,10 @@ class Receiver:
                     self.callback(message=message, raise_err=False),
                 )
                 tasks.add(task)
-
+                if self.observer is not None:
+                    self.observer.on_active_tasks_count(
+                        len(tasks),
+                    )
                 # We want the task to remove itself from the set when it's done.
                 #
                 # Because if we won't save it anywhere,

@@ -13,7 +13,7 @@ from taskiq.abc.broker import AsyncBroker
 from taskiq.cli.utils import import_object, import_tasks
 from taskiq.cli.worker.args import WorkerArgs
 from taskiq.cli.worker.process_manager import ProcessManager
-from taskiq.receiver import Receiver
+from taskiq.receiver import Receiver, ReceiverObserver
 
 try:
     import uvloop
@@ -163,6 +163,7 @@ def start_listen(args: WorkerArgs) -> None:
             receiver = receiver_type(
                 broker=broker,
                 executor=pool,
+                observer=getattr(broker, "_receiver_observer", None),
                 validate_params=not args.no_parse,
                 max_async_tasks=args.max_async_tasks,
                 max_prefetch=args.max_prefetch,
