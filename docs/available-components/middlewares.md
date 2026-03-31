@@ -32,7 +32,7 @@ async def test():
 
 ```
 
-`retry_on_error` enables retries for a task. `max_retries` is the maximum number of times,.
+`retry_on_error` enables retries for a task. `max_retries` is the maximum number of retry attempts.
 
 ## Smart retry middleware
 
