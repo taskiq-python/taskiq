@@ -51,12 +51,12 @@ def test_template_with_required_value() -> None:
 
 def test_missing_argument_raises_type_error() -> None:
     with pytest.raises(TypeError, match="Missing arguments: 'value'"):
-        ValueTemplateError()
+        ValueTemplateError()  # type: ignore[call-arg]
 
 
 def test_undeclared_argument_raises_type_error() -> None:
     with pytest.raises(TypeError, match="Undeclared arguments: 'extra'"):
-        ValueTemplateError(value=1, extra=2)
+        ValueTemplateError(value=1, extra=2)  # type: ignore[call-arg]
 
 
 def test_default_value_is_used_without_kwargs() -> None:

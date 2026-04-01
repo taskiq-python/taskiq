@@ -1,8 +1,20 @@
 """Minimal exception templating used by taskiq exceptions."""
 
+import sys
 from string import Formatter
 
+if sys.version_info >= (3, 11):
+    from typing import dataclass_transform
+else:
+    from typing_extensions import dataclass_transform
 
+
+@dataclass_transform(
+    eq_default=False,
+    order_default=False,
+    kw_only_default=True,
+    frozen_default=False,
+)
 class Error(Exception):
     """Base templated exception compatible with taskiq needs."""
 
