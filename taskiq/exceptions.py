@@ -1,9 +1,9 @@
 from typing import Any
 
-from izulu import root
+from taskiq.error import Error
 
 
-class TaskiqError(root.Error):
+class TaskiqError(Error):
     """Base exception for all errors."""
 
     __template__ = "Exception occurred"
