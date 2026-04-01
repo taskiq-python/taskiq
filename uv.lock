@@ -754,15 +754,6 @@ wheels = [
 ]
 
 [[package]]
-name = "izulu"
-version = "0.50.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d0/58/6d6335c78b7ade54d8a6c6dbaa589e5c21b3fd916341d5a16f774c72652a/izulu-0.50.0.tar.gz", hash = "sha256:cc8e252d5e8560c70b95380295008eeb0786f7b745a405a40d3556ab3252d5f5", size = 48558, upload-time = "2025-03-24T15:52:21.51Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/4a/9f/bf9d33546bbb6e5e80ebafe46f90b7d8b4a77410b7b05160b0ca8978c15a/izulu-0.50.0-py3-none-any.whl", hash = "sha256:4e9ae2508844e7c5f62c468a8b9e2deba2f60325ef63f01e65b39fd9a6b3fab4", size = 18095, upload-time = "2025-03-24T15:52:19.667Z" },
-]
-
-[[package]]
 name = "msgpack"
 version = "1.1.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1820,7 +1811,6 @@ source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
     { name = "anyio" },
-    { name = "izulu" },
     { name = "packaging" },
     { name = "pycron" },
     { name = "pydantic" },
@@ -1881,7 +1871,6 @@ requires-dist = [
     { name = "anyio", specifier = ">=4" },
     { name = "cbor2", marker = "extra == 'cbor'", specifier = ">=5" },
     { name = "gitignore-parser", marker = "extra == 'reload'", specifier = ">=0" },
-    { name = "izulu", specifier = "==0.50.0" },
     { name = "msgpack", marker = "extra == 'msgpack'", specifier = ">=1.0.7" },
     { name = "opentelemetry-api", marker = "extra == 'opentelemetry'", specifier = ">=1.38.0,<2.0.0" },
     { name = "opentelemetry-instrumentation", marker = "extra == 'opentelemetry'", specifier = ">=0.59b0,<1" },
