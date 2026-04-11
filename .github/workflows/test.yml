@@ -52,7 +52,7 @@ jobs:
       - name: Setup python
         uses: actions/setup-python@v6
         with:
-          python-version: '${{ matrix.py_version }}' 
+          python-version: '${{ matrix.py_version }}'
       - id: setup-uv
         name: Setup UV
         uses: astral-sh/setup-uv@v7
