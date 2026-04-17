@@ -43,6 +43,36 @@ pip install "taskiq[zmq]"
 
 :::
 
+## NNG broker
+
+NNG broker is very much alike to the ZMQ broker. It is as lightweight as ZMQ, but uses NNG as an underlying socket
+management solution.
+
+For more information visit their website at [nng.nanomsg.org](https://nng.nanomsg.org/).
+
+::: caution Be careful!
+If you choose this type of broker, please run taskiq with `-w 1` parameter,
+otherwise you may encounter problems.
+:::
+
+
+::: tabs
+
+@tab Only PyNNG
+
+```bash
+pip install pynng
+```
+
+@tab Taskiq with NNG
+
+```bash
+pip install "taskiq[nng]"
+```
+
+:::
+
+
 ## Async shared broker and shared tasks
 
 This is also a special broker. You cannot use it directly. It's used to create shared tasks.
