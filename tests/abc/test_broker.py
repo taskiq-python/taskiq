@@ -1,4 +1,5 @@
 from collections.abc import AsyncGenerator
+from copy import copy
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.decor import AsyncTaskiqDecoratedTask
@@ -61,3 +62,17 @@ def test_decorator_with_labels_success() -> None:
         "label1": 1,
         "label2": 2,
     }
+
+
+def test_kicker_labels_modification() -> None:
+    """Test that using kicker.with_labels doesn't modify task's labels globally."""
+    broker = _TestBroker()
+
+    @broker.task(test_lb="one")
+    async def test_task() -> None: ...
+
+    old_labels = copy(test_task.labels)
+    test_kicker = test_task.kicker().with_labels(another_label="test")
+    assert "another_label" in test_kicker.labels
+
+    assert test_task.labels == old_labels
