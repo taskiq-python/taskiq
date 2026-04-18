@@ -114,7 +114,7 @@ After that, you can use your preferred serializer in your project like this:
 
 ```python
 from taskiq import InMemoryBroker
-from taskiq.serializers import ORJSONSerializer 
+from taskiq.serializers import ORJSONSerializer
 
 broker = InMemoryBroker().with_serializer(ORJSONSerializer())
 ```
@@ -123,7 +123,7 @@ broker = InMemoryBroker().with_serializer(ORJSONSerializer())
 
 ```python
 from taskiq import InMemoryBroker
-from taskiq.serializers import MSGPackSerializer 
+from taskiq.serializers import MSGPackSerializer
 
 broker = InMemoryBroker().with_serializer(MSGPackSerializer())
 ```
@@ -132,7 +132,7 @@ broker = InMemoryBroker().with_serializer(MSGPackSerializer())
 
 ```python
 from taskiq import InMemoryBroker
-from taskiq.serializers import CBORSerializer 
+from taskiq.serializers import CBORSerializer
 
 broker = InMemoryBroker().with_serializer(CBORSerializer())
 ```

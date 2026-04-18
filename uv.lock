@@ -1806,7 +1806,6 @@ wheels = [
 
 [[package]]
 name = "taskiq"
-version = "0.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -1886,7 +1885,7 @@ requires-dist = [
     { name = "uvloop", marker = "sys_platform != 'win32' and extra == 'uv'", specifier = ">=0.16.0,<1" },
     { name = "watchdog", marker = "extra == 'reload'", specifier = ">=4" },
 ]
-provides-extras = ["zmq", "uv", "metrics", "reload", "orjson", "msgpack", "cbor", "opentelemetry"]
+provides-extras = ["cbor", "metrics", "msgpack", "opentelemetry", "orjson", "reload", "uv", "zmq"]
 
 [package.metadata.requires-dev]
 dev = [

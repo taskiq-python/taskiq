@@ -176,30 +176,11 @@ lint.ignore = [
 ]
 lint.mccabe = { max-complexity = 10 }
 
-[tool.tox]
-requires = ["tox>=4"]
-isolated_build = true
-env_list = ["3.13", "3.12", "3.11", "3.10"]
-
-[tool.tox.env_run_base]
-description = "Run tests with Python {base_python}"
-runner = "uv-venv-lock-runner"
-uv_sync_flags = ["--all-extras"]
-commands = [["pytest", "-vv", "-n", "auto"]]
-
-[tool.typos.files]
-extend-exclude = [
-  "docs/README.md"  # because of identifier in head section
-]
-
-[lint.flake8-bugbear]
-extend-immutable-calls = ["taskiq_dependencies.Depends", "taskiq.TaskiqDepends"]
-
-[lint.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "taskiq/compat.py" = [
   "D103"  # Missing docstring in public function
 ]
-"tests/*" = [
+"tests/**/*" = [
   "S101",  # Use of assert detected
   "S301",  # Use of pickle detected
   "D103",  # Missing docstring in public function
@@ -218,9 +199,28 @@ extend-immutable-calls = ["taskiq_dependencies.Depends", "taskiq.TaskiqDepends"]
   "T201"  # print found
 ]
 
-[lint.pydocstyle]
+[tool.tox]
+requires = ["tox>=4"]
+isolated_build = true
+env_list = ["3.13", "3.12", "3.11", "3.10"]
+
+[tool.tox.env_run_base]
+description = "Run tests with Python {base_python}"
+runner = "uv-venv-lock-runner"
+uv_sync_flags = ["--all-extras"]
+commands = [["pytest", "-vv", "-n", "auto"]]
+
+[tool.typos.files]
+extend-exclude = [
+  "docs/README.md"  # because of identifier in head section
+]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["taskiq_dependencies.Depends", "taskiq.TaskiqDepends"]
+
+[tool.ruff.lint.pydocstyle]
 convention = "pep257"
 ignore-decorators = ["typing.overload"]
 
-[lint.pylint]
+[tool.ruff.lint.pylint]
 allow-magic-value-types = ["int", "str", "float"]
