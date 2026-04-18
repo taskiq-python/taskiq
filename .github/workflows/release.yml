@@ -12,6 +12,8 @@ jobs:
       name: release
     permissions:
       id-token: write
+    env:
+      UV_SYSTEM_PYTHON: 1
     steps:
       - uses: actions/checkout@v6
         with:

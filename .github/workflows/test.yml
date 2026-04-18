@@ -44,8 +44,6 @@ jobs:
         pydantic_ver: ["<2", ">=2.5,<3"]
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: "${{ matrix.os }}"
-    env:
-      UV_SYSTEM_PYTHON: 1
     steps:
       - uses: actions/checkout@v6
         with:
