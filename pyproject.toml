@@ -1,95 +1,115 @@
 [project]
 name = "taskiq"
-version = "0.0.0"
 description = "Distributed task queue with full async support"
-authors = [{ name = "Pavel Kirilin", email = "<win10@list.ru>" }]
-maintainers = [{ name = "Pavel Kirilin", email = "<win10@list.ru>" }]
 readme = "README.md"
-repository = "https://github.com/taskiq-python/taskiq"
-homepage = "https://taskiq-python.github.io/"
-documentation = "https://taskiq-python.github.io/"
+requires-python = ">=3.10,<4"
 license = "MIT"
 license-files = ["LICENSE"]
+authors = [{ name = "Pavel Kirilin", email = "win10@list.ru" }]
+maintainers = [{ name = "Pavel Kirilin", email = "win10@list.ru" }]
+keywords = ["async", "distributed", "taskiq", "tasks"]
 classifiers = [
-	"Typing :: Typed",
-	"Programming Language :: Python",
-	"Programming Language :: Python :: 3",
-	"Programming Language :: Python :: 3 :: Only",
-	"Programming Language :: Python :: 3.10",
-	"Programming Language :: Python :: 3.11",
-	"Programming Language :: Python :: 3.12",
-	"Programming Language :: Python :: 3.13",
-	"Programming Language :: Python :: 3.14",
-	"Operating System :: OS Independent",
-	"Intended Audience :: Developers",
-	"Topic :: System :: Networking",
-	"Development Status :: 3 - Alpha",
-	"License :: OSI Approved :: MIT License",
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: System :: Networking",
+  "Typing :: Typed"
 ]
-keywords = ["taskiq", "tasks", "distributed", "async"]
-requires-python = ">=3.10,<4"
 dependencies = [
-	"typing-extensions>=3.10.0.0; python_version < '3.11'",
-	"pydantic>=1.0,<=3.0",
-	"pycron>=3.0.0",
-	"taskiq_dependencies>=1.3.1,<2",
-	"anyio>=4",
-	"packaging>=19",
-	"aiohttp>=3",
+  "aiohttp>=3",
+  "anyio>=4",
+  "packaging>=19",
+  "pycron>=3.0.0",
+  "pydantic>=1.0,<=3.0",
+  "taskiq_dependencies>=1.3.1,<2",
+  "typing-extensions>=3.10.0.0; python_version < '3.11'"
 ]
+dynamic = ["version"]
 
 [project.optional-dependencies]
-zmq = ["pyzmq>=26"]
-uv = ["uvloop>=0.16.0,<1; sys_platform != 'win32'"]
-metrics = ["prometheus_client>=0"]
-reload = ["watchdog>=4", "gitignore-parser>=0"]
-orjson = ["orjson>=3"]
-msgpack = ["msgpack>=1.0.7"]
 cbor = ["cbor2>=5"]
+metrics = ["prometheus_client>=0"]
+msgpack = ["msgpack>=1.0.7"]
 opentelemetry = [
-	"opentelemetry-api (>=1.38.0,<2.0.0)",
-	"opentelemetry-instrumentation (>=0.59b0,<1)",
-	"opentelemetry-semantic-conventions (>=0.59b0,<1)",
+  "opentelemetry-api (>=1.38.0,<2.0.0)",
+  "opentelemetry-instrumentation (>=0.59b0,<1)",
+  "opentelemetry-semantic-conventions (>=0.59b0,<1)"
 ]
+orjson = ["orjson>=3"]
+reload = ["watchdog>=4", "gitignore-parser>=0"]
+uv = ["uvloop>=0.16.0,<1; sys_platform != 'win32'"]
+zmq = ["pyzmq>=26"]
 
-[dependency-groups]
-dev = [
-	"pre-commit>=4.4.0",
-	# lint
-	"ruff>=0.14.5",
-	"black>=25.11.0",
-	# type check
-	"mypy>=1.18.2",
-	# test
-	"pytest>=9.0.1",
-	"pytest-cov>=7.0.0",
-	"coverage>=7.11.3",
-	"pytest-xdist[psutil]>=3.8.0",
-	"freezegun>=1.5.5",
-	"tzdata>=2025.2; sys_platform == 'win32'",
-	"opentelemetry-test-utils (>=0.59b0,<1)",
-	"polyfactory>=3.1.0",
-	# tests with all python versions
-	"tox>=4.32.0",
-	"tox-uv>=1.29.0",
-]
-
-[project.urls]
-Homepage = "https://taskiq-python.github.io/"
-Documentation = "https://taskiq-python.github.io/"
-Repository = "https://github.com/taskiq-python/taskiq"
-"Bug Tracker" = "https://github.com/taskiq-python/taskiq/issues"
-Changelog = "https://github.com/taskiq-python/taskiq/releases"
-
-[project.scripts]
-taskiq = "taskiq.__main__:main"
+[project.entry-points.opentelemetry_instrumentor]
+taskiq = "taskiq.instrumentation:TaskiqInstrumentor"
 
 [project.entry-points.taskiq_cli]
 worker = "taskiq.cli.worker.cmd:WorkerCMD"
 scheduler = "taskiq.cli.scheduler.cmd:SchedulerCMD"
 
-[project.entry-points.opentelemetry_instrumentor]
-taskiq = "taskiq.instrumentation:TaskiqInstrumentor"
+[project.scripts]
+taskiq = "taskiq.__main__:main"
+
+[project.urls]
+"Bug Tracker" = "https://github.com/taskiq-python/taskiq/issues"
+Changelog = "https://github.com/taskiq-python/taskiq/releases"
+Documentation = "https://taskiq-python.github.io/"
+Homepage = "https://taskiq-python.github.io/"
+Repository = "https://github.com/taskiq-python/taskiq"
+
+[dependency-groups]
+dev = [
+  "black>=25.11.0",
+  "coverage>=7.11.3",
+  "freezegun>=1.5.5",
+  # type check
+  "mypy>=1.18.2",
+  "opentelemetry-test-utils (>=0.59b0,<1)",
+  "polyfactory>=3.1.0",
+  "pre-commit>=4.4.0",
+  # test
+  "pytest>=9.0.1",
+  "pytest-cov>=7.0.0",
+  "pytest-xdist[psutil]>=3.8.0",
+  # lint
+  "ruff>=0.14.5",
+  # tests with all python versions
+  "tox>=4.32.0",
+  "tox-uv>=1.29.0",
+  "tzdata>=2025.2; sys_platform == 'win32'"
+]
+
+[build-system]
+requires = ["hatchling", "versioningit"]
+build-backend = "hatchling.build"
+
+[tool.coverage.run]
+omit = [
+  "taskiq/__main__.py",
+  "taskiq/abc/cmd.py",
+  "taskiq/cli/scheduler/args.py",
+  "taskiq/cli/scheduler/cmd.py",
+  "taskiq/cli/utils.py",
+  "taskiq/cli/worker/args.py",
+  "taskiq/cli/worker/async_task_runner.py",
+  "taskiq/cli/worker/cmd.py"
+]
+
+[tool.hatch.version]
+source = "versioningit"
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
 
 [tool.mypy]
 python_version = "3.10"
@@ -104,119 +124,57 @@ allow_untyped_decorators = true
 warn_return_any = false
 warn_unused_ignores = false
 
-[tool.isort]
-profile = "black"
-multi_line_output = 3
-
 [tool.pytest.ini_options]
-log_level = 'INFO'
+log_level = "INFO"
 anyio_mode = "auto"
 
-[tool.coverage.run]
-omit = [
-	"taskiq/__main__.py",
-	"taskiq/abc/cmd.py",
-	"taskiq/cli/scheduler/args.py",
-	"taskiq/cli/scheduler/cmd.py",
-	"taskiq/cli/utils.py",
-	"taskiq/cli/worker/args.py",
-	"taskiq/cli/worker/async_task_runner.py",
-	"taskiq/cli/worker/cmd.py",
-]
-
-[build-system]
-requires = ["uv_build>=0.9.16,<0.10.0"]
-build-backend = "uv_build"
-
-[tool.uv.build-backend]
-module-name = "taskiq"
-module-root = ""
-
 [tool.ruff]
-target-version="py310"
+target-version = "py310"
+exclude = [".venv/"]
+line-length = 88
 # List of enabled rulsets.
 # See https://docs.astral.sh/ruff/rules/ for more information.
 lint.select = [
-	"E",     # Error
-	"F",     # Pyflakes
-	"W",     # Pycodestyle
-	"C90",   # McCabe complexity
-	"I",     # Isort
-	"N",     # pep8-naming
-	"D",     # Pydocstyle
-	"ANN",   # Pytype annotations
-	"S",     # Bandit
-	"B",     # Bugbear
-	"COM",   # Commas
-	"C4",    # Comprehensions
-	"ISC",   # Implicit string concat
-	"PIE",   # Unnecessary code
-	"T20",   # Catch prints
-	"PYI",   # validate pyi files
-	"Q",     # Checks for quotes
-	"RSE",   # Checks raise statements
-	"RET",   # Checks return statements
-	"SLF",   # Self checks
-	"SIM",   # Simplificator
-	"PTH",   # Pathlib checks
-	"ERA",   # Checks for commented out code
-	"PL",    # PyLint checks
-	"RUF",   # Specific to Ruff checks
-	"FA102", # Future annotations
-	"UP",    # Pyupgrade
+  "E",  # Error
+  "F",  # Pyflakes
+  "W",  # Pycodestyle
+  "C90",  # McCabe complexity
+  "I",  # Isort
+  "N",  # pep8-naming
+  "D",  # Pydocstyle
+  "ANN",  # Pytype annotations
+  "S",  # Bandit
+  "B",  # Bugbear
+  "COM",  # Commas
+  "C4",  # Comprehensions
+  "ISC",  # Implicit string concat
+  "PIE",  # Unnecessary code
+  "T20",  # Catch prints
+  "PYI",  # validate pyi files
+  "Q",  # Checks for quotes
+  "RSE",  # Checks raise statements
+  "RET",  # Checks return statements
+  "SLF",  # Self checks
+  "SIM",  # Simplificator
+  "PTH",  # Pathlib checks
+  "ERA",  # Checks for commented out code
+  "PL",  # PyLint checks
+  "RUF",  # Specific to Ruff checks
+  "FA102",  # Future annotations
+  "UP"  # Pyupgrade
 ]
 lint.ignore = [
-	"D105",    # Missing docstring in magic method
-	"D107",    # Missing docstring in __init__
-	"D212",    # Multi-line docstring summary should start at the first line
-	"D401",    # First line should be in imperative mood
-	"D104",    # Missing docstring in public package
-	"D100",    # Missing docstring in public module
-	"ANN401",  # typing.Any are disallowed in `**kwargs
-	"PLR0913", # Too many arguments for function call
-	"D106",    # Missing docstring in public nested class
+  "D105",  # Missing docstring in magic method
+  "D107",  # Missing docstring in __init__
+  "D212",  # Multi-line docstring summary should start at the first line
+  "D401",  # First line should be in imperative mood
+  "D104",  # Missing docstring in public package
+  "D100",  # Missing docstring in public module
+  "ANN401",  # typing.Any are disallowed in `**kwargs
+  "PLR0913",  # Too many arguments for function call
+  "D106"  # Missing docstring in public nested class
 ]
 lint.mccabe = { max-complexity = 10 }
-exclude = [".venv/"]
-line-length = 88
-
-[tool.ruff.lint.per-file-ignores]
-"taskiq/compat.py" = [
-    "D103",   # Missing docstring in public function
-]
-"tests/*" = [
-	"S101",   # Use of assert detected
-	"S301",   # Use of pickle detected
-	"D103",   # Missing docstring in public function
-	"SLF001", # Private member accessed
-	"S311",   # Standard pseudo-random generators are not suitable for security/cryptographic purposes
-	"D101",   # Missing docstring in public class
-	"D102",   # Missing docstring in public method
-	"PLR2004",  # Magic value
-]
-"docs/examples/*" = [
-	"D103",  # Missing docstring in public function
-    "D101",   # Missing docstring in public class
-    "D102",  # Missing docstring in public method
-    "S311",  #  Standard pseudo-random generators
-    "S101",  # use of asserts detected
-    "T201",  # print found
-]
-
-[tool.ruff.lint.pydocstyle]
-convention = "pep257"
-ignore-decorators = ["typing.overload"]
-
-[tool.ruff.lint.pylint]
-allow-magic-value-types = ["int", "str", "float"]
-
-[tool.ruff.lint.flake8-bugbear]
-extend-immutable-calls = ["taskiq_dependencies.Depends", "taskiq.TaskiqDepends"]
-
-[tool.typos.files]
-extend-exclude = [
-	"docs/README.md", # because of identifier in head section
-]
 
 [tool.tox]
 requires = ["tox>=4"]
@@ -227,6 +185,42 @@ env_list = ["3.13", "3.12", "3.11", "3.10"]
 description = "Run tests with Python {base_python}"
 runner = "uv-venv-lock-runner"
 uv_sync_flags = ["--all-extras"]
-commands = [
-    ["pytest", "-vv", "-n", "auto"]
+commands = [["pytest", "-vv", "-n", "auto"]]
+
+[tool.typos.files]
+extend-exclude = [
+  "docs/README.md"  # because of identifier in head section
 ]
+
+[lint.flake8-bugbear]
+extend-immutable-calls = ["taskiq_dependencies.Depends", "taskiq.TaskiqDepends"]
+
+[lint.per-file-ignores]
+"taskiq/compat.py" = [
+  "D103"  # Missing docstring in public function
+]
+"tests/*" = [
+  "S101",  # Use of assert detected
+  "S301",  # Use of pickle detected
+  "D103",  # Missing docstring in public function
+  "SLF001",  # Private member accessed
+  "S311",  # Standard pseudo-random generators are not suitable for security/cryptographic purposes
+  "D101",  # Missing docstring in public class
+  "D102",  # Missing docstring in public method
+  "PLR2004"  # Magic value
+]
+"docs/examples/*" = [
+  "D103",  # Missing docstring in public function
+  "D101",  # Missing docstring in public class
+  "D102",  # Missing docstring in public method
+  "S311",  # Standard pseudo-random generators
+  "S101",  # use of asserts detected
+  "T201"  # print found
+]
+
+[lint.pydocstyle]
+convention = "pep257"
+ignore-decorators = ["typing.overload"]
+
+[lint.pylint]
+allow-magic-value-types = ["int", "str", "float"]
