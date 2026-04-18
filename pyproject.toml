@@ -115,16 +115,13 @@ multi_line_output = 3
 python_version = "3.10"
 strict = true
 ignore_missing_imports = true
-allow_subclassing_any = true
-allow_untyped_calls = true
 pretty = true
-show_error_codes = true
 implicit_reexport = true
 allow_untyped_decorators = true
 warn_return_any = false
 warn_unused_ignores = false
 
-[tool.pytest.ini_options]
+[tool.pytest]
 log_level = "INFO"
 anyio_mode = "auto"
 
