@@ -12,26 +12,19 @@ jobs:
       name: release
     permissions:
       id-token: write
-    env:
-      UV_SYSTEM_PYTHON: 1
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
           fetch-depth: 0
-      - name: Setup python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.14'
       - id: setup-uv
         name: Setup UV
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
-          cache-suffix: '3.14'
+          cache-suffix: "3.13"
           github-token: ${{ github.token }}
-          version: "3.14"
-      - run: uv version "${GITHUB_REF_NAME}"
+          python-version: "3.13"
       - run: uv build
       - name: Release package
         env:
