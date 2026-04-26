@@ -28,13 +28,19 @@ from taskiq.brokers.nng import (
     NNGHub,
     ControlMessage,
     ControlResponse,
+    InMemoryStore,
+    LeastLoaded,
     MessageKind,
+    PowerOfTwoChoices,
+    QueueFullError,
+    RoutingPolicy,
+    RoundRobin,
+    StoreConfig,
     TaskEnvelope,
     WorkerState,
     WorkerStatus,
-    QueueFullError,
-    InMemoryStore,
-    StoreConfig,
+    WorkerView,
+    make_routing_policy,
 )
 
 
@@ -543,4 +549,133 @@ async def test_graceful_drain_and_unregister(ctrl_addr: str, db_path: str) -> No
         assert len(hub.store.list_workers()) == 0
     finally:
         worker.close()
+        await hub.stop()
+
+
+# ── 2b. Routing policy unit tests ─────────────────────────────────────────────
+
+
+def test_least_loaded_picks_idle_worker() -> None:
+    policy = LeastLoaded()
+    workers = [WorkerView("w1", inflight=3, capacity=4), WorkerView("w2", inflight=0, capacity=4)]
+    assert policy.choose(workers).worker_id == "w2"  # type: ignore[union-attr]
+
+
+def test_least_loaded_empty_returns_none() -> None:
+    assert LeastLoaded().choose([]) is None
+
+
+def test_p2c_returns_a_worker() -> None:
+    policy = PowerOfTwoChoices()
+    workers = [WorkerView("w1", 1, 4), WorkerView("w2", 2, 4), WorkerView("w3", 0, 4)]
+    chosen = policy.choose(workers)
+    assert chosen is not None
+    assert chosen.worker_id in {"w1", "w2", "w3"}
+
+
+def test_p2c_single_worker() -> None:
+    policy = PowerOfTwoChoices()
+    workers = [WorkerView("only", 0, 4)]
+    assert policy.choose(workers).worker_id == "only"  # type: ignore[union-attr]
+
+
+def test_round_robin_cycles() -> None:
+    policy = RoundRobin()
+    workers = [WorkerView("w1", 0, 4), WorkerView("w2", 0, 4), WorkerView("w3", 0, 4)]
+    ids = [policy.choose(workers).worker_id for _ in range(6)]  # type: ignore[union-attr]
+    assert ids == ["w1", "w2", "w3", "w1", "w2", "w3"]
+
+
+def test_make_routing_policy_string() -> None:
+    assert isinstance(make_routing_policy("least_loaded"), LeastLoaded)
+    assert isinstance(make_routing_policy("p2c"), PowerOfTwoChoices)
+    assert isinstance(make_routing_policy("round_robin"), RoundRobin)
+
+
+def test_make_routing_policy_instance_passthrough() -> None:
+    policy = LeastLoaded()
+    assert make_routing_policy(policy) is policy
+
+
+def test_make_routing_policy_unknown_raises() -> None:
+    with pytest.raises(ValueError, match="Unknown routing policy"):
+        make_routing_policy("no_such_policy")
+
+
+def test_custom_routing_policy_accepted(store: InMemoryStore) -> None:
+    """Users can pass a RoutingPolicy instance directly to choose_worker."""
+
+    class AlwaysFirstPolicy:
+        """Trivial policy: always pick the worker with the lexicographically smallest ID."""
+        def choose(self, workers: list[WorkerView]) -> WorkerView | None:
+            return min(workers, key=lambda w: w.worker_id) if workers else None
+
+    policy = AlwaysFirstPolicy()
+    # Verify it satisfies the Protocol at runtime.
+    assert isinstance(policy, RoutingPolicy)
+
+    w1 = _worker_state(worker_id="aaa", capacity=4)
+    w2 = _worker_state(worker_id="zzz", capacity=4)
+    store.register_worker(w1)
+    store.register_worker(w2)
+    chosen = store.choose_worker(policy, heartbeat_timeout=30.0)
+    assert chosen is not None
+    assert chosen["worker_id"] == "aaa"
+
+
+def test_choose_worker_p2c(store: InMemoryStore) -> None:
+    """P2C routing returns one of the registered workers."""
+    for i in range(4):
+        store.register_worker(_worker_state(worker_id=f"w{i}", capacity=4))
+    chosen = store.choose_worker("p2c", heartbeat_timeout=30.0)
+    assert chosen is not None
+    assert chosen["worker_id"] in {f"w{i}" for i in range(4)}
+
+
+def test_hub_accepts_policy_instance(ctrl_addr: str, db_path: str) -> None:
+    """HubConfig.routing_policy accepts a RoutingPolicy instance."""
+    hub = NNGHub(HubConfig(
+        control_addr=ctrl_addr,
+        routing_policy=RoundRobin(),
+        max_pending=100,
+    ))
+    assert isinstance(hub._routing, RoundRobin)
+
+
+# ── 3b. Backpressure integration test ────────────────────────────────────────
+
+
+async def test_backpressure_hub_rejects_when_full(
+    ctrl_addr: str, db_path: str
+) -> None:
+    """Hub returns error=queue full when max_pending is reached."""
+    hub = _hub(ctrl_addr, db_path, max_pending=1)
+    await hub.start()
+    client = FakeClient(ctrl_addr)
+    try:
+        await client.submit()  # fills the one slot (no worker → stays queued)
+        # Second submission must be rejected
+        payload: dict[str, object] = {
+            "task_id": uuid.uuid4().hex,
+            "task_name": "tests:task",
+            "payload_b64": "dGVzdA==",
+            "labels": {},
+            "lease_id": "",
+            "attempts": 0,
+            "max_retries": 0,
+            "retry_backoff": 1.0,
+            "retry_jitter": 0.0,
+            "priority": 0,
+            "created_at": time.time(),
+        }
+        async with client._lock:
+            await client._ctrl.asend(
+                ControlMessage(kind="submit", payload=payload).to_bytes()
+            )
+            raw = await client._ctrl.arecv()
+        resp = ControlResponse.from_bytes(raw)
+        assert not resp.ok
+        assert resp.error == "queue full"
+    finally:
+        client.close()
         await hub.stop()

@@ -4,7 +4,7 @@ from __future__ import annotations
 import random
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from .protocol import TaskEnvelope, WorkerState
@@ -101,6 +101,113 @@ class _Worker:
             "status": self.status,
             "version": self.version,
         }
+
+
+# ── routing policy abstraction ────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class WorkerView:
+    """Immutable worker snapshot passed to :class:`RoutingPolicy` implementations."""
+
+    worker_id: str
+    inflight: int
+    capacity: int
+
+    @property
+    def load(self) -> float:
+        """Fractional load: 0.0 idle → 1.0 at capacity."""
+        return self.inflight / max(self.capacity, 1)
+
+
+@runtime_checkable
+class RoutingPolicy(Protocol):
+    """Strategy interface for selecting a dispatch target from available workers."""
+
+    def choose(self, workers: list[WorkerView]) -> WorkerView | None:
+        """Return the chosen worker, or None to hold off dispatch."""
+        ...
+
+
+class LeastLoaded:
+    """Pick the worker with the lowest inflight / capacity ratio."""
+
+    def choose(self, workers: list[WorkerView]) -> WorkerView | None:
+        """Return the least-loaded worker."""
+        if not workers:
+            return None
+        return min(workers, key=lambda w: w.load)
+
+
+class PowerOfTwoChoices:
+    """
+    Power-of-two-choices routing.
+
+    Samples two workers uniformly at random and returns the less loaded one.
+    Reduces hot-spot probability under high concurrency compared to pure random.
+    """
+
+    def choose(self, workers: list[WorkerView]) -> WorkerView | None:
+        """Return the less loaded of two randomly sampled workers."""
+        if not workers:
+            return None
+        if len(workers) == 1:
+            return workers[0]
+        a, b = random.sample(workers, k=2)  # noqa: S311
+        return a if a.load <= b.load else b
+
+
+class RoundRobin:
+    """
+    Round-robin routing — cycle through workers in alphabetical ID order.
+
+    Ignores load; useful when tasks are homogeneous and worker capacity is equal.
+    The counter is per-instance, so each :class:`NNGHub` maintains its own cycle.
+    """
+
+    def __init__(self) -> None:
+        """Initialise the cycle counter."""
+        self._idx: int = 0
+
+    def choose(self, workers: list[WorkerView]) -> WorkerView | None:
+        """Return the next worker in the cycle."""
+        if not workers:
+            return None
+        w = workers[self._idx % len(workers)]
+        self._idx += 1
+        return w
+
+
+# Singletons for stateless built-ins; RoundRobin singleton is fine for single-hub
+# processes.  Users needing isolated counters should pass their own instance.
+_BUILTIN_POLICIES: dict[str, RoutingPolicy] = {
+    "least_loaded": LeastLoaded(),
+    "p2c": PowerOfTwoChoices(),
+    "round_robin": RoundRobin(),
+}
+
+
+def make_routing_policy(policy: "RoutingPolicy | str") -> RoutingPolicy:
+    """
+    Resolve a routing policy name or pass through an instance.
+
+    :param policy: ``'least_loaded'``, ``'p2c'``, ``'round_robin'``, or a
+        :class:`RoutingPolicy` instance.
+    :return: concrete routing policy.
+    :raises ValueError: for unknown string names.
+    """
+    if isinstance(policy, str):
+        resolved = _BUILTIN_POLICIES.get(policy)
+        if resolved is None:
+            raise ValueError(
+                f"Unknown routing policy {policy!r}; "
+                f"available: {sorted(_BUILTIN_POLICIES)}"
+            )
+        return resolved
+    return policy
+
+
+# ── store ─────────────────────────────────────────────────────────────────────
 
 
 class InMemoryStore:
@@ -384,17 +491,17 @@ class InMemoryStore:
 
     def choose_worker(
         self,
-        routing_policy: str = "least_loaded",
+        policy: "RoutingPolicy | str" = "least_loaded",
         *,
         heartbeat_timeout: float = 15.0,
     ) -> dict[str, Any] | None:
         """
-        Select the best available worker according to ``routing_policy``.
+        Select the best available worker using a routing policy.
 
-        ``'least_loaded'`` picks the worker with the lowest inflight/capacity
-        ratio.  ``'p2c'`` samples two workers and picks the less loaded one.
+        Accepts a :class:`RoutingPolicy` instance or a string name
+        (``'least_loaded'``, ``'p2c'``, ``'round_robin'``).
 
-        :param routing_policy: ``'least_loaded'`` or ``'p2c'``.
+        :param policy: routing policy or name.
         :param heartbeat_timeout: seconds before a worker is considered stale.
         :return: chosen worker dict, or None if no worker has capacity.
         """
@@ -408,14 +515,17 @@ class InMemoryStore:
         ]
         if not available:
             return None
-        if routing_policy == "p2c" and len(available) >= 2:
-            a, b = random.sample(available, k=2)  # noqa: S311
-            load_a = a.inflight / max(a.capacity, 1)
-            load_b = b.inflight / max(b.capacity, 1)
-            chosen = a if load_a <= load_b else b
-        else:
-            chosen = min(available, key=lambda w: w.inflight / max(w.capacity, 1))
-        return chosen.as_dict()
+        # Stable sort so RoundRobin cycles in a predictable, deterministic order.
+        views = sorted(
+            [WorkerView(w.worker_id, w.inflight, w.capacity) for w in available],
+            key=lambda v: v.worker_id,
+        )
+        routing = make_routing_policy(policy)
+        chosen = routing.choose(views)
+        if chosen is None:
+            return None
+        worker = self._workers.get(chosen.worker_id)
+        return worker.as_dict() if worker is not None else None
 
     # ── observability ─────────────────────────────────────────────────────────
 

@@ -37,7 +37,13 @@ from .protocol import (
     TaskEnvelope,
     WorkerState,
 )
-from .storage import InMemoryStore, QueueFullError, StoreConfig
+from .storage import (
+    InMemoryStore,
+    QueueFullError,
+    RoutingPolicy,
+    StoreConfig,
+    make_routing_policy,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +59,7 @@ class HubConfig:
     lease_timeout: float = 20.0
     dispatch_interval: float = 0.05
     reaper_interval: float = 0.5
-    routing_policy: str = "least_loaded"
+    routing_policy: RoutingPolicy | str = "least_loaded"
     backoff_cap: float = 60.0
     # Number of concurrent Rep0 contexts.  Each context handles one req/rep
     # pair independently; N contexts ≈ N simultaneous control-plane clients.
@@ -107,6 +113,9 @@ class NNGHub:
                 backoff_cap=config.backoff_cap,
             ),
         )
+        # Resolve once at construction so RoundRobin and similar stateful
+        # policies maintain their counter across dispatch calls.
+        self._routing: RoutingPolicy = make_routing_policy(config.routing_policy)
         self._stop = asyncio.Event()
         self._ctrl_sock: Any = None  # pynng.Rep0
         self._worker_push: dict[str, Any] = {}  # worker_id -> pynng.Push0
@@ -282,7 +291,7 @@ class NNGHub:
         sent_any = False
         for row in due:
             worker = self.store.choose_worker(
-                self.config.routing_policy,
+                self._routing,
                 heartbeat_timeout=self.config.heartbeat_timeout,
             )
             if worker is None:
@@ -384,7 +393,7 @@ def _build_config() -> HubConfig:
     )
     p.add_argument(
         "--routing-policy",
-        choices=["least_loaded", "p2c"],
+        choices=["least_loaded", "p2c", "round_robin"],
         default=os.getenv("NNG_ROUTING_POLICY", "least_loaded"),
     )
     p.add_argument(
