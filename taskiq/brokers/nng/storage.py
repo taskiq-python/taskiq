@@ -1,24 +1,20 @@
-"""Durable WAL-mode SQLite task journal for the NNG hub."""
+"""Pure in-memory task store for the NNG hub — no external dependencies."""
 from __future__ import annotations
 
-import json
 import random
-import sqlite3
-import threading
 import time
-from contextlib import contextmanager
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Generator
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
 
-from protocol import TaskEnvelope, WorkerState, WorkerStatus
+if TYPE_CHECKING:
+    from .protocol import TaskEnvelope, WorkerState
 
 
 @dataclass
 class StoreConfig:
-    """Configuration for the SQLite task journal."""
+    """Configuration for :class:`InMemoryStore`."""
 
-    path: str
+    path: str = ""  # kept for API compat; not used
     max_pending: int = 10_000
     lease_timeout: float = 30.0
     backoff_base: float = 1.0
@@ -29,203 +25,172 @@ class QueueFullError(RuntimeError):
     """Raised when a submission is attempted on a full queue."""
 
 
-class SQLiteJournal:
-    """
-    Thread-safe, WAL-mode SQLite task store.
+@dataclass
+class _Task:
+    task_id: str
+    task_name: str
+    payload: bytes
+    labels: dict[str, Any]
+    state: str  # ready / leased / done / failed
+    attempts: int = 0
+    max_retries: int = 0
+    retry_backoff: float = 1.0
+    retry_jitter: float = 0.0
+    priority: int = 0
+    created_at: float = field(default_factory=time.time)
+    updated_at: float = field(default_factory=time.time)
+    next_run_at: float = field(default_factory=time.time)
+    lease_id: str | None = None
+    leased_worker_id: str | None = None
+    lease_until: float | None = None
+    last_error: str | None = None
 
-    Design notes
-    ────────────
-    * Every method opens and closes its own connection.  WAL allows concurrent
-      readers without blocking; SQLite serialises concurrent writers internally,
-      and the Python-level ``_submit_lock`` prevents the TOCTOU race in
-      :meth:`submit`.
-    * The hub runs every call through a single-threaded
-      ``ThreadPoolExecutor`` so, in practice, writes never contend at the
-      OS level either.
-    * ``PRAGMA`` settings (WAL, synchronous, busy_timeout) are applied per
-      connection because each ``sqlite3.connect()`` call starts with defaults.
+    def as_dict(self) -> dict[str, Any]:
+        """Return a dict view of this task record."""
+        return {
+            "task_id": self.task_id,
+            "task_name": self.task_name,
+            "payload": self.payload,
+            "labels": self.labels,
+            "state": self.state,
+            "attempts": self.attempts,
+            "max_retries": self.max_retries,
+            "retry_backoff": self.retry_backoff,
+            "retry_jitter": self.retry_jitter,
+            "priority": self.priority,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "next_run_at": self.next_run_at,
+            "lease_id": self.lease_id,
+            "leased_worker_id": self.leased_worker_id,
+            "lease_until": self.lease_until,
+            "last_error": self.last_error,
+        }
+
+    def as_status_dict(self) -> dict[str, Any]:
+        """Return a JSON-safe dict (no raw bytes) for control-plane status responses."""
+        d = self.as_dict()
+        d.pop("payload", None)
+        return d
+
+
+@dataclass
+class _Worker:
+    worker_id: str
+    task_addr: str
+    capacity: int
+    inflight: int = 0
+    last_seen: float = 0.0
+    heartbeat_interval: float = 5.0
+    lease_timeout: float = 15.0
+    draining: bool = False
+    status: str = "starting"
+    version: str = "unknown"
+
+    def as_dict(self) -> dict[str, Any]:
+        """Return a dict view of this worker record."""
+        return {
+            "worker_id": self.worker_id,
+            "task_addr": self.task_addr,
+            "capacity": self.capacity,
+            "inflight": self.inflight,
+            "last_seen": self.last_seen,
+            "heartbeat_interval": self.heartbeat_interval,
+            "lease_timeout": self.lease_timeout,
+            "draining": self.draining,
+            "status": self.status,
+            "version": self.version,
+        }
+
+
+class InMemoryStore:
+    """
+    Pure in-memory task store for the NNG hub.
+
+    All methods are synchronous and safe to call from a single asyncio event
+    loop — asyncio's cooperative scheduling makes them effectively atomic (no
+    ``await`` between reads and writes).
+
+    State is lost when the process exits.  For persistent task queues use a
+    dedicated result backend; the NNG broker is designed for low-latency
+    in-process delivery, not durable storage.
     """
 
     def __init__(self, config: StoreConfig) -> None:
-        """Initialise the journal and create schema if not present."""
+        """Initialise an empty store with the given configuration."""
         self.config = config
-        # Guards only the pending_count check + INSERT pair in submit() to
-        # prevent concurrent callers from racing past max_pending.
-        self._submit_lock = threading.Lock()
-        self._init()
-
-    # ── connection ────────────────────────────────────────────────────────────
-
-    @contextmanager
-    def _conn(self) -> Generator[sqlite3.Connection, None, None]:
-        conn = sqlite3.connect(
-            self.config.path,
-            timeout=10.0,
-            check_same_thread=False,
-            isolation_level=None,  # we manage transactions explicitly
-        )
-        conn.row_factory = sqlite3.Row
-        # Must be set per-connection, not just once at schema creation.
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")  # safe with WAL; faster than FULL
-        conn.execute("PRAGMA busy_timeout=5000")  # wait up to 5s before SQLITE_BUSY
-        conn.execute("PRAGMA cache_size=-32000")  # 32 MB page cache
-        try:
-            yield conn
-        finally:
-            conn.close()
-
-    def _init(self) -> None:
-        Path(self.config.path).parent.mkdir(parents=True, exist_ok=True)
-        with self._conn() as conn:
-            conn.executescript("""
-                CREATE TABLE IF NOT EXISTS tasks (
-                    task_id          TEXT    PRIMARY KEY,
-                    task_name        TEXT    NOT NULL,
-                    payload          BLOB    NOT NULL,
-                    labels_json      TEXT    NOT NULL DEFAULT '{}',
-                    state            TEXT    NOT NULL,
-                    attempts         INTEGER NOT NULL DEFAULT 0,
-                    max_retries      INTEGER NOT NULL DEFAULT 0,
-                    retry_backoff    REAL    NOT NULL DEFAULT 1.0,
-                    retry_jitter     REAL    NOT NULL DEFAULT 0.0,
-                    priority         INTEGER NOT NULL DEFAULT 0,
-                    created_at       REAL    NOT NULL,
-                    updated_at       REAL    NOT NULL,
-                    next_run_at      REAL    NOT NULL,
-                    lease_id         TEXT,
-                    leased_worker_id TEXT,
-                    lease_until      REAL,
-                    last_error       TEXT
-                );
-
-                CREATE TABLE IF NOT EXISTS workers (
-                    worker_id          TEXT    PRIMARY KEY,
-                    task_addr          TEXT    NOT NULL,
-                    capacity           INTEGER NOT NULL,
-                    inflight           INTEGER NOT NULL DEFAULT 0,
-                    last_seen          REAL    NOT NULL DEFAULT 0,
-                    heartbeat_interval REAL    NOT NULL DEFAULT 5.0,
-                    lease_timeout      REAL    NOT NULL DEFAULT 15.0,
-                    draining           INTEGER NOT NULL DEFAULT 0,
-                    status             TEXT    NOT NULL,
-                    version            TEXT    NOT NULL DEFAULT 'unknown'
-                );
-
-                CREATE TABLE IF NOT EXISTS journal (
-                    seq          INTEGER PRIMARY KEY AUTOINCREMENT,
-                    ts           REAL    NOT NULL,
-                    kind         TEXT    NOT NULL,
-                    payload_json TEXT    NOT NULL
-                );
-
-                CREATE INDEX IF NOT EXISTS idx_tasks_dispatch
-                    ON tasks (state, next_run_at, priority DESC);
-                CREATE INDEX IF NOT EXISTS idx_tasks_lease
-                    ON tasks (state, lease_until);
-                CREATE INDEX IF NOT EXISTS idx_workers_active
-                    ON workers (status, draining, last_seen);
-            """)
+        self._tasks: dict[str, _Task] = {}
+        self._workers: dict[str, _Worker] = {}
 
     # ── helpers ───────────────────────────────────────────────────────────────
-
-    def _journal(
-        self,
-        conn: sqlite3.Connection,
-        kind: str,
-        payload: dict[str, Any],
-    ) -> None:
-        conn.execute(
-            "INSERT INTO journal (ts, kind, payload_json) VALUES (?, ?, ?)",
-            (
-                time.time(),
-                kind,
-                json.dumps(payload, separators=(",", ":"), ensure_ascii=False),
-            ),
-        )
 
     def _backoff(self, attempts: int, backoff_base: float) -> float:
         return min(self.config.backoff_cap, backoff_base * (2 ** max(0, attempts - 1)))
 
+    def _requeue_or_fail(self, task: _Task, worker_id: str, error: str) -> bool:
+        now = time.time()
+        if task.attempts > task.max_retries:
+            task.state = "failed"
+        else:
+            task.state = "ready"
+            task.next_run_at = now + self._backoff(task.attempts, task.retry_backoff)
+        task.last_error = error
+        task.lease_id = None
+        task.leased_worker_id = None
+        task.lease_until = None
+        task.updated_at = now
+        worker = self._workers.get(worker_id)
+        if worker is not None:
+            worker.inflight = max(0, worker.inflight - 1)
+        return True
+
     # ── task lifecycle ────────────────────────────────────────────────────────
 
     def pending_count(self) -> int:
-        """Return the number of ready + leased tasks."""
-        with self._conn() as conn:
-            return int(
-                conn.execute(
-                    "SELECT COUNT(*) FROM tasks WHERE state IN ('ready', 'leased')",
-                ).fetchone()[0],
-            )
+        """Return the count of ready and leased tasks."""
+        return sum(1 for t in self._tasks.values() if t.state in ("ready", "leased"))
 
     def submit(self, envelope: TaskEnvelope) -> None:
         """
-        Persist a new task in 'ready' state.
+        Accept a new task into the store.
 
         :param envelope: task envelope to store.
         :raises QueueFullError: when ``max_pending`` is reached.
         """
+        if self.pending_count() >= self.config.max_pending:
+            raise QueueFullError("Task queue is full.")
         now = time.time()
-        with self._submit_lock, self._conn() as conn:
-            count = conn.execute(
-                "SELECT COUNT(*) FROM tasks WHERE state IN ('ready', 'leased')",
-            ).fetchone()[0]
-            if count >= self.config.max_pending:
-                raise QueueFullError("Task queue is full.")
-            conn.execute("BEGIN")
-            conn.execute(
-                """
-                INSERT INTO tasks (
-                    task_id, task_name, payload, labels_json, state,
-                    attempts, max_retries, retry_backoff, retry_jitter,
-                    priority, created_at, updated_at, next_run_at
-                ) VALUES (?, ?, ?, ?, 'ready', 0, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    envelope.task_id,
-                    envelope.task_name,
-                    envelope.payload,
-                    json.dumps(
-                        envelope.labels, separators=(",", ":"), ensure_ascii=False
-                    ),
-                    envelope.max_retries,
-                    envelope.retry_backoff,
-                    envelope.retry_jitter,
-                    envelope.priority,
-                    envelope.created_at or now,
-                    now,
-                    now,
-                ),
-            )
-            self._journal(
-                conn,
-                "task_submitted",
-                {"task_id": envelope.task_id, "task_name": envelope.task_name},
-            )
-            conn.execute("COMMIT")
+        self._tasks[envelope.task_id] = _Task(
+            task_id=envelope.task_id,
+            task_name=envelope.task_name,
+            payload=envelope.payload,
+            labels=envelope.labels,
+            state="ready",
+            max_retries=envelope.max_retries,
+            retry_backoff=envelope.retry_backoff,
+            retry_jitter=envelope.retry_jitter,
+            priority=envelope.priority,
+            created_at=envelope.created_at or now,
+            updated_at=now,
+            next_run_at=now,
+        )
 
-    def due_tasks(self, limit: int = 50) -> list[sqlite3.Row]:
+    def due_tasks(self, limit: int = 50) -> list[dict[str, Any]]:
         """
         Return ready tasks whose ``next_run_at`` is in the past.
 
         Results are ordered by priority (descending) then creation time.
 
         :param limit: maximum number of rows to return.
-        :return: list of task rows.
+        :return: list of task dicts.
         """
         now = time.time()
-        with self._conn() as conn:
-            return list(
-                conn.execute(
-                    """
-                    SELECT * FROM tasks
-                    WHERE state = 'ready' AND next_run_at <= ?
-                    ORDER BY priority DESC, created_at ASC
-                    LIMIT ?
-                    """,
-                    (now, limit),
-                ),
-            )
+        ready = [
+            t for t in self._tasks.values()
+            if t.state == "ready" and t.next_run_at <= now
+        ]
+        ready.sort(key=lambda t: (-t.priority, t.created_at))
+        return [t.as_dict() for t in ready[:limit]]
 
     def mark_leased(
         self,
@@ -241,90 +206,50 @@ class SQLiteJournal:
         :param worker_id: worker receiving the task.
         :param lease_id: unique token for this dispatch attempt.
         :param lease_until: absolute epoch deadline for the lease.
-        :return: True if the transition succeeded; False if the task was
-                 already taken (concurrent dispatch race).
+        :return: True on success; False if the task is not in 'ready' state.
         """
+        task = self._tasks.get(task_id)
+        if task is None or task.state != "ready":
+            return False
         now = time.time()
-        with self._conn() as conn:
-            row = conn.execute(
-                "SELECT state FROM tasks WHERE task_id = ?", (task_id,)
-            ).fetchone()
-            if not row or row["state"] != "ready":
-                return False
-            conn.execute("BEGIN")
-            conn.execute(
-                """
-                UPDATE tasks
-                SET state = 'leased',
-                    leased_worker_id = ?, lease_id = ?, lease_until = ?,
-                    attempts = attempts + 1, updated_at = ?
-                WHERE task_id = ?
-                """,
-                (worker_id, lease_id, lease_until, now, task_id),
-            )
-            conn.execute(
-                "UPDATE workers SET inflight = inflight + 1 WHERE worker_id = ?",
-                (worker_id,),
-            )
-            self._journal(
-                conn,
-                "task_leased",
-                {
-                    "task_id": task_id,
-                    "worker_id": worker_id,
-                    "lease_id": lease_id,
-                },
-            )
-            conn.execute("COMMIT")
-            return True
+        task.state = "leased"
+        task.leased_worker_id = worker_id
+        task.lease_id = lease_id
+        task.lease_until = lease_until
+        task.attempts += 1
+        task.updated_at = now
+        worker = self._workers.get(worker_id)
+        if worker is not None:
+            worker.inflight += 1
+        return True
 
     def ack(self, task_id: str, worker_id: str, lease_id: str) -> bool:
         """
         Mark a task as successfully completed.
 
         Late or duplicate acks (mismatched ``lease_id`` or state ≠ 'leased')
-        are silently rejected and return False.
+        are silently rejected.
 
         :param task_id: task being acknowledged.
         :param worker_id: worker sending the ack.
-        :param lease_id: lease token that was issued at dispatch.
+        :param lease_id: lease token issued at dispatch.
         :return: True if the ack was accepted.
         """
+        task = self._tasks.get(task_id)
+        if task is None or task.state != "leased":
+            return False
+        if task.lease_id != lease_id or task.leased_worker_id != worker_id:
+            return False
         now = time.time()
-        with self._conn() as conn:
-            row = conn.execute(
-                "SELECT state, lease_id, leased_worker_id FROM tasks WHERE task_id = ?",
-                (task_id,),
-            ).fetchone()
-            if not row or row["state"] != "leased":
-                return False
-            if row["lease_id"] != lease_id or row["leased_worker_id"] != worker_id:
-                return False
-            conn.execute("BEGIN")
-            conn.execute(
-                """
-                UPDATE tasks
-                SET state = 'done', updated_at = ?,
-                    lease_id = NULL, leased_worker_id = NULL, lease_until = NULL
-                WHERE task_id = ?
-                """,
-                (now, task_id),
-            )
-            conn.execute(
-                "UPDATE workers SET inflight = MAX(inflight - 1, 0) WHERE worker_id = ?",
-                (worker_id,),
-            )
-            self._journal(
-                conn,
-                "task_acked",
-                {
-                    "task_id": task_id,
-                    "worker_id": worker_id,
-                    "lease_id": lease_id,
-                },
-            )
-            conn.execute("COMMIT")
-            return True
+        task.state = "done"
+        task.updated_at = now
+        task.lease_id = None
+        task.leased_worker_id = None
+        task.lease_until = None
+        worker = self._workers.get(worker_id)
+        if worker is not None:
+            worker.inflight = max(0, worker.inflight - 1)
+        return True
 
     def nack(
         self, task_id: str, worker_id: str, lease_id: str, error: str
@@ -335,274 +260,106 @@ class SQLiteJournal:
         :param task_id: task being nacked.
         :param worker_id: worker sending the nack.
         :param lease_id: lease token issued at dispatch.
-        :param error: human-readable reason for the failure.
+        :param error: human-readable failure reason.
         :return: True if the nack was accepted.
         """
-        return self._requeue_or_fail(task_id, worker_id, lease_id, error)
-
-    def _requeue_or_fail(
-        self, task_id: str, worker_id: str, lease_id: str, error: str
-    ) -> bool:
-        now = time.time()
-        with self._conn() as conn:
-            row = conn.execute(
-                "SELECT * FROM tasks WHERE task_id = ?", (task_id,)
-            ).fetchone()
-            if (
-                not row
-                or row["state"] != "leased"
-                or row["lease_id"] != lease_id
-                or row["leased_worker_id"] != worker_id
-            ):
-                return False
-            attempts = int(row["attempts"])
-            max_retries = int(row["max_retries"])
-            conn.execute("BEGIN")
-            if attempts > max_retries:
-                conn.execute(
-                    """
-                    UPDATE tasks
-                    SET state = 'failed', updated_at = ?,
-                        lease_id = NULL, leased_worker_id = NULL, lease_until = NULL,
-                        last_error = ?
-                    WHERE task_id = ?
-                    """,
-                    (now, error, task_id),
-                )
-            else:
-                backoff = self._backoff(attempts, float(row["retry_backoff"]))
-                conn.execute(
-                    """
-                    UPDATE tasks
-                    SET state = 'ready', updated_at = ?, next_run_at = ?,
-                        lease_id = NULL, leased_worker_id = NULL, lease_until = NULL,
-                        last_error = ?
-                    WHERE task_id = ?
-                    """,
-                    (now, now + backoff, error, task_id),
-                )
-            conn.execute(
-                "UPDATE workers SET inflight = MAX(inflight - 1, 0) WHERE worker_id = ?",
-                (worker_id,),
-            )
-            self._journal(
-                conn,
-                "task_nacked",
-                {
-                    "task_id": task_id,
-                    "worker_id": worker_id,
-                    "lease_id": lease_id,
-                    "error": error,
-                    "requeued": attempts <= max_retries,
-                },
-            )
-            conn.execute("COMMIT")
-            return True
+        task = self._tasks.get(task_id)
+        if (
+            task is None
+            or task.state != "leased"
+            or task.lease_id != lease_id
+            or task.leased_worker_id != worker_id
+        ):
+            return False
+        return self._requeue_or_fail(task, worker_id, error)
 
     # ── reaper / recovery ─────────────────────────────────────────────────────
 
     def reap_expired_leases(self) -> int:
         """
-        Find leases past their deadline and requeue or permanently fail them.
+        Requeue or permanently fail tasks whose lease deadline has passed.
 
         :return: number of tasks reaped.
         """
         now = time.time()
-        with self._conn() as conn:
-            expired = list(
-                conn.execute(
-                    """
-                    SELECT * FROM tasks
-                    WHERE state = 'leased'
-                      AND lease_until IS NOT NULL
-                      AND lease_until < ?
-                    """,
-                    (now,),
-                ),
-            )
-            if not expired:
-                return 0
-            conn.execute("BEGIN")
-            count = 0
-            for row in expired:
-                attempts = int(row["attempts"])
-                max_retries = int(row["max_retries"])
-                worker_id = row["leased_worker_id"]
-                if attempts > max_retries:
-                    conn.execute(
-                        """
-                        UPDATE tasks
-                        SET state = 'failed', updated_at = ?,
-                            lease_id = NULL, leased_worker_id = NULL, lease_until = NULL,
-                            last_error = 'lease expired'
-                        WHERE task_id = ?
-                        """,
-                        (now, row["task_id"]),
-                    )
-                else:
-                    backoff = self._backoff(attempts, float(row["retry_backoff"]))
-                    conn.execute(
-                        """
-                        UPDATE tasks
-                        SET state = 'ready', updated_at = ?, next_run_at = ?,
-                            lease_id = NULL, leased_worker_id = NULL, lease_until = NULL,
-                            last_error = 'lease expired'
-                        WHERE task_id = ?
-                        """,
-                        (now, now + backoff, row["task_id"]),
-                    )
-                if worker_id:
-                    conn.execute(
-                        "UPDATE workers SET inflight = MAX(inflight - 1, 0) WHERE worker_id = ?",
-                        (worker_id,),
-                    )
-                self._journal(
-                    conn,
-                    "lease_reaped",
-                    {
-                        "task_id": row["task_id"],
-                        "worker_id": worker_id,
-                        "lease_id": row["lease_id"],
-                    },
-                )
-                count += 1
-            conn.execute("COMMIT")
-            return count
+        expired = [
+            t for t in self._tasks.values()
+            if t.state == "leased"
+            and t.lease_until is not None
+            and t.lease_until < now
+        ]
+        for task in expired:
+            self._requeue_or_fail(task, task.leased_worker_id or "", "lease expired")
+        return len(expired)
 
     def recover_dead_workers(self, heartbeat_timeout: float) -> int:
         """
-        Mark workers that missed their heartbeat deadline as DEAD.
-
-        All tasks leased to dead workers are requeued (or permanently failed
-        if retries are exhausted).
+        Mark workers that missed their heartbeat deadline as dead and requeue their tasks.
 
         :param heartbeat_timeout: seconds of silence before a worker is dead.
         :return: number of tasks requeued.
         """
-        now = time.time()
-        cutoff = now - heartbeat_timeout
-        with self._conn() as conn:
-            dead = list(
-                conn.execute(
-                    "SELECT * FROM workers WHERE last_seen < ? AND status != 'dead'",
-                    (cutoff,),
-                ),
-            )
-            if not dead:
-                return 0
-            conn.execute("BEGIN")
-            requeued = 0
-            for worker in dead:
-                worker_id = worker["worker_id"]
-                conn.execute(
-                    "UPDATE workers SET status = 'dead', draining = 1 WHERE worker_id = ?",
-                    (worker_id,),
-                )
-                leased = list(
-                    conn.execute(
-                        "SELECT * FROM tasks WHERE state = 'leased' AND leased_worker_id = ?",
-                        (worker_id,),
-                    ),
-                )
-                for row in leased:
-                    attempts = int(row["attempts"])
-                    max_retries = int(row["max_retries"])
-                    if attempts > max_retries:
-                        conn.execute(
-                            """
-                            UPDATE tasks
-                            SET state = 'failed', updated_at = ?,
-                                lease_id = NULL, leased_worker_id = NULL, lease_until = NULL,
-                                last_error = 'worker died'
-                            WHERE task_id = ?
-                            """,
-                            (now, row["task_id"]),
-                        )
-                    else:
-                        backoff = self._backoff(
-                            attempts, float(row["retry_backoff"])
-                        )
-                        conn.execute(
-                            """
-                            UPDATE tasks
-                            SET state = 'ready', updated_at = ?, next_run_at = ?,
-                                lease_id = NULL, leased_worker_id = NULL, lease_until = NULL,
-                                last_error = 'worker died'
-                            WHERE task_id = ?
-                            """,
-                            (now, now + backoff, row["task_id"]),
-                        )
-                    self._journal(
-                        conn,
-                        "worker_dead_requeue",
-                        {"worker_id": worker_id, "task_id": row["task_id"]},
-                    )
-                    requeued += 1
-            conn.execute("COMMIT")
-            return requeued
+        cutoff = time.time() - heartbeat_timeout
+        dead = [
+            w for w in self._workers.values()
+            if w.last_seen < cutoff and w.status != "dead"
+        ]
+        requeued = 0
+        for worker in dead:
+            worker.status = "dead"
+            worker.draining = True
+            leased = [
+                t for t in self._tasks.values()
+                if t.state == "leased" and t.leased_worker_id == worker.worker_id
+            ]
+            for task in leased:
+                self._requeue_or_fail(task, worker.worker_id, "worker died")
+                requeued += 1
+        return requeued
 
     # ── worker lifecycle ──────────────────────────────────────────────────────
 
     def register_worker(self, worker: WorkerState) -> None:
         """
-        Upsert a worker record.
-
-        Re-registering an existing worker (e.g. after hub restart) resets
-        its draining flag and updates its metadata.
+        Upsert a worker record, resetting drain state on re-registration.
 
         :param worker: worker state snapshot from the registration message.
         """
         now = time.time()
-        with self._conn() as conn:
-            conn.execute("BEGIN")
-            conn.execute(
-                """
-                INSERT INTO workers (
-                    worker_id, task_addr, capacity, inflight, last_seen,
-                    heartbeat_interval, lease_timeout, draining, status, version
-                ) VALUES (?, ?, ?, 0, ?, ?, ?, 0, ?, ?)
-                ON CONFLICT(worker_id) DO UPDATE SET
-                    task_addr          = excluded.task_addr,
-                    capacity           = excluded.capacity,
-                    last_seen          = excluded.last_seen,
-                    heartbeat_interval = excluded.heartbeat_interval,
-                    lease_timeout      = excluded.lease_timeout,
-                    draining           = 0,
-                    status             = excluded.status,
-                    version            = excluded.version
-                """,
-                (
-                    worker.worker_id,
-                    worker.task_addr,
-                    worker.capacity,
-                    now,
-                    worker.heartbeat_interval,
-                    worker.lease_timeout,
-                    str(WorkerStatus.LISTENING),
-                    worker.version,
-                ),
+        existing = self._workers.get(worker.worker_id)
+        if existing is not None:
+            existing.task_addr = worker.task_addr
+            existing.capacity = worker.capacity
+            existing.last_seen = now
+            existing.heartbeat_interval = worker.heartbeat_interval
+            existing.lease_timeout = worker.lease_timeout
+            existing.draining = False
+            existing.status = "listening"
+            existing.version = worker.version
+        else:
+            self._workers[worker.worker_id] = _Worker(
+                worker_id=worker.worker_id,
+                task_addr=worker.task_addr,
+                capacity=worker.capacity,
+                inflight=0,
+                last_seen=now,
+                heartbeat_interval=worker.heartbeat_interval,
+                lease_timeout=worker.lease_timeout,
+                draining=False,
+                status="listening",
+                version=worker.version,
             )
-            self._journal(
-                conn,
-                "worker_register",
-                {"worker_id": worker.worker_id, "task_addr": worker.task_addr},
-            )
-            conn.execute("COMMIT")
 
     def heartbeat(self, worker_id: str) -> None:
         """
-        Record a heartbeat from a worker, resetting its last_seen timestamp.
+        Record a heartbeat, resetting the worker's last_seen timestamp.
 
         :param worker_id: ID of the worker sending the heartbeat.
         """
-        with self._conn() as conn:
-            conn.execute("BEGIN")
-            conn.execute(
-                "UPDATE workers SET last_seen = ?, status = ? WHERE worker_id = ?",
-                (time.time(), str(WorkerStatus.LISTENING), worker_id),
-            )
-            self._journal(conn, "heartbeat", {"worker_id": worker_id})
-            conn.execute("COMMIT")
+        worker = self._workers.get(worker_id)
+        if worker is not None:
+            worker.last_seen = time.time()
+            worker.status = "listening"
 
     def unregister_worker(self, worker_id: str) -> None:
         """
@@ -610,11 +367,7 @@ class SQLiteJournal:
 
         :param worker_id: ID of the worker unregistering.
         """
-        with self._conn() as conn:
-            conn.execute("BEGIN")
-            conn.execute("DELETE FROM workers WHERE worker_id = ?", (worker_id,))
-            self._journal(conn, "worker_unregister", {"worker_id": worker_id})
-            conn.execute("COMMIT")
+        self._workers.pop(worker_id, None)
 
     def mark_draining(self, worker_id: str) -> None:
         """
@@ -622,14 +375,10 @@ class SQLiteJournal:
 
         :param worker_id: ID of the worker entering drain mode.
         """
-        with self._conn() as conn:
-            conn.execute("BEGIN")
-            conn.execute(
-                "UPDATE workers SET draining = 1, status = ? WHERE worker_id = ?",
-                (str(WorkerStatus.DRAINING), worker_id),
-            )
-            self._journal(conn, "worker_drain", {"worker_id": worker_id})
-            conn.execute("COMMIT")
+        worker = self._workers.get(worker_id)
+        if worker is not None:
+            worker.draining = True
+            worker.status = "draining"
 
     # ── routing ───────────────────────────────────────────────────────────────
 
@@ -638,85 +387,70 @@ class SQLiteJournal:
         routing_policy: str = "least_loaded",
         *,
         heartbeat_timeout: float = 15.0,
-    ) -> sqlite3.Row | None:
+    ) -> dict[str, Any] | None:
         """
         Select the best available worker according to ``routing_policy``.
 
-        ``'least_loaded'`` picks the worker with the lowest ``inflight /
-        capacity`` ratio.  ``'p2c'`` (Power-of-Two-Choices) samples two
-        workers at random and picks the less loaded one, reducing hot-spot
-        probability under high concurrency.
+        ``'least_loaded'`` picks the worker with the lowest inflight/capacity
+        ratio.  ``'p2c'`` samples two workers and picks the less loaded one.
 
         :param routing_policy: ``'least_loaded'`` or ``'p2c'``.
         :param heartbeat_timeout: seconds before a worker is considered stale.
-        :return: chosen worker row, or None if no worker has capacity.
+        :return: chosen worker dict, or None if no worker has capacity.
         """
         cutoff = time.time() - heartbeat_timeout
-        with self._conn() as conn:
-            rows = list(
-                conn.execute(
-                    """
-                    SELECT * FROM workers
-                    WHERE status IN ('starting', 'listening')
-                      AND draining = 0
-                      AND last_seen >= ?
-                    """,
-                    (cutoff,),
-                ),
-            )
         available = [
-            w for w in rows if int(w["inflight"]) < int(w["capacity"])
+            w for w in self._workers.values()
+            if w.status in ("starting", "listening")
+            and not w.draining
+            and w.last_seen >= cutoff
+            and w.inflight < w.capacity
         ]
         if not available:
             return None
         if routing_policy == "p2c" and len(available) >= 2:
             a, b = random.sample(available, k=2)  # noqa: S311
-            load_a = int(a["inflight"]) / max(int(a["capacity"]), 1)
-            load_b = int(b["inflight"]) / max(int(b["capacity"]), 1)
-            return a if load_a <= load_b else b
-        return min(
-            available,
-            key=lambda w: int(w["inflight"]) / max(int(w["capacity"]), 1),
-        )
+            load_a = a.inflight / max(a.capacity, 1)
+            load_b = b.inflight / max(b.capacity, 1)
+            chosen = a if load_a <= load_b else b
+        else:
+            chosen = min(available, key=lambda w: w.inflight / max(w.capacity, 1))
+        return chosen.as_dict()
 
-    # ── management / observability ────────────────────────────────────────────
+    # ── observability ─────────────────────────────────────────────────────────
 
-    def get_task(self, task_id: str) -> sqlite3.Row | None:
+    def get_task(self, task_id: str) -> dict[str, Any] | None:
         """
-        Fetch a single task row by ID.
+        Fetch task status by ID (no raw bytes in result).
 
         :param task_id: ID of the task to look up.
-        :return: row or None if not found.
+        :return: status dict or None if not found.
         """
-        with self._conn() as conn:
-            return conn.execute(
-                "SELECT * FROM tasks WHERE task_id = ?", (task_id,)
-            ).fetchone()
+        task = self._tasks.get(task_id)
+        return task.as_status_dict() if task is not None else None
 
-    def list_workers(self) -> list[sqlite3.Row]:
+    def list_workers(self) -> list[dict[str, Any]]:
         """Return all registered workers ordered by most-recently-seen."""
-        with self._conn() as conn:
-            return list(
-                conn.execute("SELECT * FROM workers ORDER BY last_seen DESC"),
+        return [
+            w.as_dict()
+            for w in sorted(
+                self._workers.values(), key=lambda w: w.last_seen, reverse=True
             )
+        ]
 
     def stats(self) -> dict[str, int]:
         """Return a summary dict with task state counts and active worker count."""
-        with self._conn() as conn:
-            rows = conn.execute(
-                "SELECT state, COUNT(*) AS n FROM tasks GROUP BY state",
-            ).fetchall()
-            counts = {r["state"]: r["n"] for r in rows}
-            worker_count = conn.execute(
-                """
-                SELECT COUNT(*) FROM workers
-                WHERE status IN ('starting', 'listening') AND draining = 0
-                """,
-            ).fetchone()[0]
+        counts: dict[str, int] = {}
+        for t in self._tasks.values():
+            counts[t.state] = counts.get(t.state, 0) + 1
+        active = sum(
+            1 for w in self._workers.values()
+            if w.status in ("starting", "listening") and not w.draining
+        )
         return {
             "ready": counts.get("ready", 0),
             "leased": counts.get("leased", 0),
             "done": counts.get("done", 0),
             "failed": counts.get("failed", 0),
-            "active_workers": worker_count,
+            "active_workers": active,
         }

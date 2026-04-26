@@ -17,7 +17,7 @@ from taskiq.abc.result_backend import AsyncResultBackend
 from taskiq.acks import AckableMessage
 from taskiq.message import BrokerMessage
 
-from protocol import (
+from .protocol import (
     ControlMessage,
     ControlResponse,
     TaskEnvelope,

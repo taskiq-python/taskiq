@@ -4,8 +4,8 @@ Tests for the NNG broker, hub, storage, and protocol.
 The test suite is split into three layers:
 
 1. **Protocol** — pure serialisation roundtrips; no NNG sockets needed.
-2. **Storage** — SQLiteJournal unit tests; no NNG sockets needed.
-3. **Integration** — real NNG sockets, real SQLite, single asyncio event loop.
+2. **Storage** — InMemoryStore unit tests; no NNG sockets needed.
+3. **Integration** — real NNG sockets, single asyncio event loop.
    Uses ``FakeWorker`` / ``FakeClient`` helpers that speak the wire protocol
    directly so we can inject faults precisely (crash before ack, late ack, etc.).
 
@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-import sqlite3
 import tempfile
 import time
 import uuid
@@ -34,7 +33,7 @@ from taskiq.brokers.nng import (
     WorkerState,
     WorkerStatus,
     QueueFullError,
-    SQLiteJournal,
+    InMemoryStore,
     StoreConfig,
 )
 
@@ -253,24 +252,24 @@ def test_task_envelope_payload_decode() -> None:
 
 
 @pytest.fixture
-def store(db_path: str) -> SQLiteJournal:
-    return SQLiteJournal(StoreConfig(path=db_path, max_pending=50, lease_timeout=5.0))
+def store(db_path: str) -> InMemoryStore:
+    return InMemoryStore(StoreConfig(path=db_path, max_pending=50, lease_timeout=5.0))
 
 
-def test_submit_and_pending(store: SQLiteJournal) -> None:
+def test_submit_and_pending(store: InMemoryStore) -> None:
     store.submit(_envelope())
     assert store.pending_count() == 1
 
 
 def test_submit_queue_full(db_path: str) -> None:
-    s = SQLiteJournal(StoreConfig(path=db_path, max_pending=2))
+    s = InMemoryStore(StoreConfig(path=db_path, max_pending=2))
     s.submit(_envelope())
     s.submit(_envelope())
     with pytest.raises(QueueFullError):
         s.submit(_envelope())
 
 
-def test_due_tasks_ordered_by_priority(store: SQLiteJournal) -> None:
+def test_due_tasks_ordered_by_priority(store: InMemoryStore) -> None:
     store.submit(_envelope(task_id="lo", priority=0))
     store.submit(_envelope(task_id="hi", priority=10))
     due = store.due_tasks(limit=10)
@@ -278,7 +277,7 @@ def test_due_tasks_ordered_by_priority(store: SQLiteJournal) -> None:
     assert due[1]["task_id"] == "lo"
 
 
-def test_ack_happy_path(store: SQLiteJournal) -> None:
+def test_ack_happy_path(store: InMemoryStore) -> None:
     env = _envelope()
     store.submit(env)
     w = _worker_state()
@@ -288,7 +287,7 @@ def test_ack_happy_path(store: SQLiteJournal) -> None:
     assert store.get_task(env.task_id)["state"] == "done"
 
 
-def test_ack_wrong_lease_rejected(store: SQLiteJournal) -> None:
+def test_ack_wrong_lease_rejected(store: InMemoryStore) -> None:
     env = _envelope()
     store.submit(env)
     w = _worker_state()
@@ -297,7 +296,7 @@ def test_ack_wrong_lease_rejected(store: SQLiteJournal) -> None:
     assert not store.ack(env.task_id, w.worker_id, "wrong")
 
 
-def test_late_ack_after_requeue_ignored(store: SQLiteJournal) -> None:
+def test_late_ack_after_requeue_ignored(store: InMemoryStore) -> None:
     env = _envelope()
     store.submit(env)
     w = _worker_state()
@@ -307,7 +306,7 @@ def test_late_ack_after_requeue_ignored(store: SQLiteJournal) -> None:
     assert not store.ack(env.task_id, w.worker_id, "L2")
 
 
-def test_nack_requeues_with_backoff(store: SQLiteJournal) -> None:
+def test_nack_requeues_with_backoff(store: InMemoryStore) -> None:
     env = _envelope(max_retries=2, retry_backoff=1.0)
     store.submit(env)
     w = _worker_state()
@@ -319,7 +318,7 @@ def test_nack_requeues_with_backoff(store: SQLiteJournal) -> None:
     assert float(task["next_run_at"]) > time.time()
 
 
-def test_nack_exceeds_retries_fails(store: SQLiteJournal) -> None:
+def test_nack_exceeds_retries_fails(store: InMemoryStore) -> None:
     env = _envelope(max_retries=0)
     store.submit(env)
     w = _worker_state()
@@ -329,35 +328,29 @@ def test_nack_exceeds_retries_fails(store: SQLiteJournal) -> None:
     assert store.get_task(env.task_id)["state"] == "failed"
 
 
-def test_dead_worker_tasks_requeued(store: SQLiteJournal, db_path: str) -> None:
+def test_dead_worker_tasks_requeued(store: InMemoryStore) -> None:
     w = _worker_state()
     store.register_worker(w)
     env = _envelope(max_retries=3)
     store.submit(env)
     store.mark_leased(env.task_id, w.worker_id, "L5", time.time() + 60)
-    conn = sqlite3.connect(db_path)
-    conn.execute("UPDATE workers SET last_seen=0 WHERE worker_id=?", (w.worker_id,))
-    conn.commit()
-    conn.close()
+    store._workers[w.worker_id].last_seen = 0  # simulate missed heartbeats
     assert store.recover_dead_workers(heartbeat_timeout=1.0) == 1
     assert store.get_task(env.task_id)["state"] == "ready"
 
 
-def test_choose_worker_least_loaded(store: SQLiteJournal, db_path: str) -> None:
+def test_choose_worker_least_loaded(store: InMemoryStore) -> None:
     w1 = _worker_state(worker_id="w1", capacity=4)
     w2 = _worker_state(worker_id="w2", capacity=4)
     store.register_worker(w1)
     store.register_worker(w2)
-    conn = sqlite3.connect(db_path)
-    conn.execute("UPDATE workers SET inflight=3 WHERE worker_id='w1'")
-    conn.commit()
-    conn.close()
+    store._workers["w1"].inflight = 3  # w1 heavily loaded
     chosen = store.choose_worker("least_loaded", heartbeat_timeout=30.0)
     assert chosen is not None
     assert chosen["worker_id"] == "w2"
 
 
-def test_stats(store: SQLiteJournal) -> None:
+def test_stats(store: InMemoryStore) -> None:
     w = _worker_state()
     store.register_worker(w)
     store.submit(_envelope())
@@ -507,36 +500,13 @@ async def test_late_ack_after_requeue_rejected(
         await hub.stop()
 
 
+@pytest.mark.skip(
+    reason="In-memory store has no persistence; restart recovery requires a durable backend."
+)
 async def test_hub_restart_recovers_orphaned_tasks(
     ctrl_addr: str, db_path: str
 ) -> None:
-    """
-    Tasks leased at hub shutdown must be requeued when a new hub starts
-    with the same database.
-    """
-    hub1 = _hub(ctrl_addr, db_path)
-    await hub1.start()
-    w1 = FakeWorker(ctrl_addr, capacity=1)
-    client = FakeClient(ctrl_addr)
-    await w1.register()
-    tid = await client.submit(max_retries=3)
-    env = await w1.recv_task(timeout=3.0)
-    assert env.task_id == tid
-    # "kill" hub1 without giving worker a chance to ack
-    await hub1.stop()
-    w1.close()
-    client.close()
-
-    # Task is still leased in the DB
-    assert hub1.store.get_task(tid)["state"] == "leased"
-
-    hub2 = _hub(ctrl_addr, db_path)
-    await hub2.start()
-    await asyncio.sleep(0.3)  # allow startup recovery
-    try:
-        assert hub2.store.get_task(tid)["state"] == "ready"
-    finally:
-        await hub2.stop()
+    """Persistence across restarts is not supported by the in-memory store."""
 
 
 async def test_concurrent_heartbeats(ctrl_addr: str, db_path: str) -> None:
