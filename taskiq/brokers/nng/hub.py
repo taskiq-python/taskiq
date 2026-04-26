@@ -39,9 +39,12 @@ from .protocol import (
 )
 from .storage import (
     InMemoryStore,
+    PriorityScheduler,
     QueueFullError,
     RoutingPolicy,
+    Scheduler,
     StoreConfig,
+    TaskContext,
     make_routing_policy,
 )
 
@@ -60,6 +63,7 @@ class HubConfig:
     dispatch_interval: float = 0.05
     reaper_interval: float = 0.5
     routing_policy: RoutingPolicy | str = "least_loaded"
+    scheduler: Scheduler | None = None
     backoff_cap: float = 60.0
     # Number of concurrent Rep0 contexts.  Each context handles one req/rep
     # pair independently; N contexts ≈ N simultaneous control-plane clients.
@@ -116,6 +120,7 @@ class NNGHub:
         # Resolve once at construction so RoundRobin and similar stateful
         # policies maintain their counter across dispatch calls.
         self._routing: RoutingPolicy = make_routing_policy(config.routing_policy)
+        self._scheduler: Scheduler = config.scheduler or PriorityScheduler()
         self._stop = asyncio.Event()
         self._ctrl_sock: Any = None  # pynng.Rep0
         self._worker_push: dict[str, Any] = {}  # worker_id -> pynng.Push0
@@ -285,14 +290,22 @@ class NNGHub:
 
     async def _dispatch_once(self) -> bool:
         """Dispatch up to ``dispatch_batch`` due tasks to available workers."""
-        due = self.store.due_tasks(self.config.dispatch_batch)
+        due = self._scheduler.select(self.store, self.config.dispatch_batch)
         if not due:
             return False
         sent_any = False
         for row in due:
+            task_ctx = TaskContext(
+                task_id=row["task_id"],
+                task_name=row["task_name"],
+                labels=row["labels"],
+                priority=int(row["priority"]),
+                attempts=int(row["attempts"]),
+            )
             worker = self.store.choose_worker(
                 self._routing,
                 heartbeat_timeout=self.config.heartbeat_timeout,
+                task=task_ctx,
             )
             if worker is None:
                 return sent_any  # no capacity; leave remaining tasks in queue

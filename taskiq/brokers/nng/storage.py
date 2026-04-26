@@ -1,6 +1,8 @@
 """Pure in-memory task store for the NNG hub — no external dependencies."""
 from __future__ import annotations
 
+import functools
+import inspect
 import random
 import time
 from dataclasses import dataclass, field
@@ -103,6 +105,20 @@ class _Worker:
         }
 
 
+# ── task context ─────────────────────────────────────────────────────────────
+
+
+@dataclass
+class TaskContext:
+    """Task metadata passed to context-aware routing policies (e.g. affinity)."""
+
+    task_id: str
+    task_name: str
+    labels: dict[str, Any]
+    priority: int = 0
+    attempts: int = 0
+
+
 # ── routing policy abstraction ────────────────────────────────────────────────
 
 
@@ -178,12 +194,70 @@ class RoundRobin:
         return w
 
 
-# Singletons for stateless built-ins; RoundRobin singleton is fine for single-hub
-# processes.  Users needing isolated counters should pass their own instance.
+class AffinityPolicy:
+    """
+    Sticky routing: tasks with the same ``affinity_key`` label always go to the
+    same worker.  Falls back to least-loaded when the preferred worker is gone.
+
+    The affinity table is per-instance and lives only in memory.
+    """
+
+    def __init__(self) -> None:
+        """Initialise an empty affinity table."""
+        self._table: dict[str, str] = {}  # affinity_key → worker_id
+
+    def choose(
+        self,
+        workers: list[WorkerView],
+        task: "TaskContext | None" = None,
+    ) -> WorkerView | None:
+        """Return the sticky worker for the task's affinity key, or least-loaded."""
+        if not workers:
+            return None
+        if task is not None:
+            key = str(task.labels.get("affinity_key", ""))
+            if key and key in self._table:
+                match = next(
+                    (w for w in workers if w.worker_id == self._table[key]), None
+                )
+                if match is not None:
+                    return match
+        chosen = min(workers, key=lambda w: w.load)
+        if task is not None:
+            key = str(task.labels.get("affinity_key", ""))
+            if key:
+                self._table[key] = chosen.worker_id
+        return chosen
+
+
+@functools.lru_cache(maxsize=None)
+def _policy_accepts_task(policy_cls: type) -> bool:
+    """Return True if policy.choose accepts a ``task`` keyword argument."""
+    try:
+        return "task" in inspect.signature(policy_cls.choose).parameters
+    except (ValueError, TypeError):
+        return False
+
+
+def _choose_with_context(
+    policy: RoutingPolicy,
+    views: list[WorkerView],
+    task: "TaskContext | None",
+) -> "WorkerView | None":
+    """Call policy.choose, passing ``task`` only when the policy supports it."""
+    if task is not None and _policy_accepts_task(type(policy)):
+        return policy.choose(views, task=task)  # type: ignore[call-arg]
+    return policy.choose(views)
+
+
+# Singletons for stateless built-ins; RoundRobin/AffinityPolicy singletons are
+# fine for single-hub processes.  Users needing isolated state should pass their
+# own instance.
 _BUILTIN_POLICIES: dict[str, RoutingPolicy] = {
     "least_loaded": LeastLoaded(),
     "p2c": PowerOfTwoChoices(),
     "round_robin": RoundRobin(),
+    "affinity": AffinityPolicy(),  # type: ignore[dict-item]
 }
 
 
@@ -205,6 +279,26 @@ def make_routing_policy(policy: "RoutingPolicy | str") -> RoutingPolicy:
             )
         return resolved
     return policy
+
+
+# ── scheduler abstraction ─────────────────────────────────────────────────────
+
+
+@runtime_checkable
+class Scheduler(Protocol):
+    """Strategy interface for selecting which tasks to dispatch next."""
+
+    def select(self, store: "InMemoryStore", limit: int) -> list[dict[str, Any]]:
+        """Return up to ``limit`` tasks ready for dispatch."""
+        ...
+
+
+class PriorityScheduler:
+    """Default scheduler: highest-priority due tasks first."""
+
+    def select(self, store: "InMemoryStore", limit: int) -> list[dict[str, Any]]:
+        """Delegate to :meth:`InMemoryStore.due_tasks`."""
+        return store.due_tasks(limit)
 
 
 # ── store ─────────────────────────────────────────────────────────────────────
@@ -494,15 +588,21 @@ class InMemoryStore:
         policy: "RoutingPolicy | str" = "least_loaded",
         *,
         heartbeat_timeout: float = 15.0,
+        task: "TaskContext | None" = None,
     ) -> dict[str, Any] | None:
         """
         Select the best available worker using a routing policy.
 
         Accepts a :class:`RoutingPolicy` instance or a string name
-        (``'least_loaded'``, ``'p2c'``, ``'round_robin'``).
+        (``'least_loaded'``, ``'p2c'``, ``'round_robin'``, ``'affinity'``).
+
+        Context-aware policies (e.g. :class:`AffinityPolicy`) receive the
+        optional ``task`` argument when they declare it in their ``choose``
+        signature.
 
         :param policy: routing policy or name.
         :param heartbeat_timeout: seconds before a worker is considered stale.
+        :param task: optional task context for context-aware policies.
         :return: chosen worker dict, or None if no worker has capacity.
         """
         cutoff = time.time() - heartbeat_timeout
@@ -521,7 +621,7 @@ class InMemoryStore:
             key=lambda v: v.worker_id,
         )
         routing = make_routing_policy(policy)
-        chosen = routing.choose(views)
+        chosen = _choose_with_context(routing, views, task)
         if chosen is None:
             return None
         worker = self._workers.get(chosen.worker_id)

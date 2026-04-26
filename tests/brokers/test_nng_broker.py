@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import asyncio
 import os
+import sys
 import tempfile
+import textwrap
 import time
 import uuid
 
@@ -24,6 +26,7 @@ import pytest
 pynng = pytest.importorskip("pynng")
 
 from taskiq.brokers.nng import (
+    AffinityPolicy,
     HubConfig,
     NNGHub,
     ControlMessage,
@@ -32,10 +35,13 @@ from taskiq.brokers.nng import (
     LeastLoaded,
     MessageKind,
     PowerOfTwoChoices,
+    PriorityScheduler,
     QueueFullError,
     RoutingPolicy,
     RoundRobin,
+    Scheduler,
     StoreConfig,
+    TaskContext,
     TaskEnvelope,
     WorkerState,
     WorkerStatus,
@@ -86,16 +92,19 @@ def _worker_state(
 
 
 def _hub(control_addr: str, db_path: str, **kwargs: object) -> NNGHub:
+    defaults: dict[str, object] = {
+        "max_pending": 100,
+        "heartbeat_timeout": 2.0,
+        "lease_timeout": 2.0,
+        "dispatch_interval": 0.02,
+        "reaper_interval": 0.1,
+        "control_concurrency": 4,
+    }
+    defaults.update(kwargs)
     cfg = HubConfig(
         control_addr=control_addr,
         task_db=db_path,
-        max_pending=100,
-        heartbeat_timeout=2.0,
-        lease_timeout=2.0,
-        dispatch_interval=0.02,
-        reaper_interval=0.1,
-        control_concurrency=4,
-        **kwargs,  # type: ignore[arg-type]
+        **defaults,  # type: ignore[arg-type]
     )
     return NNGHub(cfg)
 
@@ -677,5 +686,198 @@ async def test_backpressure_hub_rejects_when_full(
         assert not resp.ok
         assert resp.error == "queue full"
     finally:
+        client.close()
+        await hub.stop()
+
+
+# ── 2c. AffinityPolicy unit tests ────────────────────────────────────────────
+
+
+def test_affinity_policy_sticks_to_worker() -> None:
+    """Same affinity_key must route to the same worker across calls."""
+    policy = AffinityPolicy()
+    workers = [WorkerView("w1", 0, 4), WorkerView("w2", 0, 4)]
+    task = TaskContext("t1", "fn", {"affinity_key": "user-42"})
+    first = policy.choose(workers, task=task)
+    assert first is not None
+    for _ in range(10):
+        chosen = policy.choose(workers, task=task)
+        assert chosen is not None
+        assert chosen.worker_id == first.worker_id
+
+
+def test_affinity_policy_falls_back_when_worker_gone() -> None:
+    """When the sticky worker is no longer available, fall back to least-loaded."""
+    policy = AffinityPolicy()
+    workers_full = [WorkerView("w1", 0, 4), WorkerView("w2", 0, 4)]
+    task = TaskContext("t1", "fn", {"affinity_key": "key-x"})
+    first = policy.choose(workers_full, task=task)
+    assert first is not None
+    # Remove the sticky worker — only the other one remains.
+    remaining = [w for w in workers_full if w.worker_id != first.worker_id]
+    fallback = policy.choose(remaining, task=task)
+    assert fallback is not None
+    assert fallback.worker_id != first.worker_id
+
+
+def test_affinity_policy_no_key_uses_least_loaded() -> None:
+    """Tasks without affinity_key get least-loaded routing."""
+    policy = AffinityPolicy()
+    workers = [WorkerView("w1", 3, 4), WorkerView("w2", 0, 4)]
+    task = TaskContext("t1", "fn", {})
+    chosen = policy.choose(workers, task=task)
+    assert chosen is not None
+    assert chosen.worker_id == "w2"
+
+
+def test_affinity_policy_is_routing_policy() -> None:
+    assert isinstance(AffinityPolicy(), RoutingPolicy)
+
+
+def test_choose_worker_affinity_string(store: InMemoryStore) -> None:
+    """String 'affinity' resolves to the singleton AffinityPolicy via choose_worker."""
+    for wid in ("a1", "a2"):
+        store.register_worker(_worker_state(worker_id=wid, capacity=4))
+    task = TaskContext("t1", "fn", {"affinity_key": "session-1"})
+    first = store.choose_worker("affinity", heartbeat_timeout=30.0, task=task)
+    assert first is not None
+    for _ in range(5):
+        chosen = store.choose_worker("affinity", heartbeat_timeout=30.0, task=task)
+        assert chosen is not None
+        assert chosen["worker_id"] == first["worker_id"]
+
+
+# ── 2d. Scheduler unit tests ─────────────────────────────────────────────────
+
+
+def test_priority_scheduler_delegates_to_due_tasks(store: InMemoryStore) -> None:
+    store.submit(_envelope(task_id="lo", priority=0))
+    store.submit(_envelope(task_id="hi", priority=5))
+    sched = PriorityScheduler()
+    rows = sched.select(store, limit=10)
+    assert rows[0]["task_id"] == "hi"
+
+
+def test_priority_scheduler_is_scheduler() -> None:
+    assert isinstance(PriorityScheduler(), Scheduler)
+
+
+def test_custom_scheduler_used_by_hub(ctrl_addr: str, db_path: str) -> None:
+    """HubConfig.scheduler accepts a custom Scheduler instance."""
+
+    class NoopScheduler:
+        """Never returns tasks — useful for verifying it is actually called."""
+        called = False
+
+        def select(
+            self, store: InMemoryStore, limit: int
+        ) -> list[dict[str, object]]:
+            NoopScheduler.called = True
+            return []
+
+    scheduler = NoopScheduler()
+    assert isinstance(scheduler, Scheduler)
+    hub = NNGHub(HubConfig(
+        control_addr=ctrl_addr,
+        scheduler=scheduler,
+        max_pending=10,
+    ))
+    assert hub._scheduler is scheduler
+
+
+# ── 4. Multiprocess integration test ─────────────────────────────────────────
+
+_WORKER_SCRIPT = textwrap.dedent("""\
+    import asyncio, sys, os
+    sys.path.insert(0, {root!r})
+    try:
+        import pynng  # noqa: F401
+        from taskiq.brokers.nng.broker import NNGBroker
+    except Exception as exc:
+        sys.stdout.write(f"SKIP:{{exc}}\\n")
+        sys.stdout.flush()
+        sys.exit(0)
+
+    async def main() -> None:
+        broker = NNGBroker(
+            {ctrl_addr!r},
+            worker_task_addr={task_addr!r},
+            worker_id={worker_id!r},
+            capacity=1,
+            heartbeat_interval=1.0,
+            recv_timeout_ms=3000,
+            send_timeout_ms=3000,
+        )
+        broker.is_worker_process = True
+        await broker.startup()
+        sys.stdout.write("READY\\n")
+        sys.stdout.flush()
+        async for msg in broker.listen():
+            sys.stdout.write(f"TASK:{{msg.data.decode()}}\\n")
+            sys.stdout.flush()
+            await msg.ack()
+            break
+        await broker.shutdown()
+
+    asyncio.run(main())
+""")
+
+
+async def test_multiprocess_worker_receives_task(
+    ctrl_addr: str, db_path: str
+) -> None:
+    """A real subprocess worker (separate OS process) receives and acks a task."""
+    repo_root = str(
+        __import__("pathlib").Path(__file__).parent.parent.parent.resolve()
+    )
+    task_addr = _ipc("mp-worker")
+    worker_id = f"mp-{uuid.uuid4().hex[:8]}"
+
+    script = _WORKER_SCRIPT.format(
+        root=repo_root,
+        ctrl_addr=ctrl_addr,
+        task_addr=task_addr,
+        worker_id=worker_id,
+    )
+
+    hub = _hub(ctrl_addr, db_path)
+    await hub.start()
+    client = FakeClient(ctrl_addr)
+
+    proc = await asyncio.create_subprocess_exec(
+        sys.executable, "-c", script,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+
+    async def _read_line(timeout: float = 10.0) -> str:
+        assert proc.stdout is not None
+        line = await asyncio.wait_for(proc.stdout.readline(), timeout=timeout)
+        return line.decode().strip()
+
+    try:
+        first_line = await _read_line(timeout=10.0)
+        if first_line.startswith("SKIP:"):
+            pytest.skip(f"Worker subprocess skipped: {first_line[5:]}")
+
+        assert first_line == "READY", f"Expected READY, got: {first_line!r}"
+
+        # Submit a task now that the worker is registered and listening.
+        tid = await client.submit()
+
+        task_line = await _read_line(timeout=10.0)
+        assert task_line.startswith("TASK:"), f"Expected TASK:..., got: {task_line!r}"
+
+        await proc.wait()
+
+        # Give hub's reaper a tick to process the ack.
+        await asyncio.sleep(0.2)
+        state = hub.store.get_task(tid)
+        assert state is not None
+        assert state["state"] == "done", f"Expected done, got {state['state']!r}"
+    finally:
+        if proc.returncode is None:
+            proc.terminate()
+            await proc.wait()
         client.close()
         await hub.stop()

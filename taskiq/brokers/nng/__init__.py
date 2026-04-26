@@ -9,13 +9,17 @@ from .protocol import (
     WorkerStatus,
 )
 from .storage import (
+    AffinityPolicy,
     InMemoryStore,
     LeastLoaded,
     PowerOfTwoChoices,
+    PriorityScheduler,
     QueueFullError,
     RoutingPolicy,
     RoundRobin,
+    Scheduler,
     StoreConfig,
+    TaskContext,
     WorkerView,
     make_routing_policy,
 )
@@ -35,10 +39,15 @@ __all__ = [
     "InMemoryStore",
     "StoreConfig",
     # routing
+    "TaskContext",
     "WorkerView",
     "RoutingPolicy",
+    "AffinityPolicy",
     "LeastLoaded",
     "PowerOfTwoChoices",
     "RoundRobin",
     "make_routing_policy",
+    # scheduler
+    "Scheduler",
+    "PriorityScheduler",
 ]
