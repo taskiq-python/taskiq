@@ -2,7 +2,8 @@ import logging
 from contextlib import AbstractContextManager
 from datetime import datetime, timezone
 from importlib.metadata import version
-from typing import Any, TypeVar
+from typing import Any, Generator, TypeVar
+import psutil
 
 from packaging.version import Version, parse
 
@@ -17,7 +18,7 @@ except ImportError as exc:
 
 from opentelemetry import context as context_api
 from opentelemetry import trace
-from opentelemetry.metrics import Meter, MeterProvider, get_meter
+from opentelemetry.metrics import Meter, MeterProvider, Observation, get_meter
 from opentelemetry.propagate import extract, inject
 from opentelemetry.semconv.trace import SpanAttributes
 from opentelemetry.trace import Span, Tracer, TracerProvider
@@ -205,6 +206,30 @@ class OpenTelemetryMiddleware(TaskiqMiddleware):
             unit="s",
             description="Time the tasks waited before executing",
         )
+        # current metrics to watch for in workers: CPU and memory utilization
+        self._process = psutil.Process()
+        # 6- CPU utilization
+        self.worker_cpu_utilization = self._meter.create_observable_gauge(
+            "worker_cpu_utilization",
+            callbacks=[self._observe_cpu],
+            unit="%",
+            description="Worker CPU utilization percentage. Only for worker processes",
+        )
+        # 7- Memory utilization
+        self.worker_memory_utilization = self._meter.create_observable_gauge(
+            "worker_memory_utilization",
+            callbacks=[self._observe_memory],
+            unit="By",
+            description="Worker memory utilization in bytes. Only for worker processes",
+        )
+
+    def _observe_memory(self, _options: Any) -> Generator[Observation, None, None]:
+        if self.broker and self.broker.is_worker_process:
+            yield Observation(self._process.memory_info().rss)
+
+    def _observe_cpu(self, _options: Any) -> Generator[Observation, None, None]:
+        if self.broker and self.broker.is_worker_process:
+            yield Observation(self._process.cpu_percent())
 
     def pre_send(self, message: TaskiqMessage) -> TaskiqMessage:
         """
