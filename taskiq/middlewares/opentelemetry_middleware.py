@@ -1,5 +1,6 @@
 import logging
 from contextlib import AbstractContextManager
+from datetime import datetime, timezone
 from importlib.metadata import version
 from typing import Any, TypeVar
 
@@ -58,6 +59,9 @@ _TASK_EXECUTE = "execute"
 
 _TASK_RETRY_REASON_KEY = "taskiq.retry.reason"
 _TASK_NAME_KEY = "taskiq.task_name"
+
+_TASK_QUEUE_TIME_KEY = "_taskiq_queue_time"
+_TASK_RECEIVED_TIME_KEY = "_taskiq_broker_receive_time"
 
 
 def set_attributes_from_context(span: Span, context: dict[str, Any]) -> None:
@@ -170,6 +174,37 @@ class OpenTelemetryMiddleware(TaskiqMiddleware):
             if meter is None
             else meter
         )
+        # Create metrics
+        # 1- Number of tasks sent. Producer (Counter)
+        self.n_tasks_sent_counter = self._meter.create_counter(
+            name="tasks_sent",
+            unit="1",
+            description="Number of tasks sent from the producer side",
+        )
+        # 2- Number of errors by task name. consumer (Counter)
+        self.n_errors_counter = self._meter.create_counter(
+            name="task_errors",
+            unit="1",
+            description="Number of errors raised",
+        )
+        # 3- Number of task successes. consumer (Counter)
+        self.n_success_counter = self._meter.create_counter(
+            name="task_success",
+            unit="1",
+            description="Number of tasks completed successfully",
+        )
+        # 4- Task execution time. consumer (Histogram)
+        self.execution_time_hist = self._meter.create_histogram(
+            "task_execution_time",
+            unit="s",
+            description="Time to finish executing tasks",
+        )
+        # 5- Task wait time. both (Histogram)
+        self.task_wait_time = self._meter.create_histogram(
+            "task_wait_time",
+            unit="s",
+            description="Time the tasks waited before executing",
+        )
 
     def pre_send(self, message: TaskiqMessage) -> TaskiqMessage:
         """
@@ -193,7 +228,7 @@ class OpenTelemetryMiddleware(TaskiqMiddleware):
         activation.__enter__()
         attach_context(message, span, activation, None, is_publish=True)
         inject(message.labels)
-
+        message.labels[_TASK_QUEUE_TIME_KEY] = datetime.now(timezone.utc).timestamp()
         return message
 
     def post_send(self, message: TaskiqMessage) -> None:
@@ -214,6 +249,7 @@ class OpenTelemetryMiddleware(TaskiqMiddleware):
 
         activation.__exit__(None, None, None)
         detach_context(message, is_publish=True)
+        self.n_tasks_sent_counter.add(1, attributes={"task_name": message.task_name})
 
     def pre_execute(self, message: TaskiqMessage) -> TaskiqMessage:
         """
@@ -236,6 +272,7 @@ class OpenTelemetryMiddleware(TaskiqMiddleware):
         activation = trace.use_span(span, end_on_exit=True)
         activation.__enter__()  # pylint: disable=E1101
         attach_context(message, span, activation, token)
+        message.labels[_TASK_RECEIVED_TIME_KEY] = datetime.now(timezone.utc).timestamp()
         return message
 
     def post_save(  # pylint: disable=R6301
@@ -313,3 +350,52 @@ class OpenTelemetryMiddleware(TaskiqMiddleware):
         }
         span.record_exception(exception)
         span.set_status(Status(**status_kwargs))  # type: ignore[arg-type]
+
+    def post_execute(
+        self,
+        message: "TaskiqMessage",
+        result: "TaskiqResult[Any]",
+    ) -> None:
+        """
+        This function tracks number of errors and success executions.
+
+        :param message: received message.
+        :param result: result of the execution.
+        """
+        if result.is_err:
+            retry_on_error = message.labels.get("retry_on_error")
+            if isinstance(retry_on_error, str):
+                retry_on_error = retry_on_error.lower() == "true"
+
+            if retry_on_error is None:
+                retry_on_error = False
+
+            if retry_on_error:
+                # Add retry reason metadata to span
+                self.n_errors_counter.add(
+                    1,
+                    attributes={"retry_error": True, "task_name": message.task_name},
+                )
+            else:
+                self.n_errors_counter.add(
+                    1,
+                    attributes={"retry_error": False, "task_name": message.task_name},
+                )
+        else:
+            self.n_success_counter.add(
+                1,
+                attributes={"task_name": message.task_name},
+            )
+        self.execution_time_hist.record(
+            result.execution_time,
+            attributes={
+                "task_name": message.task_name,
+            },
+        )
+        task_receive_time = message.labels.get(_TASK_RECEIVED_TIME_KEY)
+        task_send_time = message.labels.get(_TASK_QUEUE_TIME_KEY)
+        if task_receive_time is not None and task_send_time is not None:
+            self.task_wait_time.record(
+                amount=task_receive_time - task_send_time,
+                attributes={"task_name": message.task_name},
+            )
