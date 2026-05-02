@@ -6,6 +6,7 @@ from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.test.test_base import TestBase
 
 from taskiq.instrumentation import TaskiqInstrumentor
+from taskiq.middlewares.opentelemetry_middleware import OpenTelemetryMiddleware
 
 from .taskiq_test_tasks import (
     broker,
@@ -58,6 +59,7 @@ class TestTaskiqOTelMetrics(TestBase):
             "task_success",
             "task_execution_time",
             "task_wait_time",
+            "worker_active_tasks",
         }
         found = {
             metric.name
@@ -167,3 +169,56 @@ class TestTaskiqOTelMetrics(TestBase):
         points = self._get_data_points("tasks_sent")
         self.assertEqual(len(points), 1)
         self.assertEqual(points[0].value, 3)
+
+    def test_active_tasks_counter(self) -> None:
+        async def test() -> None:
+            for _ in range(3):
+                await task_add.kiq(1, 2)
+            await broker.wait_all()
+
+        asyncio.run(test())
+
+        points = self._get_data_points("worker_active_tasks")
+        # all 3 tasks share the same task_name so they aggregate into one data point
+        self.assertEqual(len(points), 1)
+        # net zero: pre_execute incremented, post_execute decremented for each task
+        self.assertEqual(points[0].value, 0)
+        self.assertIn("task_name", points[0].attributes)
+        self.assertEqual(
+            points[0].attributes.get("task_name"),
+            "tests.opentelemetry.taskiq_test_tasks:task_add",
+        )
+
+    def test_prefetch_queue_counter(self) -> None:
+        middleware = next(
+            m for m in broker.middlewares if isinstance(m, OpenTelemetryMiddleware)
+        )
+        middleware.on_prefetch_queue_add()
+        middleware.on_prefetch_queue_add()
+        middleware.on_prefetch_queue_add()
+        middleware.on_prefetch_queue_remove()
+
+        points = self._get_data_points("worker_prefetched_tasks")
+        self.assertEqual(len(points), 1)
+        self.assertEqual(points[0].value, 2)
+
+    def test_worker_resource_metrics_when_worker_process(self) -> None:
+        middleware = next(
+            m for m in broker.middlewares if isinstance(m, OpenTelemetryMiddleware)
+        )
+        middleware.set_broker(broker)
+        broker.is_worker_process = True
+        try:
+            metrics_data = self.reader.get_metrics_data()
+            self.assertIsNotNone(metrics_data)
+            found = {
+                metric.name
+                for rm in metrics_data.resource_metrics  # type: ignore[union-attr]
+                for sm in rm.scope_metrics
+                for metric in sm.metrics
+            }
+            self.assertIn("worker_cpu_utilization", found)
+            self.assertIn("worker_memory_utilization", found)
+        finally:
+            broker.is_worker_process = False
+            middleware.set_broker(None)  # type: ignore[arg-type]

@@ -1,10 +1,11 @@
 import logging
+from collections.abc import Generator
 from contextlib import AbstractContextManager
 from datetime import datetime, timezone
 from importlib.metadata import version
-from typing import Any, Generator, TypeVar
-import psutil
+from typing import Any, TypeVar
 
+import psutil
 from packaging.version import Version, parse
 
 try:
@@ -223,11 +224,24 @@ class OpenTelemetryMiddleware(TaskiqMiddleware):
             description="Worker memory utilization in bytes. Only for worker processes",
         )
 
-    def _observe_memory(self, _options: Any) -> Generator[Observation, None, None]:
+        # 8- Number of tasks executing
+        self.number_of_broker_active_tasks = self._meter.create_up_down_counter(
+            "worker_active_tasks",
+            unit="1",
+            description="Number of tasks currently executing in the worker.",
+        )
+        # 9- Number of tasks executing
+        self.number_of_broker_prefetched_tasks = self._meter.create_up_down_counter(
+            "worker_prefetched_tasks",
+            unit="1",
+            description="Number of tasks currently prefetched in the worker.",
+        )
+
+    def _observe_memory(self, options: Any) -> Generator[Observation, None, None]:
         if self.broker and self.broker.is_worker_process:
             yield Observation(self._process.memory_info().rss)
 
-    def _observe_cpu(self, _options: Any) -> Generator[Observation, None, None]:
+    def _observe_cpu(self, options: Any) -> Generator[Observation, None, None]:
         if self.broker and self.broker.is_worker_process:
             yield Observation(self._process.cpu_percent())
 
@@ -298,6 +312,10 @@ class OpenTelemetryMiddleware(TaskiqMiddleware):
         activation.__enter__()  # pylint: disable=E1101
         attach_context(message, span, activation, token)
         message.labels[_TASK_RECEIVED_TIME_KEY] = datetime.now(timezone.utc).timestamp()
+        self.number_of_broker_active_tasks.add(
+            1,
+            attributes={"task_name": message.task_name},
+        )
         return message
 
     def post_save(  # pylint: disable=R6301
@@ -424,3 +442,16 @@ class OpenTelemetryMiddleware(TaskiqMiddleware):
                 amount=task_receive_time - task_send_time,
                 attributes={"task_name": message.task_name},
             )
+
+        self.number_of_broker_active_tasks.add(
+            -1,
+            attributes={"task_name": message.task_name},
+        )
+
+    def on_prefetch_queue_add(self) -> None:
+        """This hook is called after task is added to the worker prefetch queue."""
+        self.number_of_broker_prefetched_tasks.add(1)
+
+    def on_prefetch_queue_remove(self) -> None:
+        """This hook is called after task is removed from the worker prefetch queue."""
+        self.number_of_broker_prefetched_tasks.add(-1)

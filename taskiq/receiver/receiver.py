@@ -415,6 +415,12 @@ class Receiver:
                 current_message = asyncio.create_task(iterator.__anext__())  # type: ignore
                 fetched_tasks += 1
                 await queue.put(message)
+                # Custom hooks for OTel and any future instrumentations
+                for middleware in reversed(self.broker.middlewares):
+                    if hasattr(middleware, "on_prefetch_queue_add"):
+                        await maybe_awaitable(
+                            middleware.on_prefetch_queue_add(),  # type: ignore
+                        )
             except (asyncio.CancelledError, StopAsyncIteration):
                 break
         # We don't want to fetch new messages if we are shutting down.
@@ -465,6 +471,13 @@ class Receiver:
                         await asyncio.wait(tasks, timeout=self.wait_tasks_timeout)
                         logger.info("No more tasks to wait for. Shutting down.")
                     break
+
+                # Custom hooks for OTel and any future instrumentations
+                for middleware in reversed(self.broker.middlewares):
+                    if hasattr(middleware, "on_prefetch_queue_remove"):
+                        await maybe_awaitable(
+                            middleware.on_prefetch_queue_remove(),  # type: ignore
+                        )
 
                 task = asyncio.create_task(
                     self.callback(message=message, raise_err=False),
