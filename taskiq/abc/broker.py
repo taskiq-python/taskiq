@@ -533,3 +533,11 @@ class AsyncBroker(ABC):
         if task.broker != self:
             raise TaskBrokerMismatchError(broker=task.broker)
         self.local_task_registry[task_name] = task
+
+    async def __aenter__(self) -> None:
+        """Satarts the broker as ctx manager."""
+        await self.startup()
+
+    async def __aexit__(self, *args: object, **kwargs: Any) -> None:
+        """Shuts down the broker as ctx manager."""
+        await self.shutdown()
