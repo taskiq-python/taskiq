@@ -84,22 +84,17 @@ class PrometheusMiddleware(TaskiqMiddleware):
         This function starts prometheus server.
         It starts it only in case if it's a worker process.
         """
-        from prometheus_client import (  # noqa: PLC0415
-            CollectorRegistry,
-            start_http_server,
-        )
+        from prometheus_client import REGISTRY, start_http_server  # noqa: PLC0415
         from prometheus_client.multiprocess import (  # noqa: PLC0415
             MultiProcessCollector,
         )
 
         if self.broker.is_worker_process:
             try:
-                registry = CollectorRegistry()
-                MultiProcessCollector(registry)
+                MultiProcessCollector(REGISTRY)
                 start_http_server(
                     port=self.server_port,
                     addr=self.server_addr,
-                    registry=registry,
                 )
             except OSError as exc:
                 logger.debug("Cannot start prometheus server: %s", exc)
