@@ -83,10 +83,18 @@ def test_kicker_labels_modification() -> None:
 
 
 @pytest.mark.anyio
-@pytest.mark.parametrize('is_worker_process', [True, False])
+@pytest.mark.parametrize(
+    ('is_worker_process', 'startup', 'shutdown'),
+    [
+        (True, TaskiqEvents.WORKER_STARTUP, TaskiqEvents.WORKER_SHUTDOWN),
+        (False, TaskiqEvents.CLIENT_STARTUP, TaskiqEvents.CLIENT_SHUTDOWN),
+    ],
+)
 async def test_async_context_manager_enter(
     *,
     is_worker_process: bool,
+    startup: TaskiqEvents,
+    shutdown: TaskiqEvents,
 ) -> None:
     """Test that `__aenter__` and `__aexit__` calls work."""
     broker = _TestBroker()
@@ -94,12 +102,12 @@ async def test_async_context_manager_enter(
     startup_called = False
     shutdown_called = False
 
-    @broker.on_event(TaskiqEvents.CLIENT_STARTUP)
+    @broker.on_event(startup)
     async def track_startup(state: TaskiqState) -> None:
         nonlocal startup_called
         startup_called = True
 
-    @broker.on_event(TaskiqEvents.CLIENT_SHUTDOWN)
+    @broker.on_event(shutdown)
     async def track_shutdown(state: TaskiqState) -> None:
         nonlocal shutdown_called
         shutdown_called = True
@@ -113,10 +121,18 @@ async def test_async_context_manager_enter(
 
 
 @pytest.mark.anyio
-@pytest.mark.parametrize('is_worker_process', [True, False])
+@pytest.mark.parametrize(
+    ('is_worker_process', 'startup', 'shutdown'),
+    [
+        (True, TaskiqEvents.WORKER_STARTUP, TaskiqEvents.WORKER_SHUTDOWN),
+        (False, TaskiqEvents.CLIENT_STARTUP, TaskiqEvents.CLIENT_SHUTDOWN),
+    ],
+)
 async def test_async_context_manager_exit_on_exception(
     *,
     is_worker_process: bool,
+    startup: TaskiqEvents,
+    shutdown: TaskiqEvents,
 ) -> None:
     """Test that __aexit__ calls shutdown even if exception is raised."""
     broker = _TestBroker()
@@ -124,12 +140,12 @@ async def test_async_context_manager_exit_on_exception(
     startup_called = False
     shutdown_called = False
 
-    @broker.on_event(TaskiqEvents.CLIENT_STARTUP)
+    @broker.on_event(startup)
     async def track_startup(state: TaskiqState) -> None:
         nonlocal startup_called
         startup_called = True
 
-    @broker.on_event(TaskiqEvents.CLIENT_SHUTDOWN)
+    @broker.on_event(shutdown)
     async def track_shutdown(state: TaskiqState) -> None:
         nonlocal shutdown_called
         shutdown_called = True
