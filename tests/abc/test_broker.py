@@ -83,77 +83,52 @@ def test_kicker_labels_modification() -> None:
 
 
 @pytest.mark.anyio
-async def test_async_context_manager_enter() -> None:
-    """Test that __aenter__ calls startup."""
+@pytest.mark.parametrize('is_worker_process', [True, False])
+async def test_async_context_manager_enter(
+    *,
+    is_worker_process: bool,
+) -> None:
+    """Test that `__aenter__` and `__aexit__` calls work."""
     broker = _TestBroker()
+    broker.is_worker_process = is_worker_process
     startup_called = False
+    shutdown_called = False
 
     @broker.on_event(TaskiqEvents.CLIENT_STARTUP)
     async def track_startup(state: TaskiqState) -> None:
         nonlocal startup_called
         startup_called = True
 
-    async with broker:
-        assert startup_called is True
-
-
-@pytest.mark.anyio
-async def test_async_context_manager_exit() -> None:
-    """Test that __aexit__ calls shutdown."""
-    broker = _TestBroker()
-    shutdown_called = False
-
     @broker.on_event(TaskiqEvents.CLIENT_SHUTDOWN)
     async def track_shutdown(state: TaskiqState) -> None:
         nonlocal shutdown_called
         shutdown_called = True
 
-    async with broker:
-        pass
+    async with broker as ctx:
+        assert ctx is None
+        assert startup_called is True
+        assert shutdown_called is False
 
     assert shutdown_called is True
 
 
 @pytest.mark.anyio
-async def test_async_context_manager_enter_worker() -> None:
-    """Test that __aenter__ calls worker startup when is_worker_process is True."""
+@pytest.mark.parametrize('is_worker_process', [True, False])
+async def test_async_context_manager_exit_on_exception(
+    *,
+    is_worker_process: bool,
+) -> None:
+    """Test that __aexit__ calls shutdown even if exception is raised."""
     broker = _TestBroker()
-    broker.is_worker_process = True
+    broker.is_worker_process = is_worker_process
     startup_called = False
+    shutdown_called = False
 
-    @broker.on_event(TaskiqEvents.WORKER_STARTUP)
+    @broker.on_event(TaskiqEvents.CLIENT_STARTUP)
     async def track_startup(state: TaskiqState) -> None:
         nonlocal startup_called
         startup_called = True
 
-    async with broker:
-        assert startup_called is True
-
-
-@pytest.mark.anyio
-async def test_async_context_manager_exit_worker() -> None:
-    """Test that __aexit__ calls worker shutdown when is_worker_process is True."""
-    broker = _TestBroker()
-    broker.is_worker_process = True
-    shutdown_called = False
-
-    @broker.on_event(TaskiqEvents.WORKER_SHUTDOWN)
-    async def track_shutdown(state: TaskiqState) -> None:
-        nonlocal shutdown_called
-        shutdown_called = True
-
-    async with broker:
-        pass
-
-    assert shutdown_called is True
-
-
-@pytest.mark.anyio
-async def test_async_context_manager_exit_on_exception() -> None:
-    """Test that __aexit__ calls shutdown even if exception is raised."""
-    broker = _TestBroker()
-    shutdown_called = False
-
     @broker.on_event(TaskiqEvents.CLIENT_SHUTDOWN)
     async def track_shutdown(state: TaskiqState) -> None:
         nonlocal shutdown_called
@@ -161,25 +136,8 @@ async def test_async_context_manager_exit_on_exception() -> None:
 
     with pytest.raises(ValueError, match="Test exception"):
         async with broker:
-            raise ValueError("Test exception")
-
-    assert shutdown_called is True
-
-
-@pytest.mark.anyio
-async def test_async_context_manager_exit_worker_on_exception() -> None:
-    """Test that __aexit__ calls worker shutdown even if exception is raised."""
-    broker = _TestBroker()
-    broker.is_worker_process = True
-    shutdown_called = False
-
-    @broker.on_event(TaskiqEvents.WORKER_SHUTDOWN)
-    async def track_shutdown(state: TaskiqState) -> None:
-        nonlocal shutdown_called
-        shutdown_called = True
-
-    with pytest.raises(ValueError, match="Test exception"):
-        async with broker:
+            assert startup_called is True
+            assert shutdown_called is False
             raise ValueError("Test exception")
 
     assert shutdown_called is True
