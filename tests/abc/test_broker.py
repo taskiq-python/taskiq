@@ -84,7 +84,7 @@ def test_kicker_labels_modification() -> None:
 
 @pytest.mark.anyio
 @pytest.mark.parametrize(
-    ('is_worker_process', 'startup', 'shutdown'),
+    ("is_worker_process", "startup", "shutdown"),
     [
         (True, TaskiqEvents.WORKER_STARTUP, TaskiqEvents.WORKER_SHUTDOWN),
         (False, TaskiqEvents.CLIENT_STARTUP, TaskiqEvents.CLIENT_SHUTDOWN),
@@ -122,7 +122,7 @@ async def test_async_context_manager_enter(
 
 @pytest.mark.anyio
 @pytest.mark.parametrize(
-    ('is_worker_process', 'startup', 'shutdown'),
+    ("is_worker_process", "startup", "shutdown"),
     [
         (True, TaskiqEvents.WORKER_STARTUP, TaskiqEvents.WORKER_SHUTDOWN),
         (False, TaskiqEvents.CLIENT_STARTUP, TaskiqEvents.CLIENT_SHUTDOWN),
