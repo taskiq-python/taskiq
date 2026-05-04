@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 
 from opentelemetry import baggage
@@ -26,3 +27,8 @@ async def task_raises() -> None:
 @broker.task
 async def task_returns_baggage() -> Any:
     return dict(baggage.get_all())
+
+
+@broker.task
+async def task_does_processing(wait_time: float) -> None:
+    await asyncio.sleep(wait_time)
