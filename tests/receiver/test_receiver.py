@@ -2,6 +2,7 @@ import asyncio
 import contextvars
 import random
 import time
+import unittest.mock
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
 from functools import wraps
@@ -24,13 +25,15 @@ def get_receiver(
     broker: AsyncBroker | None = None,
     no_parse: bool = False,
     max_async_tasks: int | None = None,
+    max_async_tasks_jitter: int = 0,
 ) -> Receiver:
     """
     Returns receiver with custom broker and args.
 
     :param broker: broker, defaults to None
     :param no_parse: parameter to taskiq_args, defaults to False
-    :param cli_args: Taskiq worker CLI arguments.
+    :param max_async_tasks: maximum number of simultaneous async tasks.
+    :param max_async_tasks_jitter: random jitter to add to max_async_tasks.
     :return: new receiver.
     """
     if broker is None:
@@ -40,6 +43,7 @@ def get_receiver(
         executor=ThreadPoolExecutor(max_workers=10),
         validate_params=not no_parse,
         max_async_tasks=max_async_tasks,
+        max_async_tasks_jitter=max_async_tasks_jitter,
     )
 
 
@@ -544,3 +548,55 @@ async def test_sync_decorator_on_async_function() -> None:
     assert resp.return_value == "some value"
     assert not broker._running_tasks
     assert wrapper_call is True
+
+
+async def test_jitter_applied_to_semaphore() -> None:
+    """Test that jitter is correctly applied to max_async_tasks semaphore."""
+    max_async_tasks = 100
+    max_async_tasks_jitter = 10
+
+    # Test with jitter value of 0 (minimum)
+    with unittest.mock.patch("random.randint", return_value=0):
+        receiver = get_receiver(
+            max_async_tasks=max_async_tasks,
+            max_async_tasks_jitter=max_async_tasks_jitter,
+        )
+        assert receiver.sem is not None
+        assert receiver.sem._value == max_async_tasks
+
+    # Test with jitter value of 5 (middle)
+    with unittest.mock.patch("random.randint", return_value=5):
+        receiver = get_receiver(
+            max_async_tasks=max_async_tasks,
+            max_async_tasks_jitter=max_async_tasks_jitter,
+        )
+        assert receiver.sem is not None
+        assert receiver.sem._value == max_async_tasks + 5
+
+    # Test with jitter value of 10 (maximum)
+    with unittest.mock.patch("random.randint", return_value=10):
+        receiver = get_receiver(
+            max_async_tasks=max_async_tasks,
+            max_async_tasks_jitter=max_async_tasks_jitter,
+        )
+        assert receiver.sem is not None
+        assert receiver.sem._value == max_async_tasks + 10
+
+
+async def test_jitter_zero_no_randomization() -> None:
+    """Test with zero jitter, semaphore value matches max_async_tasks."""
+    max_async_tasks = 50
+
+    receiver = get_receiver(
+        max_async_tasks=max_async_tasks,
+        max_async_tasks_jitter=0,
+    )
+
+    assert receiver.sem is not None
+    assert receiver.sem._value == max_async_tasks
+
+
+async def test_no_semaphore_without_max_async_tasks() -> None:
+    """Test that semaphore is None when max_async_tasks is not set."""
+    receiver = get_receiver(max_async_tasks=None)
+    assert receiver.sem is None
