@@ -163,6 +163,7 @@ def start_listen(args: WorkerArgs) -> None:
             receiver = receiver_type(
                 broker=broker,
                 executor=pool,
+                observer=getattr(broker, "_receiver_observer", None),
                 validate_params=not args.no_parse,
                 max_async_tasks=args.max_async_tasks,
                 max_prefetch=args.max_prefetch,
