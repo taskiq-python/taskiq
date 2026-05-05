@@ -42,10 +42,12 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
     def __init__(
         self,
         task_name: str,
-        broker: "AsyncBroker",
+        broker: "AsyncBroker | None",
         labels: dict[str, Any],
         return_type: type[_ReturnType] | None = None,
     ) -> None:
+        if broker is None:
+            raise RuntimeError("Broker is not set for this task!")
         self.task_name = task_name
         self.broker = broker
         self.labels = labels

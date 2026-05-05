@@ -20,6 +20,7 @@ from uuid import uuid4
 
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.abc.serializer import TaskiqSerializer
+from taskiq.task_gen import TaskiqTaskGenerator
 from taskiq.acks import AckableMessage
 from taskiq.decor import AsyncTaskiqDecoratedTask
 from taskiq.events import TaskiqEvents
@@ -301,64 +302,23 @@ class AsyncBroker(ABC):
 
         :returns: decorator function or AsyncTaskiqDecoratedTask.
         """
-
-        def make_decorated_task(
-            inner_labels: dict[str, str | int],
-            inner_task_name: str | None = None,
-        ) -> Callable[
-            [Callable[_FuncParams, _ReturnType]],
-            AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType],
-        ]:
-            def inner(
-                func: Callable[_FuncParams, _ReturnType],
-            ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]:
-                nonlocal inner_task_name
-                if inner_task_name is None:
-                    fmodule = func.__module__
-                    if fmodule == "__main__":  # pragma: no cover
-                        fmodule = ".".join(
-                            os.path.normpath(sys.argv[0])
-                            .removesuffix(".py")
-                            .split(os.path.sep),
-                        )
-                    fname = func.__name__
-                    if fname == "<lambda>":
-                        fname = f"lambda_{uuid4().hex}"
-                    inner_task_name = f"{fmodule}:{fname}"
-                wrapper = wraps(func)
-
-                sign = get_type_hints(func)
-                return_type = None
-                if "return" in sign:
-                    return_type = sign["return"]
-
-                decorated_task = wrapper(
-                    self.decorator_class(
-                        broker=self,
-                        original_func=func,
-                        labels=inner_labels,
-                        task_name=inner_task_name,
-                        return_type=return_type,  # type: ignore
-                    ),
-                )
-
-                self._register_task(decorated_task.task_name, decorated_task)  # type: ignore
-
-                return decorated_task  # type: ignore
-
-            return inner
+        warnings.warn(
+            "Tasks are not independent from brokers. "
+            "Use `taskiq.task` as a decorator instead.",
+            TaskiqDeprecationWarning,
+            stacklevel=2,
+        )
+        generator = TaskiqTaskGenerator().labels(**labels).broker(self)
 
         if callable(task_name):
             # This is an edge case,
             # when decorator called without parameters.
-            return make_decorated_task(
-                inner_labels=labels or {},
-            )(task_name)
+            return generator(task_name)
 
-        return make_decorated_task(
-            inner_task_name=task_name,
-            inner_labels=labels or {},
-        )
+        if task_name:
+            generator = generator.name(task_name)
+
+        return generator
 
     def register_task(
         self,
@@ -534,9 +494,10 @@ class AsyncBroker(ABC):
             raise TaskBrokerMismatchError(broker=task.broker)
         self.local_task_registry[task_name] = task
 
-    async def __aenter__(self) -> None:
+    async def __aenter__(self) -> "Self":
         """Starts the broker as ctx manager."""
         await self.startup()
+        return self
 
     async def __aexit__(self, *args: object, **kwargs: Any) -> None:
         """Shuts down the broker as ctx manager."""
