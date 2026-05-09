@@ -1906,7 +1906,6 @@ dev = [
     { name = "tox-uv", specifier = ">=1.29.0" },
     { name = "tzdata", marker = "sys_platform == 'win32'", specifier = ">=2025.2" },
 ]
-opentelemetry = []
 
 [[package]]
 name = "taskiq-dependencies"
