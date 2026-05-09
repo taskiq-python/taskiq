@@ -35,19 +35,15 @@ dependencies = [
 ]
 dynamic = ["version"]
 
-[project.optional-dependencies]
-cbor = ["cbor2>=5"]
-metrics = ["prometheus_client>=0"]
-msgpack = ["msgpack>=1.0.7"]
-opentelemetry = [
-  "opentelemetry-api (>=1.38.0,<2.0.0)",
-  "opentelemetry-instrumentation (>=0.59b0,<1)",
-  "opentelemetry-semantic-conventions (>=0.59b0,<1)"
-]
-orjson = ["orjson>=3"]
-reload = ["watchdog>=4", "gitignore-parser>=0"]
-uv = ["uvloop>=0.16.0,<1; sys_platform != 'win32'"]
-zmq = ["pyzmq>=26"]
+[project.urls]
+"Bug Tracker" = "https://github.com/taskiq-python/taskiq/issues"
+Changelog = "https://github.com/taskiq-python/taskiq/releases"
+Documentation = "https://taskiq-python.github.io/"
+Homepage = "https://taskiq-python.github.io/"
+Repository = "https://github.com/taskiq-python/taskiq"
+
+[project.scripts]
+taskiq = "taskiq.__main__:main"
 
 [project.entry-points.opentelemetry_instrumentor]
 taskiq = "taskiq.instrumentation:TaskiqInstrumentor"
@@ -56,15 +52,20 @@ taskiq = "taskiq.instrumentation:TaskiqInstrumentor"
 worker = "taskiq.cli.worker.cmd:WorkerCMD"
 scheduler = "taskiq.cli.scheduler.cmd:SchedulerCMD"
 
-[project.scripts]
-taskiq = "taskiq.__main__:main"
-
-[project.urls]
-"Bug Tracker" = "https://github.com/taskiq-python/taskiq/issues"
-Changelog = "https://github.com/taskiq-python/taskiq/releases"
-Documentation = "https://taskiq-python.github.io/"
-Homepage = "https://taskiq-python.github.io/"
-Repository = "https://github.com/taskiq-python/taskiq"
+[project.optional-dependencies]
+cbor = ["cbor2>=5"]
+metrics = ["prometheus_client>=0"]
+msgpack = ["msgpack>=1.0.7"]
+opentelemetry = [
+  "opentelemetry-api (>=1.38.0,<2.0.0)",
+  "opentelemetry-instrumentation (>=0.59b0,<1)",
+  "opentelemetry-semantic-conventions (>=0.59b0,<1)",
+  "psutil>=7",
+]
+orjson = ["orjson>=3"]
+reload = ["watchdog>=4", "gitignore-parser>=0"]
+uv = ["uvloop>=0.16.0,<1; sys_platform != 'win32'"]
+zmq = ["pyzmq>=26"]
 
 [dependency-groups]
 dev = [
@@ -198,6 +199,16 @@ lint.mccabe = { max-complexity = 10 }
   "T201"  # print found
 ]
 
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["taskiq_dependencies.Depends", "taskiq.TaskiqDepends"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+ignore-decorators = ["typing.overload"]
+
+[tool.ruff.lint.pylint]
+allow-magic-value-types = ["int", "str", "float"]
+
 [tool.tox]
 requires = ["tox>=4"]
 isolated_build = true
@@ -213,13 +224,3 @@ commands = [["pytest", "-vv", "-n", "auto"]]
 extend-exclude = [
   "docs/README.md"  # because of identifier in head section
 ]
-
-[tool.ruff.lint.flake8-bugbear]
-extend-immutable-calls = ["taskiq_dependencies.Depends", "taskiq.TaskiqDepends"]
-
-[tool.ruff.lint.pydocstyle]
-convention = "pep257"
-ignore-decorators = ["typing.overload"]
-
-[tool.ruff.lint.pylint]
-allow-magic-value-types = ["int", "str", "float"]

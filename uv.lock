@@ -1831,6 +1831,7 @@ opentelemetry = [
     { name = "opentelemetry-api" },
     { name = "opentelemetry-instrumentation" },
     { name = "opentelemetry-semantic-conventions" },
+    { name = "psutil" },
 ]
 orjson = [
     { name = "orjson" },
@@ -1877,6 +1878,7 @@ requires-dist = [
     { name = "orjson", marker = "extra == 'orjson'", specifier = ">=3" },
     { name = "packaging", specifier = ">=19" },
     { name = "prometheus-client", marker = "extra == 'metrics'", specifier = ">=0" },
+    { name = "psutil", marker = "extra == 'opentelemetry'", specifier = ">=7" },
     { name = "pycron", specifier = ">=3.0.0" },
     { name = "pydantic", specifier = ">=1.0,<=3.0" },
     { name = "pyzmq", marker = "extra == 'zmq'", specifier = ">=26" },
@@ -1904,6 +1906,7 @@ dev = [
     { name = "tox-uv", specifier = ">=1.29.0" },
     { name = "tzdata", marker = "sys_platform == 'win32'", specifier = ">=2025.2" },
 ]
+opentelemetry = []
 
 [[package]]
 name = "taskiq-dependencies"
