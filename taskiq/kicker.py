@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Coroutine
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timedelta
@@ -9,17 +11,20 @@ from typing import (
     Generic,
     ParamSpec,
     TypeVar,
-    Union,
+    cast,
     overload,
 )
 
 from pydantic import BaseModel
 
 from taskiq.abc.middleware import TaskiqMiddleware
+from taskiq.abc.result_backend import AsyncResultBackend
 from taskiq.compat import model_dump
 from taskiq.exceptions import SendTaskError
+from taskiq.flow import Flow
 from taskiq.labels import prepare_label
 from taskiq.message import TaskiqMessage
+from taskiq.router import TaskiqRouter
 from taskiq.scheduler.created_schedule import CreatedSchedule
 from taskiq.scheduler.scheduled_task import CronSpec, ScheduledTask
 from taskiq.task import AsyncTaskiqTask
@@ -36,13 +41,29 @@ _ReturnType = TypeVar("_ReturnType")
 logger = getLogger("taskiq")
 
 
+class PreparedKiq(Generic[_ReturnType]):
+    """Prepared task invocation that can be sent later."""
+
+    def __init__(
+        self,
+        kicker: AsyncKicker[..., _ReturnType],
+        message: TaskiqMessage,
+    ) -> None:
+        self.kicker = kicker
+        self.message = message
+
+    async def kiq(self) -> AsyncTaskiqTask[_ReturnType]:
+        """Send prepared invocation."""
+        return await self.kicker.kiq_message(self.message)
+
+
 class AsyncKicker(Generic[_FuncParams, _ReturnType]):
     """Class that used to modify data before sending it to broker."""
 
     def __init__(
         self,
         task_name: str,
-        broker: "AsyncBroker",
+        broker: AsyncBroker,
         labels: dict[str, Any],
         return_type: type[_ReturnType] | None = None,
     ) -> None:
@@ -52,11 +73,13 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         self.custom_task_id: str | None = None
         self.custom_schedule_id: str | None = None
         self.return_type = return_type
+        self.route_broker: AsyncBroker | str | None = None
+        self.route_flow: Flow | None = None
 
     def with_labels(
         self,
         **labels: str | float,
-    ) -> "AsyncKicker[_FuncParams, _ReturnType]":
+    ) -> AsyncKicker[_FuncParams, _ReturnType]:
         """
         Update function's labels before sending.
 
@@ -69,7 +92,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
     def with_task_id(
         self,
         task_id: str | None,
-    ) -> "AsyncKicker[_FuncParams, _ReturnType]":
+    ) -> AsyncKicker[_FuncParams, _ReturnType]:
         """
         Set task_id for current execution.
 
@@ -85,7 +108,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
     def with_schedule_id(
         self,
         schedule_id: str,
-    ) -> "AsyncKicker[_FuncParams, _ReturnType]":
+    ) -> AsyncKicker[_FuncParams, _ReturnType]:
         """
         Set schedule_id for current execution.
 
@@ -97,8 +120,8 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
 
     def with_broker(
         self,
-        broker: "AsyncBroker",
-    ) -> "AsyncKicker[_FuncParams, _ReturnType]":
+        broker: AsyncBroker,
+    ) -> AsyncKicker[_FuncParams, _ReturnType]:
         """
         Replace broker for the function.
 
@@ -109,11 +132,55 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         :return: Kicker with new broker.
         """
         self.broker = broker
+        self.route_broker = broker
         return self
 
+    def with_flow(
+        self,
+        flow: Flow | None,
+    ) -> AsyncKicker[_FuncParams, _ReturnType]:
+        """
+        Replace flow for the current invocation.
+
+        :param flow: flow to send message to.
+        :return: Kicker with a route flow override.
+        """
+        self.route_flow = flow
+        return self
+
+    def with_route(
+        self,
+        broker: AsyncBroker | str,
+        flow: Flow | None,
+    ) -> AsyncKicker[_FuncParams, _ReturnType]:
+        """
+        Replace broker and flow for the current invocation.
+
+        :param broker: broker instance or broker name.
+        :param flow: flow to send message to.
+        :return: Kicker with a route override.
+        """
+        self.route_broker = broker
+        self.route_flow = flow
+        return self
+
+    def prepare(
+        self,
+        *args: _FuncParams.args,
+        **kwargs: _FuncParams.kwargs,
+    ) -> PreparedKiq[_ReturnType]:
+        """
+        Prepare a task invocation without sending it.
+
+        :param args: function's arguments.
+        :param kwargs: function's key word arguments.
+        :return: prepared task invocation.
+        """
+        return PreparedKiq(self, self._prepare_message(*args, **kwargs))
+
     @overload
     async def kiq(
-        self: "AsyncKicker[_FuncParams, CoroutineType[Any, Any, _T]]",
+        self: AsyncKicker[_FuncParams, CoroutineType[Any, Any, _T]],
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
     ) -> AsyncTaskiqTask[_T]:  # pragma: no cover
@@ -121,7 +188,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
 
     @overload
     async def kiq(
-        self: "AsyncKicker[_FuncParams, Coroutine[Any, Any, _T]]",
+        self: AsyncKicker[_FuncParams, Coroutine[Any, Any, _T]],
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
     ) -> AsyncTaskiqTask[_T]:  # pragma: no cover
@@ -129,7 +196,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
 
     @overload
     async def kiq(
-        self: "AsyncKicker[_FuncParams, _ReturnType]",
+        self: AsyncKicker[_FuncParams, _ReturnType],
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
     ) -> AsyncTaskiqTask[_ReturnType]:  # pragma: no cover
@@ -156,29 +223,60 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         logger.debug(
             f"Kicking {self.task_name} with args={args} and kwargs={kwargs}.",
         )
-        message = self._prepare_message(*args, **kwargs)
-        for middleware in self.broker.middlewares:
-            if middleware.__class__.pre_send != TaskiqMiddleware.pre_send:
-                message = await maybe_awaitable(middleware.pre_send(message))
+        return await self.kiq_message(self._prepare_message(*args, **kwargs))
+
+    async def kiq_message(
+        self,
+        message: TaskiqMessage,
+    ) -> AsyncTaskiqTask[_ReturnType]:
+        """Send a prepared message."""
         try:
-            await self.broker.kick(self.broker.formatter.dumps(message))
+            router = getattr(self.broker, "router", None)
+            if isinstance(router, TaskiqRouter):
+                return await router.kiq(
+                    message,
+                    broker=self.route_broker,
+                    flow=self.route_flow,
+                    return_type=self.return_type,
+                )
+            return await self._legacy_kiq(message)
         except Exception as exc:
             raise SendTaskError from exc
 
-        for middleware in reversed(self.broker.middlewares):
+    async def _legacy_kiq(self, message: TaskiqMessage) -> AsyncTaskiqTask[_ReturnType]:
+        """
+        Send message through the pre-router broker path.
+
+        This keeps middleware tests and external broker-like mocks compatible
+        while real AsyncBroker instances use TaskiqRouter.
+        """
+        middlewares = getattr(self.broker, "middlewares", [])
+        if not isinstance(middlewares, list):
+            middlewares = []
+
+        for middleware in middlewares:
+            if middleware.__class__.pre_send != TaskiqMiddleware.pre_send:
+                message = await maybe_awaitable(middleware.pre_send(message))
+
+        await self.broker.kick(self.broker.formatter.dumps(message))
+
+        for middleware in reversed(middlewares):
             if middleware.__class__.post_send != TaskiqMiddleware.post_send:
                 await maybe_awaitable(middleware.post_send(message))
 
         return AsyncTaskiqTask(
             task_id=message.task_id,
-            result_backend=self.broker.result_backend,
-            return_type=self.return_type,  # type: ignore # (pyright issue)
+            result_backend=cast(
+                AsyncResultBackend[_ReturnType],
+                self.broker.result_backend,
+            ),
+            return_type=self.return_type,
         )
 
     async def schedule_by_cron(
         self,
-        source: "ScheduleSource",
-        cron: Union[str, "CronSpec"],
+        source: ScheduleSource,
+        cron: str | CronSpec,
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
     ) -> CreatedSchedule[_ReturnType]:
@@ -217,7 +315,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
 
     async def schedule_by_interval(
         self,
-        source: "ScheduleSource",
+        source: ScheduleSource,
         interval: int | timedelta,
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
@@ -249,7 +347,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
 
     async def schedule_by_time(
         self,
-        source: "ScheduleSource",
+        source: ScheduleSource,
         time: datetime,
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,

@@ -24,11 +24,14 @@ from taskiq.acks import AckableMessage
 from taskiq.decor import AsyncTaskiqDecoratedTask
 from taskiq.events import TaskiqEvents
 from taskiq.exceptions import TaskBrokerMismatchError
+from taskiq.flow import Flow
 from taskiq.formatters.proxy_formatter import ProxyFormatter
 from taskiq.message import BrokerMessage
 from taskiq.result_backends.dummy import DummyResultBackend
+from taskiq.router import TaskiqRouter
 from taskiq.serializers.json_serializer import JSONSerializer
 from taskiq.state import TaskiqState
+from taskiq.task_builder import TaskDefinition
 from taskiq.utils import maybe_awaitable
 from taskiq.warnings import TaskiqDeprecationWarning
 
@@ -78,6 +81,10 @@ class AsyncBroker(ABC):
         self,
         result_backend: "AsyncResultBackend[_T] | None" = None,
         task_id_generator: Callable[[], str] | None = None,
+        *,
+        router: TaskiqRouter | None = None,
+        broker_name: str | None = None,
+        default_flow: Flow | None = None,
     ) -> None:
         if result_backend is None:
             result_backend = DummyResultBackend()
@@ -103,6 +110,13 @@ class AsyncBroker(ABC):
         self.serializer: TaskiqSerializer = JSONSerializer()
         self.formatter: TaskiqFormatter = ProxyFormatter(self)
         self.id_generator = task_id_generator
+        self.router = router or TaskiqRouter()
+        self.default_flow = default_flow
+        self.broker_name = self.router.set_broker(
+            self,
+            name=broker_name,
+            default_flow=default_flow,
+        )
         self.local_task_registry: dict[str, AsyncTaskiqDecoratedTask[Any, Any]] = {}
         # Every event has a list of handlers.
         # Every handler is a function which takes state as a first argument.
@@ -133,10 +147,14 @@ class AsyncBroker(ABC):
         :param task_name: name of a task.
         :returns: found task or None.
         """
-        return self.local_task_registry.get(
-            task_name,
-        ) or self.global_task_registry.get(
-            task_name,
+        return (
+            self.local_task_registry.get(
+                task_name,
+            )
+            or self.router.find_task(task_name)
+            or self.global_task_registry.get(
+                task_name,
+            )
         )
 
     def get_all_tasks(self) -> dict[str, AsyncTaskiqDecoratedTask[Any, Any]]:
@@ -152,7 +170,11 @@ class AsyncBroker(ABC):
 
         :return: dict of all tasks. Keys are task names, values are tasks.
         """
-        return {**self.global_task_registry, **self.local_task_registry}
+        return {
+            **self.global_task_registry,
+            **self.router.get_all_tasks(),
+            **self.local_task_registry,
+        }
 
     def add_dependency_context(self, new_ctx: dict[Any, Any]) -> None:
         """
@@ -236,6 +258,23 @@ class AsyncBroker(ABC):
 
         :param message: name of a task.
         """
+
+    async def kick_to_flow(
+        self,
+        message: BrokerMessage,
+        flow: Flow | None = None,
+    ) -> None:
+        """
+        Send message to a flow-aware broker.
+
+        Existing brokers can keep implementing only `kick`. New brokers may
+        override this method and use `flow` to route to a concrete queue, topic,
+        stream or any other transport address.
+
+        :param message: message to send.
+        :param flow: optional transport-neutral flow.
+        """
+        await self.kick(message)
 
     @abstractmethod
     def listen(self) -> AsyncGenerator[bytes | AckableMessage, None]:
@@ -362,7 +401,8 @@ class AsyncBroker(ABC):
 
     def register_task(
         self,
-        func: Callable[_FuncParams, _ReturnType],
+        func: Callable[_FuncParams, _ReturnType]
+        | TaskDefinition[_FuncParams, _ReturnType],
         task_name: str | None = None,
         **labels: Any,
     ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]:
@@ -380,6 +420,12 @@ class AsyncBroker(ABC):
 
         :returns: registered task.
         """
+        if isinstance(func, TaskDefinition):
+            return self.router.register_task(
+                func,
+                broker=self,
+                flow=self.default_flow,
+            )
         return self.task(task_name=task_name, **labels)(func)
 
     def on_event(self, *events: TaskiqEvents) -> Callable[[EventHandler], EventHandler]:
@@ -533,6 +579,11 @@ class AsyncBroker(ABC):
         if task.broker != self:
             raise TaskBrokerMismatchError(broker=task.broker)
         self.local_task_registry[task_name] = task
+        self.router.register_task(
+            task,
+            broker=self,
+            flow=self.default_flow,
+        )
 
     async def __aenter__(self) -> None:
         """Starts the broker as ctx manager."""

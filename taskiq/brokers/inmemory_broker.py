@@ -9,8 +9,10 @@ from taskiq.abc.result_backend import AsyncResultBackend, TaskiqResult
 from taskiq.depends.progress_tracker import TaskProgress
 from taskiq.events import TaskiqEvents
 from taskiq.exceptions import UnknownTaskError
+from taskiq.flow import Flow
 from taskiq.message import BrokerMessage
 from taskiq.receiver import Receiver
+from taskiq.router import TaskiqRouter
 from taskiq.utils import maybe_awaitable
 
 _ReturnType = TypeVar("_ReturnType")
@@ -130,8 +132,16 @@ class InMemoryBroker(AsyncBroker):
         max_async_tasks_jitter: int = 0,
         propagate_exceptions: bool = True,
         await_inplace: bool = False,
+        *,
+        router: TaskiqRouter | None = None,
+        broker_name: str | None = None,
+        default_flow: Flow | None = None,
     ) -> None:
-        super().__init__()
+        super().__init__(
+            router=router,
+            broker_name=broker_name,
+            default_flow=default_flow,
+        )
         self.result_backend: InmemoryResultBackend[Any] = InmemoryResultBackend(
             max_stored_results=max_stored_results,
         )

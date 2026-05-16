@@ -57,7 +57,7 @@ class Context:
         requeue_count = int(self.message.labels.get("X-Taskiq-requeue", 0))
         requeue_count += 1
         self.message.labels["X-Taskiq-requeue"] = str(requeue_count)
-        await self.broker.kick(self.broker.formatter.dumps(self.message))
+        await self.broker.router.requeue(self.message, broker=self.broker)
         raise NoResultError
 
     def reject(self) -> None:
