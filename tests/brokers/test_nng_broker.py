@@ -65,10 +65,6 @@ def _envelope(**kwargs: object) -> TaskEnvelope:
         "payload_b64": "dGVzdA==",
         "labels": {},
         "lease_id": "",
-        "attempts": 0,
-        "max_retries": 0,
-        "retry_backoff": 1.0,
-        "retry_jitter": 0.0,
         "priority": 0,
         "created_at": time.time(),
     }
@@ -208,10 +204,6 @@ class FakeClient:
             "payload_b64": "dGVzdA==",
             "labels": {},
             "lease_id": "",
-            "attempts": 0,
-            "max_retries": labels.pop("max_retries", 0),
-            "retry_backoff": labels.pop("retry_backoff", 1.0),
-            "retry_jitter": 0.0,
             "priority": labels.pop("priority", 0),
             "created_at": time.time(),
         }
@@ -321,32 +313,46 @@ def test_late_ack_after_requeue_ignored(store: InMemoryStore) -> None:
     assert not store.ack(env.task_id, w.worker_id, "L2")
 
 
-def test_nack_requeues_with_backoff(store: InMemoryStore) -> None:
-    env = _envelope(max_retries=2, retry_backoff=1.0)
-    store.submit(env)
+def test_nack_requeues_with_backoff(db_path: str) -> None:
+    """Hub-level delivery retry: nack within delivery cap requeues with backoff."""
+    s = InMemoryStore(
+        StoreConfig(
+            path=db_path, max_pending=50, lease_timeout=5.0,
+            max_delivery_attempts=2, delivery_backoff=1.0,
+        ),
+    )
+    env = _envelope()
+    s.submit(env)
     w = _worker_state()
-    store.register_worker(w)
-    store.mark_leased(env.task_id, w.worker_id, "L3", time.time() + 60)
-    assert store.nack(env.task_id, w.worker_id, "L3", "boom")
-    task = store.get_task(env.task_id)
+    s.register_worker(w)
+    s.mark_leased(env.task_id, w.worker_id, "L3", time.time() + 60)
+    assert s.nack(env.task_id, w.worker_id, "L3", "boom")
+    task = s.get_task(env.task_id)
     assert task["state"] == "ready"
     assert float(task["next_run_at"]) > time.time()
 
 
-def test_nack_exceeds_retries_fails(store: InMemoryStore) -> None:
-    env = _envelope(max_retries=0)
-    store.submit(env)
+def test_nack_exceeds_delivery_cap_fails(db_path: str) -> None:
+    """Delivery cap of 0 → first nack fails the task immediately."""
+    s = InMemoryStore(
+        StoreConfig(
+            path=db_path, max_pending=50, lease_timeout=5.0,
+            max_delivery_attempts=0,
+        ),
+    )
+    env = _envelope()
+    s.submit(env)
     w = _worker_state()
-    store.register_worker(w)
-    store.mark_leased(env.task_id, w.worker_id, "L4", time.time() + 60)
-    store.nack(env.task_id, w.worker_id, "L4", "error")
-    assert store.get_task(env.task_id)["state"] == "failed"
+    s.register_worker(w)
+    s.mark_leased(env.task_id, w.worker_id, "L4", time.time() + 60)
+    s.nack(env.task_id, w.worker_id, "L4", "error")
+    assert s.get_task(env.task_id)["state"] == "failed"
 
 
 def test_dead_worker_tasks_requeued(store: InMemoryStore) -> None:
     w = _worker_state()
     store.register_worker(w)
-    env = _envelope(max_retries=3)
+    env = _envelope()
     store.submit(env)
     store.mark_leased(env.task_id, w.worker_id, "L5", time.time() + 60)
     store._workers[w.worker_id].last_seen = 0  # simulate missed heartbeats
@@ -456,7 +462,7 @@ async def test_worker_crash_before_ack_task_requeued(
     client = FakeClient(ctrl_addr)
     try:
         await w1.register()
-        tid = await client.submit(max_retries=3)
+        tid = await client.submit()
         env1 = await w1.recv_task(timeout=3.0)
         assert env1.task_id == tid
         w1.close()  # simulate crash without acking
@@ -493,7 +499,7 @@ async def test_late_ack_after_requeue_rejected(
     client = FakeClient(ctrl_addr)
     try:
         await w1.register()
-        tid = await client.submit(max_retries=3)
+        tid = await client.submit()
         env1 = await w1.recv_task(timeout=3.0)
         await asyncio.sleep(3.5)  # let lease expire
 
@@ -670,10 +676,6 @@ async def test_backpressure_hub_rejects_when_full(
             "payload_b64": "dGVzdA==",
             "labels": {},
             "lease_id": "",
-            "attempts": 0,
-            "max_retries": 0,
-            "retry_backoff": 1.0,
-            "retry_jitter": 0.0,
             "priority": 0,
             "created_at": time.time(),
         }

@@ -57,6 +57,11 @@ class TaskEnvelope:
     ``lease_id`` is the UUID assigned by the hub at dispatch time.
     Workers must echo it back in the ACK so the hub can validate
     that the ack is not stale (e.g. after lease expiry and requeue).
+
+    User-level retry policy is the responsibility of the
+    :class:`~taskiq.middlewares.SmartRetryMiddleware` (or any compatible
+    middleware) and travels in :attr:`labels`; the envelope itself carries
+    no retry knobs.
     """
 
     task_id: str
@@ -64,10 +69,6 @@ class TaskEnvelope:
     payload_b64: str
     labels: dict[str, Any] = field(default_factory=dict)
     lease_id: str = ""
-    attempts: int = 0
-    max_retries: int = 0
-    retry_backoff: float = 1.0
-    retry_jitter: float = 0.0
     priority: int = 0
     created_at: float = 0.0
 
@@ -157,3 +158,4 @@ class WorkerState:
         d = asdict(self)
         d["status"] = str(self.status)
         return d
+

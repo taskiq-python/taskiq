@@ -5,7 +5,7 @@ import functools
 import inspect
 import random
 import time
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
@@ -19,7 +19,11 @@ class StoreConfig:
     path: str = ""  # kept for API compat; not used
     max_pending: int = 10_000
     lease_timeout: float = 30.0
-    backoff_base: float = 1.0
+    # Hub-internal cap on delivery retries (lease expiry / worker death).
+    # Has nothing to do with user-level retry policy, which is handled by
+    # taskiq retry middlewares.  Set to 0 to disable redelivery entirely.
+    max_delivery_attempts: int = 5
+    delivery_backoff: float = 1.0
     backoff_cap: float = 60.0
 
 
@@ -34,10 +38,9 @@ class _Task:
     payload: bytes
     labels: dict[str, Any]
     state: str  # ready / leased / done / failed
+    # Internal delivery-attempt counter (incremented on each dispatch).
+    # NOT related to user-level retry policy — that lives in middlewares.
     attempts: int = 0
-    max_retries: int = 0
-    retry_backoff: float = 1.0
-    retry_jitter: float = 0.0
     priority: int = 0
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
@@ -49,25 +52,7 @@ class _Task:
 
     def as_dict(self) -> dict[str, Any]:
         """Return a dict view of this task record."""
-        return {
-            "task_id": self.task_id,
-            "task_name": self.task_name,
-            "payload": self.payload,
-            "labels": self.labels,
-            "state": self.state,
-            "attempts": self.attempts,
-            "max_retries": self.max_retries,
-            "retry_backoff": self.retry_backoff,
-            "retry_jitter": self.retry_jitter,
-            "priority": self.priority,
-            "created_at": self.created_at,
-            "updated_at": self.updated_at,
-            "next_run_at": self.next_run_at,
-            "lease_id": self.lease_id,
-            "leased_worker_id": self.leased_worker_id,
-            "lease_until": self.lease_until,
-            "last_error": self.last_error,
-        }
+        return asdict(self)
 
     def as_status_dict(self) -> dict[str, Any]:
         """Return a JSON-safe dict (no raw bytes) for control-plane status responses."""
@@ -91,18 +76,7 @@ class _Worker:
 
     def as_dict(self) -> dict[str, Any]:
         """Return a dict view of this worker record."""
-        return {
-            "worker_id": self.worker_id,
-            "task_addr": self.task_addr,
-            "capacity": self.capacity,
-            "inflight": self.inflight,
-            "last_seen": self.last_seen,
-            "heartbeat_interval": self.heartbeat_interval,
-            "lease_timeout": self.lease_timeout,
-            "draining": self.draining,
-            "status": self.status,
-            "version": self.version,
-        }
+        return asdict(self)
 
 
 # ── task context ─────────────────────────────────────────────────────────────
@@ -325,16 +299,21 @@ class InMemoryStore:
 
     # ── helpers ───────────────────────────────────────────────────────────────
 
-    def _backoff(self, attempts: int, backoff_base: float) -> float:
-        return min(self.config.backoff_cap, backoff_base * (2 ** max(0, attempts - 1)))
+    def _backoff(self, attempts: int) -> float:
+        return min(
+            self.config.backoff_cap,
+            self.config.delivery_backoff * (2 ** max(0, attempts - 1)),
+        )
 
     def _requeue_or_fail(self, task: _Task, worker_id: str, error: str) -> bool:
         now = time.time()
-        if task.attempts > task.max_retries:
+        # Hub-internal delivery cap.  User-level retries are handled by
+        # retry middlewares, which re-kick the task with updated labels.
+        if task.attempts > self.config.max_delivery_attempts:
             task.state = "failed"
         else:
             task.state = "ready"
-            task.next_run_at = now + self._backoff(task.attempts, task.retry_backoff)
+            task.next_run_at = now + self._backoff(task.attempts)
         task.last_error = error
         task.lease_id = None
         task.leased_worker_id = None
@@ -367,9 +346,6 @@ class InMemoryStore:
             payload=envelope.payload,
             labels=envelope.labels,
             state="ready",
-            max_retries=envelope.max_retries,
-            retry_backoff=envelope.retry_backoff,
-            retry_jitter=envelope.retry_jitter,
             priority=envelope.priority,
             created_at=envelope.created_at or now,
             updated_at=now,

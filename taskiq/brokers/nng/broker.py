@@ -83,9 +83,6 @@ class NNGBroker(AsyncBroker):
         heartbeat_interval: float = 5.0,
         lease_timeout: float = 20.0,
         capacity: int = 1,
-        max_retries: int = 0,
-        retry_backoff: float = 1.0,
-        retry_jitter: float = 0.0,
         recv_timeout_ms: int = 5_000,
         send_timeout_ms: int = 5_000,
     ) -> None:
@@ -102,9 +99,6 @@ class NNGBroker(AsyncBroker):
         :param heartbeat_interval: seconds between heartbeat messages to hub.
         :param lease_timeout: seconds a dispatched task lease remains valid.
         :param capacity: max concurrent tasks this worker will accept.
-        :param max_retries: default max retries for submitted tasks.
-        :param retry_backoff: base seconds for exponential backoff.
-        :param retry_jitter: jitter multiplier added to backoff (0 = no jitter).
         :param recv_timeout_ms: Req0 recv timeout in milliseconds.
         :param send_timeout_ms: Req0 send timeout in milliseconds.
         """
@@ -123,9 +117,6 @@ class NNGBroker(AsyncBroker):
         self.heartbeat_interval = heartbeat_interval
         self.lease_timeout = lease_timeout
         self.capacity = capacity
-        self.max_retries = max_retries
-        self.retry_backoff = retry_backoff
-        self.retry_jitter = retry_jitter
         self.recv_timeout_ms = recv_timeout_ms
         self.send_timeout_ms = send_timeout_ms
 
@@ -249,16 +240,6 @@ class NNGBroker(AsyncBroker):
             "payload_b64": base64.b64encode(message.message).decode("ascii"),
             "labels": message.labels,
             "lease_id": "",  # hub assigns the real lease_id at dispatch time
-            "attempts": int(message.labels.get("attempts", 0)),
-            "max_retries": int(
-                message.labels.get("max_retries", self.max_retries),
-            ),
-            "retry_backoff": float(
-                message.labels.get("retry_backoff", self.retry_backoff),
-            ),
-            "retry_jitter": float(
-                message.labels.get("retry_jitter", self.retry_jitter),
-            ),
             "priority": int(message.labels.get("priority", 0)),
             "created_at": time.time(),
         }

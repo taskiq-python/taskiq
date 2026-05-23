@@ -300,7 +300,7 @@ class NNGHub:
                 task_name=row["task_name"],
                 labels=row["labels"],
                 priority=int(row["priority"]),
-                attempts=int(row["attempts"]),
+                attempts=int(row.get("attempts", 0)),
             )
             worker = self.store.choose_worker(
                 self._routing,
@@ -334,10 +334,6 @@ class NNGHub:
                 payload_b64=base64.b64encode(row["payload"]).decode("ascii"),
                 labels=row["labels"],
                 lease_id=lease_id,
-                attempts=int(row["attempts"]) + 1,
-                max_retries=int(row["max_retries"]),
-                retry_backoff=float(row["retry_backoff"]),
-                retry_jitter=float(row["retry_jitter"]),
                 priority=int(row["priority"]),
                 created_at=float(row["created_at"]),
             )
