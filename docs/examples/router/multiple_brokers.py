@@ -6,9 +6,9 @@ from taskiq import Flow, InMemoryBroker, TaskiqRouter
 
 router = TaskiqRouter()
 
-default_email_flow = Flow.queue("emails.default")
-priority_email_flow = Flow.queue("emails.priority")
-bulk_email_flow = Flow.queue("emails.bulk")
+default_email_flow = Flow("emails.default")
+priority_email_flow = Flow("emails.priority")
+bulk_email_flow = Flow("emails.bulk")
 
 default_broker = InMemoryBroker(
     router=router,
@@ -30,9 +30,9 @@ async def send_email(user_id: int, template: str) -> str:
     return f"{template} email sent to user {user_id}"
 
 
-router.route_task(
-    send_email.task_name,
-    broker="priority",
+priority_route = router.route_task(
+    send_email,
+    broker=priority_broker,
     flow=priority_email_flow,
 )
 
@@ -46,14 +46,18 @@ async def _main() -> None:
         routed_task = await send_email.kiq(7, "welcome")
         routed_result = await routed_task.wait_result(timeout=2)
 
-        bulk_task = await send_email.kicker().with_route(
-            "default",
-            bulk_email_flow,
-        ).kiq(8, "digest")
+        bulk_task = (
+            await send_email.kicker()
+            .with_route(
+                default_broker,
+                bulk_email_flow,
+            )
+            .kiq(8, "digest")
+        )
         bulk_result = await bulk_task.wait_result(timeout=2)
 
         print(f"Direct call: {direct_result}")
-        print(f"Default route: {router.resolve_route(send_email.task_name)}")
+        print(f"Declared route: {priority_route.broker_name}")
         print(f"Routed call: {routed_result.return_value}")
         print(f"Route override: {bulk_result.return_value}")
     finally:

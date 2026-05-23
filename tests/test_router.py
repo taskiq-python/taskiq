@@ -1,10 +1,26 @@
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Mapping
+from dataclasses import dataclass
 
 import pytest
 
-from taskiq import Flow, TaskiqRouter, task_builder
+from taskiq import Flow, FlowProtocol, TaskiqRouter, task_builder
 from taskiq.abc.broker import AsyncBroker
 from taskiq.message import BrokerMessage
+
+
+@dataclass(frozen=True, slots=True)
+class BrokerQueue:
+    """Broker-specific flow used to prove protocol-based routing."""
+
+    name: str
+    durable: bool = True
+
+    def broker_options(self, broker_name: str) -> Mapping[str, object]:
+        """Return options for the target broker."""
+        return {
+            "broker": broker_name,
+            "durable": self.durable,
+        }
 
 
 class RecordingBroker(AsyncBroker):
@@ -15,9 +31,9 @@ class RecordingBroker(AsyncBroker):
         *,
         router: TaskiqRouter | None = None,
         broker_name: str | None = None,
-        default_flow: Flow | None = None,
+        default_flow: FlowProtocol | None = None,
     ) -> None:
-        self.sent: list[tuple[BrokerMessage, Flow | None]] = []
+        self.sent: list[tuple[BrokerMessage, FlowProtocol | None]] = []
         super().__init__(
             router=router,
             broker_name=broker_name,
@@ -31,7 +47,7 @@ class RecordingBroker(AsyncBroker):
     async def kick_to_flow(
         self,
         message: BrokerMessage,
-        flow: Flow | None = None,
+        flow: FlowProtocol | None = None,
     ) -> None:
         """Record flow-aware send."""
         self.sent.append((message, flow))
@@ -75,10 +91,12 @@ async def test_router_can_route_task_to_another_broker_flow() -> None:
     async def demo_task() -> None:
         return None
 
-    router.route_task("demo.task", broker="target", flow=flow)
+    route = router.route_task(demo_task, broker=target, flow=flow)
 
     await demo_task.kiq()
 
+    assert route.broker is target
+    assert route.broker_name == "target"
     assert source.sent == []
     assert target.sent[0][0].task_name == "demo.task"
     assert target.sent[0][1] == flow
@@ -95,12 +113,48 @@ async def test_kicker_route_override_wins_over_registered_route() -> None:
     async def demo_task() -> None:
         return None
 
-    router.route_task("demo.task", broker="first", flow=first_flow)
+    router.route_task(demo_task, broker=first, flow=first_flow)
 
-    await demo_task.kicker().with_route("second", second_flow).kiq()
+    await demo_task.kicker().with_route(second, second_flow).kiq()
 
     assert first.sent == []
     assert second.sent[0][1] == second_flow
+
+
+async def test_router_keeps_string_broker_lookup_for_compatibility() -> None:
+    router = TaskiqRouter()
+    source = RecordingBroker(router=router, broker_name="source")
+    target = RecordingBroker(router=router, broker_name="target")
+    flow = Flow("compat")
+
+    @source.task(task_name="demo.task")
+    async def demo_task() -> None:
+        return None
+
+    router.route_task("demo.task", broker="target", flow=flow)
+
+    await demo_task.kicker().with_route("target", flow).kiq()
+
+    assert target.sent[0][0].task_name == "demo.task"
+    assert target.sent[0][1] == flow
+
+
+async def test_router_accepts_broker_specific_flow_protocol() -> None:
+    broker = RecordingBroker(broker_name="transport")
+    flow = BrokerQueue(name="critical", durable=False)
+
+    @broker.task(task_name="demo.task")
+    async def demo_task() -> None:
+        return None
+
+    await demo_task.kicker().with_flow(flow).kiq()
+
+    assert isinstance(flow, FlowProtocol)
+    assert broker.sent[0][1] is flow
+    assert flow.broker_options("transport") == {
+        "broker": "transport",
+        "durable": False,
+    }
 
 
 async def test_kicker_can_prepare_invocation_for_later() -> None:
@@ -146,7 +200,7 @@ async def test_router_task_decorator_can_choose_broker_and_flow() -> None:
     target = RecordingBroker(router=router, broker_name="target")
     flow = Flow("target-flow")
 
-    @router.task("demo.task", broker="target", flow=flow)
+    @router.task("demo.task", broker=target, flow=flow)
     async def demo_task() -> None:
         return None
 

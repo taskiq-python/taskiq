@@ -1,58 +1,42 @@
-import enum
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
-from typing import Any
+from typing import Protocol, runtime_checkable
 
-__all__ = ("Flow", "FlowKind")
+__all__ = ("Flow", "FlowProtocol")
 
 
-@enum.unique
-class FlowKind(str, enum.Enum):
-    """Transport-neutral flow shape."""
+@runtime_checkable
+class FlowProtocol(Protocol):
+    """Transport-neutral flow contract accepted by routers and brokers."""
 
-    QUEUE = "queue"
-    TOPIC = "topic"
-    STREAM = "stream"
+    name: str
+
+    def broker_options(self, broker_name: str) -> Mapping[str, object]:
+        """Return options relevant for a concrete broker implementation."""
+        ...
 
 
 @dataclass(frozen=True, slots=True)
 class Flow:
-    """Transport-neutral publish or subscribe address.
+    """Generic transport-neutral flow address.
 
-    Plain flows are intentionally generic. Every broker may interpret a flow
-    using its own defaults: queue name, topic, stream, channel, list key, or any
-    other transport address.
-
-    Broker packages can subclass this value object to expose transport-specific
-    details while still accepting plain Flow instances.
+    Broker packages can provide their own flow objects that implement
+    FlowProtocol, for example RabbitQueue, KafkaTopic, NatsSubject or RedisQueue.
+    This generic value object is intentionally small and works as a common
+    fallback for brokers that only need a named address with optional metadata.
     """
 
     name: str
-    kind: FlowKind = FlowKind.QUEUE
-    options: dict[str, Any] = field(
+    options: Mapping[str, object] = field(
         default_factory=dict,
         compare=False,
         hash=False,
     )
 
-    @classmethod
-    def queue(cls, name: str, **options: Any) -> "Flow":
-        """Create a queue-like flow."""
-        return cls(name=name, kind=FlowKind.QUEUE, options=options)
-
-    @classmethod
-    def topic(cls, name: str, **options: Any) -> "Flow":
-        """Create a topic-like flow."""
-        return cls(name=name, kind=FlowKind.TOPIC, options=options)
-
-    @classmethod
-    def stream(cls, name: str, **options: Any) -> "Flow":
-        """Create a stream-like flow."""
-        return cls(name=name, kind=FlowKind.STREAM, options=options)
-
-    def with_options(self, **options: Any) -> "Flow":
+    def with_options(self, **options: object) -> "Flow":
         """Return the same flow with additional generic options."""
         return replace(self, options={**self.options, **options})
 
-    def broker_options(self, broker_name: str) -> dict[str, Any]:
+    def broker_options(self, broker_name: str) -> Mapping[str, object]:
         """Return transport options for broker-specific implementations."""
         return dict(self.options)

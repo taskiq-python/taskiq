@@ -21,7 +21,7 @@ from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.abc.result_backend import AsyncResultBackend
 from taskiq.compat import model_dump
 from taskiq.exceptions import SendTaskError
-from taskiq.flow import Flow
+from taskiq.flow import FlowProtocol
 from taskiq.labels import prepare_label
 from taskiq.message import TaskiqMessage
 from taskiq.router import TaskiqRouter
@@ -74,7 +74,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         self.custom_schedule_id: str | None = None
         self.return_type = return_type
         self.route_broker: AsyncBroker | str | None = None
-        self.route_flow: Flow | None = None
+        self.route_flow: FlowProtocol | None = None
 
     def with_labels(
         self,
@@ -137,7 +137,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
 
     def with_flow(
         self,
-        flow: Flow | None,
+        flow: FlowProtocol | None,
     ) -> AsyncKicker[_FuncParams, _ReturnType]:
         """
         Replace flow for the current invocation.
@@ -151,12 +151,14 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
     def with_route(
         self,
         broker: AsyncBroker | str,
-        flow: Flow | None,
+        flow: FlowProtocol | None,
     ) -> AsyncKicker[_FuncParams, _ReturnType]:
         """
         Replace broker and flow for the current invocation.
 
         :param broker: broker instance or broker name.
+            Broker instances are preferred; names are kept for configuration
+            and backward-compatible lookup.
         :param flow: flow to send message to.
         :return: Kicker with a route override.
         """

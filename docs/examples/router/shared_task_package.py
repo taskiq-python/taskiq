@@ -1,8 +1,25 @@
 """Declare shared task definitions and bind them in the final application."""
 
 import asyncio
+from collections.abc import Mapping
+from dataclasses import dataclass
 
 from taskiq import Flow, InMemoryBroker, TaskiqRouter, task_builder
+
+
+@dataclass(frozen=True, slots=True)
+class BillingQueue:
+    """Broker-specific flow that follows the shared flow protocol."""
+
+    name: str
+    priority: int
+
+    def broker_options(self, broker_name: str) -> Mapping[str, object]:
+        """Return options that a billing broker adapter can understand."""
+        return {
+            "broker": broker_name,
+            "priority": self.priority,
+        }
 
 
 @task_builder("billing.calculate_total", domain="billing")
@@ -12,8 +29,8 @@ async def calculate_total(price: int, quantity: int) -> int:
 
 
 router = TaskiqRouter()
-billing_flow = Flow.queue("billing.tasks")
-priority_billing_flow = Flow.queue("billing.priority")
+billing_flow = Flow("billing.tasks")
+priority_billing_flow = BillingQueue(name="billing.priority", priority=10)
 
 billing_broker = InMemoryBroker(
     router=router,
@@ -22,7 +39,11 @@ billing_broker = InMemoryBroker(
     await_inplace=True,
 )
 
-registered_calculate_total = billing_broker.register_task(calculate_total)
+registered_calculate_total = router.register_task(
+    calculate_total,
+    broker=billing_broker,
+    flow=billing_flow,
+)
 
 
 async def _main() -> None:
@@ -30,9 +51,14 @@ async def _main() -> None:
     try:
         direct_result = await calculate_total.call(19, 3)
 
-        prepared_task = registered_calculate_total.kicker().with_flow(
-            priority_billing_flow,
-        ).prepare(19, 3)
+        prepared_task = (
+            registered_calculate_total.kicker()
+            .with_route(
+                billing_broker,
+                priority_billing_flow,
+            )
+            .prepare(19, 3)
+        )
 
         queued_task = await prepared_task.kiq()
         queued_result = await queued_task.wait_result(timeout=2)

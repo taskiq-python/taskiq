@@ -24,7 +24,7 @@ from taskiq.acks import AckableMessage
 from taskiq.decor import AsyncTaskiqDecoratedTask
 from taskiq.events import TaskiqEvents
 from taskiq.exceptions import TaskBrokerMismatchError
-from taskiq.flow import Flow
+from taskiq.flow import FlowProtocol
 from taskiq.formatters.proxy_formatter import ProxyFormatter
 from taskiq.message import BrokerMessage
 from taskiq.result_backends.dummy import DummyResultBackend
@@ -84,7 +84,7 @@ class AsyncBroker(ABC):
         *,
         router: TaskiqRouter | None = None,
         broker_name: str | None = None,
-        default_flow: Flow | None = None,
+        default_flow: FlowProtocol | None = None,
     ) -> None:
         if result_backend is None:
             result_backend = DummyResultBackend()
@@ -262,7 +262,7 @@ class AsyncBroker(ABC):
     async def kick_to_flow(
         self,
         message: BrokerMessage,
-        flow: Flow | None = None,
+        flow: FlowProtocol | None = None,
     ) -> None:
         """
         Send message to a flow-aware broker.
@@ -401,8 +401,10 @@ class AsyncBroker(ABC):
 
     def register_task(
         self,
-        func: Callable[_FuncParams, _ReturnType]
-        | TaskDefinition[_FuncParams, _ReturnType],
+        func: (
+            Callable[_FuncParams, _ReturnType]
+            | TaskDefinition[_FuncParams, _ReturnType]
+        ),
         task_name: str | None = None,
         **labels: Any,
     ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]:

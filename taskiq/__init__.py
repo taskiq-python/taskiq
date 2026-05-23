@@ -24,7 +24,7 @@ from taskiq.exceptions import (
     TaskiqError,
     TaskiqResultTimeoutError,
 )
-from taskiq.flow import Flow, FlowKind
+from taskiq.flow import Flow, FlowProtocol
 from taskiq.funcs import gather
 from taskiq.kicker import PreparedKiq
 from taskiq.message import BrokerMessage, TaskiqMessage
@@ -53,7 +53,7 @@ __all__ = [
     "BrokerMessage",
     "Context",
     "Flow",
-    "FlowKind",
+    "FlowProtocol",
     "InMemoryBroker",
     "NoResultError",
     "PreparedKiq",

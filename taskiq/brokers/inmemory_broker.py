@@ -9,7 +9,7 @@ from taskiq.abc.result_backend import AsyncResultBackend, TaskiqResult
 from taskiq.depends.progress_tracker import TaskProgress
 from taskiq.events import TaskiqEvents
 from taskiq.exceptions import UnknownTaskError
-from taskiq.flow import Flow
+from taskiq.flow import FlowProtocol
 from taskiq.message import BrokerMessage
 from taskiq.receiver import Receiver
 from taskiq.router import TaskiqRouter
@@ -135,7 +135,7 @@ class InMemoryBroker(AsyncBroker):
         *,
         router: TaskiqRouter | None = None,
         broker_name: str | None = None,
-        default_flow: Flow | None = None,
+        default_flow: FlowProtocol | None = None,
     ) -> None:
         super().__init__(
             router=router,

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, cast, overload
 
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.abc.result_backend import AsyncResultBackend
-from taskiq.flow import Flow
+from taskiq.flow import FlowProtocol
 from taskiq.message import TaskiqMessage
 from taskiq.task import AsyncTaskiqTask
 from taskiq.task_builder import TaskDefinition
@@ -29,8 +29,13 @@ logger = getLogger("taskiq.router")
 class TaskiqRoute:
     """Resolved outbound route for a task invocation."""
 
-    broker_name: str
-    flow: Flow | None = None
+    broker: AsyncBroker
+    flow: FlowProtocol | None = None
+
+    @property
+    def broker_name(self) -> str:
+        """Return registered broker name for compatibility and diagnostics."""
+        return self.broker.broker_name
 
 
 class TaskiqRouter:
@@ -46,7 +51,7 @@ class TaskiqRouter:
         self,
         broker: AsyncBroker,
         name: str | None = None,
-        default_flow: Flow | None = None,
+        default_flow: FlowProtocol | None = None,
     ) -> str:
         """Register broker as a transport in this router."""
         broker_name = name or broker.__class__.__name__
@@ -79,7 +84,7 @@ class TaskiqRouter:
             | TaskDefinition[_FuncParams, _ReturnType]
         ),
         broker: AsyncBroker | str | None = None,
-        flow: Flow | None = None,
+        flow: FlowProtocol | None = None,
     ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]:
         """Register a bound task or bind a task definition to a broker."""
         if isinstance(task, TaskDefinition):
@@ -107,7 +112,7 @@ class TaskiqRouter:
         task_name: Callable[_FuncParams, _ReturnType],
         *,
         broker: AsyncBroker | str | None = None,
-        flow: Flow | None = None,
+        flow: FlowProtocol | None = None,
         **labels: Any,
     ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]: ...
 
@@ -117,7 +122,7 @@ class TaskiqRouter:
         task_name: str | None = None,
         *,
         broker: AsyncBroker | str | None = None,
-        flow: Flow | None = None,
+        flow: FlowProtocol | None = None,
         **labels: Any,
     ) -> Callable[
         [Callable[_FuncParams, _ReturnType]],
@@ -129,7 +134,7 @@ class TaskiqRouter:
         task_name: str | Callable[_FuncParams, _ReturnType] | None = None,
         *,
         broker: AsyncBroker | str | None = None,
-        flow: Flow | None = None,
+        flow: FlowProtocol | None = None,
         **labels: Any,
     ) -> Any:
         """Decorate and register a task through this router."""
@@ -153,30 +158,32 @@ class TaskiqRouter:
 
     def route_task(
         self,
-        task_name: str,
+        task: str | AsyncTaskiqDecoratedTask[Any, Any],
         broker: AsyncBroker | str | None = None,
-        flow: Flow | None = None,
+        flow: FlowProtocol | None = None,
     ) -> TaskiqRoute:
         """Set default outbound route for a task."""
-        broker_name = self._resolve_broker_name(broker)
-        route = TaskiqRoute(broker_name=broker_name, flow=flow)
+        task_name = self._resolve_task_name(task)
+        target_broker = self._resolve_broker(broker)
+        route = TaskiqRoute(broker=target_broker, flow=flow)
         self.routes[task_name] = route
         return route
 
     def resolve_route(
         self,
-        task_name: str,
+        task: str | AsyncTaskiqDecoratedTask[Any, Any],
         broker: AsyncBroker | str | None = None,
-        flow: Flow | None = None,
+        flow: FlowProtocol | None = None,
     ) -> TaskiqRoute:
         """Resolve outbound route for a task invocation."""
+        task_name = self._resolve_task_name(task)
         if broker is not None:
-            broker_name = self._resolve_broker_name(broker)
+            target_broker = self._resolve_broker(broker)
             route_flow = flow
             if route_flow is None:
-                route_flow = self._broker_default_flow(broker_name)
+                route_flow = self._broker_default_flow(target_broker)
             return TaskiqRoute(
-                broker_name=broker_name,
+                broker=target_broker,
                 flow=route_flow,
             )
 
@@ -184,14 +191,14 @@ class TaskiqRouter:
         if route is not None:
             if flow is None:
                 return route
-            return TaskiqRoute(broker_name=route.broker_name, flow=flow)
+            return TaskiqRoute(broker=route.broker, flow=flow)
 
-        broker_name = self._resolve_broker_name(None)
+        target_broker = self._resolve_broker(None)
         route_flow = flow
         if route_flow is None:
-            route_flow = self._broker_default_flow(broker_name)
+            route_flow = self._broker_default_flow(target_broker)
         return TaskiqRoute(
-            broker_name=broker_name,
+            broker=target_broker,
             flow=route_flow,
         )
 
@@ -200,12 +207,12 @@ class TaskiqRouter:
         message: TaskiqMessage,
         *,
         broker: AsyncBroker | str | None = None,
-        flow: Flow | None = None,
+        flow: FlowProtocol | None = None,
         return_type: type[_ReturnType] | None = None,
     ) -> AsyncTaskiqTask[_ReturnType]:
         """Send message through the resolved broker and flow."""
         route = self.resolve_route(message.task_name, broker=broker, flow=flow)
-        target_broker = self.brokers[route.broker_name]
+        target_broker = route.broker
 
         for middleware in target_broker.middlewares:
             if middleware.__class__.pre_send != TaskiqMiddleware.pre_send:
@@ -231,38 +238,50 @@ class TaskiqRouter:
         message: TaskiqMessage,
         *,
         broker: AsyncBroker | str | None = None,
-        flow: Flow | None = None,
+        flow: FlowProtocol | None = None,
     ) -> None:
         """Send an existing message again through the resolved route."""
         route = self.resolve_route(message.task_name, broker=broker, flow=flow)
-        target_broker = self.brokers[route.broker_name]
+        target_broker = route.broker
         await target_broker.kick_to_flow(
             target_broker.formatter.dumps(message),
             route.flow,
         )
 
     def _resolve_broker(self, broker: AsyncBroker | str | None) -> AsyncBroker:
-        broker_name = self._resolve_broker_name(broker)
-        return self.brokers[broker_name]
-
-    def _resolve_broker_name(self, broker: AsyncBroker | str | None) -> str:
         if isinstance(broker, str):
             if broker not in self.brokers:
                 raise ValueError(f"Unknown broker {broker!r}.")
-            return broker
+            return self.brokers[broker]
 
         if broker is not None:
             broker_name = getattr(broker, "broker_name", None)
-            if broker_name is not None and broker_name in self.brokers:
-                return broker_name
-            for registered_name, registered_broker in self.brokers.items():
+            if isinstance(broker_name, str):
+                registered_broker = self.brokers.get(broker_name)
                 if registered_broker is broker:
-                    return registered_name
+                    return broker
+            for registered_broker in self.brokers.values():
+                if registered_broker is broker:
+                    return registered_broker
             raise ValueError("Broker is not registered in this router.")
 
         if self.default_broker_name is None:
             raise ValueError("Router doesn't have registered brokers.")
-        return self.default_broker_name
+        return self.brokers[self.default_broker_name]
 
-    def _broker_default_flow(self, broker_name: str) -> Flow | None:
-        return getattr(self.brokers[broker_name], "default_flow", None)
+    def _resolve_broker_name(self, broker: AsyncBroker | str | None) -> str:
+        return self._resolve_broker(broker).broker_name
+
+    def _resolve_task_name(
+        self,
+        task: str | AsyncTaskiqDecoratedTask[Any, Any],
+    ) -> str:
+        if isinstance(task, str):
+            return task
+        task_name = getattr(task, "task_name", None)
+        if isinstance(task_name, str):
+            return task_name
+        raise TypeError("Route task must be a task name or decorated task.")
+
+    def _broker_default_flow(self, broker: AsyncBroker) -> FlowProtocol | None:
+        return getattr(broker, "default_flow", None)
