@@ -90,6 +90,7 @@ taskiq = "taskiq.__main__:main"
 [project.entry-points.taskiq_cli]
 worker = "taskiq.cli.worker.cmd:WorkerCMD"
 scheduler = "taskiq.cli.scheduler.cmd:SchedulerCMD"
+nng-hub = "taskiq.cli.nng.cmd:NNGHubCMD"
 
 [project.entry-points.opentelemetry_instrumentor]
 taskiq = "taskiq.instrumentation:TaskiqInstrumentor"
