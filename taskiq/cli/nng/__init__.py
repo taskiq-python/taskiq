@@ -1,0 +1,1 @@
+"""NNG CLI command."""

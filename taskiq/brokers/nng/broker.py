@@ -42,7 +42,7 @@ def _ipc_addr(prefix: str = "taskiq-nng") -> str:
 
 class NNGBroker(AsyncBroker):
     """
-    Taskiq broker backed by a standalone :class:`~taskiq.brokers.nng_hub.NNGHub`.
+    Taskiq broker backed by a dedicated :class:`~taskiq.brokers.nng_hub.NNGHub`.
 
     The hub must be running before workers or clients start.  Launch it with::
 

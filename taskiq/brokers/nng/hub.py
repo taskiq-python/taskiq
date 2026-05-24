@@ -1,9 +1,9 @@
 """
 NNG hub: central control plane, task dispatcher, and lease manager.
 
-Run as a standalone process::
+Run as a taskiq sub-command::
 
-    taskiq-nng-hub --control-addr ipc:///tmp/taskiq-nng.ipc
+    taskiq nng-hub --control-addr ipc:///tmp/taskiq-nng.ipc
 
 Or embed it in an application for testing::
 
@@ -14,12 +14,9 @@ Or embed it in an application for testing::
 """
 from __future__ import annotations
 
-import argparse
 import asyncio
 import base64
 import logging
-import os
-import signal
 import time
 import uuid
 from contextlib import suppress
@@ -369,91 +366,3 @@ class NNGHub:
                 raise
             except Exception:
                 logger.exception("Reaper loop error")
-
-
-# ── standalone CLI entry point ────────────────────────────────────────────────
-
-def _build_config() -> HubConfig:
-    p = argparse.ArgumentParser(
-        description="taskiq-nng-hub — NNG task router, dispatcher, and lease manager",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    p.add_argument(
-        "--control-addr",
-        default=os.getenv("NNG_CONTROL_ADDR", "ipc:///tmp/taskiq-nng.ipc"),
-        help="NNG address the hub listens on.  Env: NNG_CONTROL_ADDR",
-    )
-    p.add_argument(
-        "--max-pending",
-        type=int,
-        default=int(os.getenv("NNG_MAX_PENDING", "10000")),
-    )
-    p.add_argument(
-        "--heartbeat-timeout",
-        type=float,
-        default=float(os.getenv("NNG_HEARTBEAT_TIMEOUT", "15.0")),
-        help="Seconds of silence before a worker is declared dead.",
-    )
-    p.add_argument(
-        "--lease-timeout",
-        type=float,
-        default=float(os.getenv("NNG_LEASE_TIMEOUT", "20.0")),
-        help="Seconds before an unacked task lease is reaped.",
-    )
-    p.add_argument(
-        "--routing-policy",
-        choices=["least_loaded", "p2c", "round_robin"],
-        default=os.getenv("NNG_ROUTING_POLICY", "least_loaded"),
-    )
-    p.add_argument(
-        "--control-concurrency",
-        type=int,
-        default=int(os.getenv("NNG_CONTROL_CONCURRENCY", "16")),
-        help="Number of concurrent Rep0 contexts.",
-    )
-    p.add_argument(
-        "--log-level",
-        default=os.getenv("NNG_LOG_LEVEL", "INFO"),
-        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-    )
-    args = p.parse_args()
-    logging.basicConfig(
-        level=getattr(logging, args.log_level),
-        format="%(asctime)s %(name)-24s %(levelname)-8s %(message)s",
-    )
-    return HubConfig(
-        control_addr=args.control_addr,
-        max_pending=args.max_pending,
-        heartbeat_timeout=args.heartbeat_timeout,
-        lease_timeout=args.lease_timeout,
-        routing_policy=args.routing_policy,
-        control_concurrency=args.control_concurrency,
-    )
-
-
-async def _run(config: HubConfig) -> None:
-    hub = NNGHub(config)
-    loop = asyncio.get_running_loop()
-    stop_event = asyncio.Event()
-
-    def _on_signal() -> None:
-        logger.info("Shutdown signal received")
-        stop_event.set()
-
-    for sig in (signal.SIGTERM, signal.SIGINT):
-        loop.add_signal_handler(sig, _on_signal)
-
-    await hub.start()
-    try:
-        await stop_event.wait()
-    finally:
-        await hub.stop()
-
-
-def main() -> None:
-    """Entry point for the ``taskiq-nng-hub`` CLI command."""
-    config = _build_config()
-    try:
-        asyncio.run(_run(config))
-    except KeyboardInterrupt:
-        pass
