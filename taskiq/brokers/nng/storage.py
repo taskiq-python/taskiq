@@ -106,7 +106,7 @@ class WorkerView:
 
     @property
     def load(self) -> float:
-        """Fractional load: 0.0 idle → 1.0 at capacity."""
+        """Fractional load: 0.0 idle -> 1.0 at capacity."""
         return self.inflight / max(self.capacity, 1)
 
 
@@ -178,7 +178,7 @@ class AffinityPolicy:
 
     def __init__(self) -> None:
         """Initialise an empty affinity table."""
-        self._table: dict[str, str] = {}  # affinity_key → worker_id
+        self._table: dict[str, str] = {}  # affinity_key -> worker_id
 
     def choose(
         self,

@@ -50,7 +50,7 @@ class NNGBroker(AsyncBroker):
 
     **Client mode** (``is_worker_process = False``)
         Only the control socket is opened.  :meth:`kick` submits tasks to the
-        hub via a Req0 → Rep0 round-trip.
+        hub via a Req0 -> Rep0 round-trip.
 
     **Worker mode** (``is_worker_process = True``)
         In addition to the control socket the broker opens a unique Pull0

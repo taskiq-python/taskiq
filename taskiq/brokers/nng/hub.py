@@ -165,7 +165,7 @@ class NNGHub:
     # ── control plane ─────────────────────────────────────────────────────────
 
     async def _control_handler(self, ctx: Any) -> None:
-        """Run one Rep0 context: receive → dispatch → reply, in a loop."""
+        """Run one Rep0 context: receive -> dispatch -> reply, in a loop."""
         while not self._stop.is_set():
             try:
                 raw = await ctx.arecv()

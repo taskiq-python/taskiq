@@ -91,7 +91,7 @@ class TaskEnvelope:
 
 @dataclass
 class ControlMessage:
-    """Request sent over the control plane (Req0 → Rep0)."""
+    """Request sent over the control plane (Req0 -> Rep0)."""
 
     kind: str
     payload: dict[str, Any] = field(default_factory=dict)
@@ -113,7 +113,7 @@ class ControlMessage:
 
 @dataclass
 class ControlResponse:
-    """Response sent back over the control plane (Rep0 → Req0)."""
+    """Response sent back over the control plane (Rep0 -> Req0)."""
 
     ok: bool
     payload: dict[str, Any] = field(default_factory=dict)

@@ -333,7 +333,7 @@ def test_nack_requeues_with_backoff(db_path: str) -> None:
 
 
 def test_nack_exceeds_delivery_cap_fails(db_path: str) -> None:
-    """Delivery cap of 0 → first nack fails the task immediately."""
+    """Delivery cap of 0 -> first nack fails the task immediately."""
     s = InMemoryStore(
         StoreConfig(
             path=db_path, max_pending=50, lease_timeout=5.0,
@@ -490,7 +490,7 @@ async def test_late_ack_after_requeue_rejected(
     ctrl_addr: str, db_path: str
 ) -> None:
     """
-    Sequence: dispatch to w1 → lease expires → requeue → dispatch to w2.
+    Sequence: dispatch to w1 -> lease expires -> requeue -> dispatch to w2.
     w1's late ack must be rejected; w2's ack must succeed.
     """
     hub = _hub(ctrl_addr, db_path)
@@ -668,7 +668,7 @@ async def test_backpressure_hub_rejects_when_full(
     await hub.start()
     client = FakeClient(ctrl_addr)
     try:
-        await client.submit()  # fills the one slot (no worker → stays queued)
+        await client.submit()  # fills the one slot (no worker -> stays queued)
         # Second submission must be rejected
         payload: dict[str, object] = {
             "task_id": uuid.uuid4().hex,
