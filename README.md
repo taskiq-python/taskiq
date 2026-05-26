@@ -119,15 +119,15 @@ pytest
 
 ## Docs
 
-To run docs locally, you need to install [yarn](https://yarnpkg.com/getting-started/install).
+To run docs locally, you need to install [pnpm](https://pnpm.io/installation).
 
 First, you need to install dependencies.
 ```
-yarn install
+pnpm install
 ```
 
 After that you can set up a docs server by running:
 
 ```
-yarn docs:dev
+pnpm docs:dev
 ```
