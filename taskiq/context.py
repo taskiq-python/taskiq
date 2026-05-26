@@ -1,8 +1,10 @@
 from typing import TYPE_CHECKING
 
 from taskiq.abc.broker import AsyncBroker
+from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.exceptions import NoResultError, TaskRejectedError
 from taskiq.message import TaskiqMessage
+from taskiq.utils import maybe_awaitable
 
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.state import TaskiqState
@@ -30,7 +32,17 @@ class Context:
         requeue_count = int(self.message.labels.get("X-Taskiq-requeue", 0))
         requeue_count += 1
         self.message.labels["X-Taskiq-requeue"] = str(requeue_count)
-        await self.broker.kick(self.broker.formatter.dumps(self.message))
+        message = self.message
+        for middleware in self.broker.middlewares:
+            if middleware.__class__.pre_send != TaskiqMiddleware.pre_send:
+                message = await maybe_awaitable(middleware.pre_send(message))
+
+        await self.broker.kick(self.broker.formatter.dumps(message))
+
+        for middleware in reversed(self.broker.middlewares):
+            if middleware.__class__.post_send != TaskiqMiddleware.post_send:
+                await maybe_awaitable(middleware.post_send(message))
+
         raise NoResultError
 
     def reject(self) -> None:
