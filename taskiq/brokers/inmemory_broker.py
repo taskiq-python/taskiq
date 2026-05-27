@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, TypeVar
 
 from taskiq.abc.broker import AsyncBroker
+from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.abc.result_backend import AsyncResultBackend, TaskiqResult
 from taskiq.depends.progress_tracker import TaskProgress
 from taskiq.events import TaskiqEvents
@@ -198,9 +199,21 @@ class InMemoryBroker(AsyncBroker):
             for handler in self.event_handlers.get(event, []):
                 await maybe_awaitable(handler(self.state))
 
+        for middleware in self.middlewares:
+            if middleware.__class__.startup != TaskiqMiddleware.startup:
+                await maybe_awaitable(middleware.startup())
+
+        await self.result_backend.startup()
+
     async def shutdown(self) -> None:
         """Runs shutdown events for client and worker side."""
         for event in (TaskiqEvents.CLIENT_SHUTDOWN, TaskiqEvents.WORKER_SHUTDOWN):
             for handler in self.event_handlers.get(event, []):
                 await maybe_awaitable(handler(self.state))
+
+        for middleware in self.middlewares:
+            if middleware.__class__.shutdown != TaskiqMiddleware.shutdown:
+                await maybe_awaitable(middleware.shutdown())
+
+        await self.result_backend.shutdown()
         self.executor.shutdown()
