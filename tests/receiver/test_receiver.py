@@ -600,3 +600,28 @@ async def test_no_semaphore_without_max_async_tasks() -> None:
     """Test that semaphore is None when max_async_tasks is not set."""
     receiver = get_receiver(max_async_tasks=None)
     assert receiver.sem is None
+
+
+async def test_prefetcher_does_not_pop_message_past_max_tasks() -> None:
+    """Test not pulling a message without the intention of running it."""
+    broker = AsyncQueueBroker()
+
+    @broker.task
+    async def noop() -> None:
+        return None
+
+    for _ in range(6):
+        await noop.kiq()
+
+    assert broker.queue.qsize() == 6
+
+    receiver = Receiver(
+        broker,
+        executor=ThreadPoolExecutor(max_workers=1),
+        max_async_tasks=1,
+        max_tasks_to_execute=5,
+    )
+
+    await receiver.listen(asyncio.Event())
+
+    assert broker.queue.qsize() == 1
