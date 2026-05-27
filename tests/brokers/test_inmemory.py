@@ -4,6 +4,7 @@ import uuid
 import pytest
 
 from taskiq import InMemoryBroker
+from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.events import TaskiqEvents
 from taskiq.state import TaskiqState
 
@@ -64,6 +65,24 @@ async def test_shutdown() -> None:
 
     assert broker.state.from_worker == test_value
     assert broker.state.from_client == test_value
+
+
+async def test_middleware_startup_and_shutdown_fire() -> None:
+    calls = []
+
+    class RecordingMiddleware(TaskiqMiddleware):
+        async def startup(self) -> None:
+            calls.append("startup")
+
+        async def shutdown(self) -> None:
+            calls.append("shutdown")
+
+    broker = InMemoryBroker().with_middlewares(RecordingMiddleware())
+
+    await broker.startup()
+    await broker.shutdown()
+
+    assert calls == ["startup", "shutdown"]
 
 
 async def test_execution() -> None:
