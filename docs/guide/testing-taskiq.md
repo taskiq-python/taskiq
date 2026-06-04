@@ -361,13 +361,17 @@ import pytest
 from your_project.database import AsyncSession
 from your_project.tqk import broker
 
+# We use autouse, so this fixture
+# is called automatically before all tests.
 @pytest.fixture(autouse=True)
 def patch_broker_dependencies(
     session: AsyncSession
 ):
+    # Here we override function get_async_session
     broker.dependency_overrides[get_async_session] = lambda: session
 
     yield
 
+    # Here we clear the override (for something like session it is good idea)
     broker.dependency_overrides.pop(get_async_session)
 ```
