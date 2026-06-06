@@ -34,6 +34,15 @@ def test_router_rejects_broker_attached_to_another_router() -> None:
         second_router.set_broker(broker, name="broker")
 
 
+def test_router_default_broker_setter_rejects_foreign_broker() -> None:
+    first_router = TaskiqRouter()
+    second_router = TaskiqRouter()
+    broker = RecordingBroker(router=first_router, broker_name="broker")
+
+    with pytest.raises(ValueError, match="not registered"):
+        second_router.default_broker = broker
+
+
 def test_router_rejects_string_broker_references() -> None:
     router = TaskiqRouter()
     RecordingBroker(router=router, broker_name="broker")

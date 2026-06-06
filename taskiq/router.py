@@ -55,6 +55,8 @@ class TaskiqRouter:
 
     @default_broker.setter
     def default_broker(self, broker: AsyncBroker | None) -> None:
+        if broker is not None:
+            self._brokers.resolve(broker)
         self._brokers.default_broker = broker
 
     @property

@@ -142,7 +142,8 @@ class AsyncBroker(ABC):
 
         It searches task by name in dict of tasks that
         were registered for this broker directly.
-        If it fails, it checks global dict of all available tasks.
+        If it fails, it checks tasks registered in the broker's router,
+        then global dict of all available tasks.
 
         :param task_name: name of a task.
         :returns: found task or None.
@@ -161,8 +162,9 @@ class AsyncBroker(ABC):
         """
         Method to fetch all tasks available in broker.
 
-        This method returns all tasks, globally and locally
-        available in broker. With local tasks having higher priority.
+        This method returns all tasks globally, through the broker's router
+        and locally available in broker. With local tasks having higher
+        priority.
 
         So, if you have two tasks with the same name,
         one registered in global registry and one registered
