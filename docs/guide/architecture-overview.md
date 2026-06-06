@@ -82,6 +82,28 @@ asyncio.run(main())
 
 ```
 
+## Router and flows
+
+Taskiq can use a `TaskiqRouter` to keep routing rules outside of broker
+implementations. Brokers remain transport adapters, while the router owns task
+registration, route resolution and flow subscriptions.
+This section describes the `experiment/separate_broker` branch contract. The
+old `@broker.task(...)`, `.kiq()`, labels, scheduler and result backend behavior
+remain compatible, while router/flow APIs are additive review material for the
+branch.
+
+`Flow` is a transport-neutral delivery address. Broker packages may provide
+their own flow classes for queue, topic, subject or stream options, as long as
+they implement the same flow protocol. The router deduplicates subscriptions by
+flow name and rejects same-name flows with incompatible broker options.
+
+Routing and subscribing are separate responsibilities. `route_task(...)`
+chooses the outbound broker and flow for task invocations. `subscribe(...)`
+adds flows to a broker listen plan for flow-aware broker adapters. Worker task
+lookup still uses `task_name`; flow does not select the Python task.
+
+Read more in the [Routing and flows](./routing-and-flows.md) section.
+
 ## Messages
 
 Every message has labels. You can define labels

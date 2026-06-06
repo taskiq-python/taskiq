@@ -24,7 +24,7 @@ from taskiq.exceptions import (
     TaskiqError,
     TaskiqResultTimeoutError,
 )
-from taskiq.flow import Flow, FlowProtocol
+from taskiq.flow import Flow, FlowIdentity, FlowProtocol, get_flow_identity
 from taskiq.funcs import gather
 from taskiq.kicker import PreparedKiq
 from taskiq.message import BrokerMessage, TaskiqMessage
@@ -34,7 +34,7 @@ from taskiq.middlewares import (
     SmartRetryMiddleware,
 )
 from taskiq.result import TaskiqResult
-from taskiq.router import TaskiqRoute, TaskiqRouter
+from taskiq.router import TaskiqRoute, TaskiqRouter, TaskiqSubscription
 from taskiq.scheduler.scheduled_task import ScheduledTask
 from taskiq.scheduler.scheduler import TaskiqScheduler
 from taskiq.state import TaskiqState
@@ -53,6 +53,7 @@ __all__ = [
     "BrokerMessage",
     "Context",
     "Flow",
+    "FlowIdentity",
     "FlowProtocol",
     "InMemoryBroker",
     "NoResultError",
@@ -79,9 +80,11 @@ __all__ = [
     "TaskiqRouter",
     "TaskiqScheduler",
     "TaskiqState",
+    "TaskiqSubscription",
     "ZeroMQBroker",
     "__version__",
     "async_shared_broker",
     "gather",
+    "get_flow_identity",
     "task_builder",
 ]

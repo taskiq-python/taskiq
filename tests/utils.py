@@ -1,8 +1,43 @@
 import asyncio
 from collections.abc import AsyncGenerator
 
-from taskiq import AsyncBroker, BrokerMessage
+from taskiq import AsyncBroker, BrokerMessage, FlowProtocol, TaskiqRouter
 from taskiq.acks import AckableMessage
+
+
+class RecordingBroker(AsyncBroker):
+    """Broker for tests that records messages and selected flows."""
+
+    def __init__(
+        self,
+        *,
+        router: TaskiqRouter | None = None,
+        broker_name: str | None = None,
+        default_flow: FlowProtocol | None = None,
+    ) -> None:
+        self.sent: list[tuple[BrokerMessage, FlowProtocol | None]] = []
+        super().__init__(
+            router=router,
+            broker_name=broker_name,
+            default_flow=default_flow,
+        )
+
+    async def kick(self, message: BrokerMessage) -> None:
+        """Record old-style send."""
+        self.sent.append((message, None))
+
+    async def kick_to_flow(
+        self,
+        message: BrokerMessage,
+        flow: FlowProtocol | None = None,
+    ) -> None:
+        """Record flow-aware send."""
+        self.sent.append((message, flow))
+
+    async def listen(self) -> AsyncGenerator[bytes, None]:
+        """Recording broker does not listen in tests."""
+        if False:
+            yield b""
 
 
 class AsyncQueueBroker(AsyncBroker):

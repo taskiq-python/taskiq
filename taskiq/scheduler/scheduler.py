@@ -1,8 +1,9 @@
 from logging import getLogger
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from taskiq.exceptions import ScheduledTaskCancelledError
 from taskiq.kicker import AsyncKicker
+from taskiq.router import TaskiqRouter
 from taskiq.scheduler.scheduled_task import ScheduledTask
 from taskiq.utils import maybe_awaitable
 
@@ -47,19 +48,34 @@ class TaskiqScheduler:
         except ScheduledTaskCancelledError:
             logger.info("Scheduled task %s has been cancelled.", task.task_name)
         else:
-            await (
-                AsyncKicker(task.task_name, self.broker, task.labels)
-                .with_labels(
-                    schedule_id=task.schedule_id,
-                )
+            kicker: AsyncKicker[Any, Any] = (
+                AsyncKicker(task.task_name, self.broker, dict(task.labels))
+                .with_labels(schedule_id=task.schedule_id)
                 .with_task_id(task_id=task.task_id)
-                .kiq(
-                    *task.args,
-                    **task.kwargs,
-                )
             )
+            self._apply_scheduled_route(kicker, task.task_name)
+            await kicker.kiq(*task.args, **task.kwargs)
             await maybe_awaitable(source.post_send(task))
 
     async def shutdown(self) -> None:
         """Shutdown the scheduler process."""
         await self.broker.shutdown()
+
+    def _apply_scheduled_route(
+        self,
+        kicker: AsyncKicker[Any, Any],
+        task_name: str,
+    ) -> None:
+        """
+        Apply scheduler dispatch routing without changing schedule payloads.
+
+        Registered router routes are resolved at send time. If there is no
+        router route for the scheduled task, keep the old scheduler behavior and
+        send through the scheduler broker instead of the router default broker.
+        """
+        router = getattr(self.broker, "router", None)
+        if isinstance(router, TaskiqRouter) and task_name in router.routes:
+            kicker.with_route(router.resolve_route(task_name))
+            return
+
+        kicker.with_broker(self.broker)

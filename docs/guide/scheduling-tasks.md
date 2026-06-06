@@ -159,13 +159,26 @@ If you want to pass additional labels, you can call these methods on the `Kicker
     )
 ```
 
-::: warning Cool warning!
+::: warning Routing warning
 
-The `with_broker` method won't do anything in this case, since we have a broker assigned to each scheduler.
+`with_broker`, `with_route` and `with_flow` are immediate invocation settings.
+They are not stored in the `ScheduledTask` payload. Scheduled dispatch resolves
+the route later in the scheduler process through the scheduler broker's router.
+Use router configuration available to the scheduler process when a scheduled
+task must go to a specific broker or flow.
 
 :::
 
+The scheduler keeps route data out of schedule sources on purpose. A stored
+`ScheduledTask` remains a transport-neutral payload with task name, labels,
+args, kwargs and schedule timing fields. If you change a router rule before a
+schedule becomes ready, the scheduler uses the updated route at send time. If no
+route exists, the scheduler sends through its own broker as before.
+
 Each of these methods return you an instance of the `CreatedSchedule` class. This object has unique schedule ID and some helper methods. For example, you can use the `unschedule` method to remove the schedule from the source.
+Calling `kiq()` on a `CreatedSchedule` is an immediate queued invocation helper;
+it uses the original kicker settings for that immediate send and does not change
+the stored schedule payload.
 
 ```python
     schedule = await my_task.schedule_by_time(
