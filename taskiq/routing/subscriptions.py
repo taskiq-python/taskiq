@@ -15,7 +15,12 @@ __all__ = ("SubscriptionPlan",)
 
 
 class SubscriptionPlan:
-    """Inbound listen-plan subscriptions for flow-aware brokers."""
+    """
+    Inbound listen-plan subscriptions for flow-aware brokers.
+
+    This is mutable setup-time configuration, not a thread-safe runtime
+    coordination primitive.
+    """
 
     def __init__(self, brokers: BrokerRegistry) -> None:
         self.brokers = brokers

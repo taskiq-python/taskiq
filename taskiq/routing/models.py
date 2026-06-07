@@ -26,7 +26,13 @@ class TaskiqRoute:
 
 @dataclass(frozen=True, slots=True)
 class TaskiqSubscription:
-    """Inbound flow subscription owned by a router."""
+    """
+    Inbound flow subscription owned by a router.
+
+    `task_names` is diagnostic listen-plan metadata. It records which task
+    declarations caused a broker to listen to this flow; worker execution still
+    resolves inbound messages by `TaskiqMessage.task_name`.
+    """
 
     broker: AsyncBroker
     flow: FlowProtocol

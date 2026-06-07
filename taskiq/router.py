@@ -132,11 +132,7 @@ class TaskiqRouter:
                 broker=target_broker,
                 flow=flow,
             )
-            # Router and broker share this internal registration boundary.
-            target_broker._store_task(  # noqa: SLF001
-                registered_task.task_name,
-                registered_task,
-            )
+            target_broker.store_registered_task(registered_task)
             return registered_task
 
         return self._register_bound_task(task, broker=broker, flow=flow)
@@ -178,7 +174,7 @@ class TaskiqRouter:
             func: Callable[_FuncParams, _ReturnType],
         ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]:
             target_broker = self._brokers.resolve(broker)
-            real_task_name = task_name if not callable(task_name) else None
+            real_task_name: str | None = None if callable(task_name) else task_name
             task = target_broker.task(task_name=real_task_name, **labels)(func)
             if flow is not None:
                 self.route_task(task, broker=target_broker, flow=flow)

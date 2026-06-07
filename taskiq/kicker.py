@@ -321,7 +321,14 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
     def _prepare_route_snapshot(
         self,
     ) -> tuple[AsyncBroker, TaskiqRoute | None, FlowProtocol | None]:
-        """Resolve the route that a prepared invocation must keep."""
+        """
+        Resolve route state that a prepared invocation must keep.
+
+        The returned tuple is `(broker, route, explicit_flow_override)`.
+        When a route is present, the route already carries its flow, so the
+        separate flow override is `None`. A separate flow is returned only for
+        legacy broker paths that cannot snapshot a `TaskiqRoute`.
+        """
         router = getattr(self.broker, "router", None)
         if not isinstance(router, TaskiqRouter):
             return self.broker, None, self.route_flow

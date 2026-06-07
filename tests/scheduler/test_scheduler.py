@@ -114,6 +114,40 @@ async def test_scheduler_without_route_uses_scheduler_broker() -> None:
     assert scheduled_task.labels == {"source": "database"}
 
 
+async def test_scheduler_removed_route_uses_scheduler_broker() -> None:
+    router = TaskiqRouter()
+    scheduler_flow = Flow("scheduler.default")
+    scheduler_broker = RecordingBroker(
+        router=router,
+        broker_name="scheduler",
+        default_flow=scheduler_flow,
+    )
+    target_broker = RecordingBroker(router=router, broker_name="target")
+    source = RecordingScheduleSource()
+    scheduler = TaskiqScheduler(broker=scheduler_broker, sources=[source])
+
+    @scheduler_broker.task(task_name="demo.task")
+    async def demo_task() -> None:
+        return None
+
+    router.route_task(demo_task, broker=target_broker, flow=Flow("target"))
+    scheduled_task = ScheduledTask(
+        task_name="demo.task",
+        labels={},
+        args=[],
+        kwargs={},
+        cron="* * * * *",
+    )
+    del router.routes["demo.task"]
+
+    await scheduler.on_ready(source, scheduled_task)
+
+    sent_message, sent_flow = scheduler_broker.sent[0]
+    assert target_broker.sent == []
+    assert sent_message.task_name == "demo.task"
+    assert sent_flow == scheduler_flow
+
+
 async def test_created_schedule_kiq_does_not_mutate_schedule_payload() -> None:
     router = TaskiqRouter()
     source_broker = RecordingBroker(router=router, broker_name="source")

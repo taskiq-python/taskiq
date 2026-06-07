@@ -439,6 +439,19 @@ class AsyncBroker(ABC):
             register=register,
         )
 
+    def store_registered_task(
+        self,
+        task: AsyncTaskiqDecoratedTask[Any, Any],
+    ) -> None:
+        """
+        Store a task after router-owned registration accepted it.
+
+        Application code should use `task` or `register_task`. This method is
+        the broker/router integration boundary for cases where the router owns
+        registration ordering and the broker owns local task storage.
+        """
+        self._store_task(task.task_name, task)
+
     def _decorate_task(
         self,
         func: Callable[_FuncParams, _ReturnType],

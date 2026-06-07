@@ -150,6 +150,16 @@ keep a snapshot of the route that was resolved at prepare time, so later changes
 to the mutable kicker object or router route table do not change that prepared
 send.
 
+Flow selection is resolved in this order:
+
+| Source | Effect |
+| --- | --- |
+| Explicit route | `.with_route(route)` uses that route's broker and flow. A later `.with_flow(flow)` updates the route flow, while a later `.with_broker(broker)` clears the explicit route. |
+| Explicit broker | `.with_broker(broker)` sends through that broker. If `.with_flow(flow)` is also set, that flow wins; otherwise Taskiq uses the same-broker task route flow, then the broker `default_flow`. |
+| Explicit flow | `.with_flow(flow)` without a broker override replaces the flow of the resolved route or broker default route. |
+| Router task route | `router.route_task(task, broker=..., flow=...)` is the default outbound route for that task. |
+| Broker default flow | `InMemoryBroker(..., default_flow=...)` and other brokers with `default_flow` provide the fallback flow for that broker. |
+
 ## Subscriptions
 
 Routers also keep inbound flow subscriptions. Routing and subscribing are
@@ -179,6 +189,11 @@ The deprecated `route_task(..., subscribe=True)` shim still performs this
 subscription when a flow is resolved, but new code should call `subscribe()`
 directly.
 
+`TaskiqSubscription.task_names` is diagnostic listen-plan metadata. It records
+which task names caused the broker to listen to a flow, but it does not make the
+flow an inbound task router. Workers still execute messages by
+`TaskiqMessage.task_name`.
+
 Existing brokers can keep implementing `listen()` as before. New flow-aware
 brokers may use `get_subscribed_flows()` to subscribe to queues, topics,
 subjects or streams while the routing rules stay in the router.
@@ -186,6 +201,10 @@ subjects or streams while the routing rules stay in the router.
 `get_subscribed_flows()` returns the broker `default_flow` plus explicit
 subscriptions. It deduplicates by flow identity and checks broker options for
 conflicts.
+
+Router routes and subscriptions are mutable setup-time configuration. They are
+not thread-safe runtime coordination primitives; configure them before starting
+concurrent worker or client activity.
 
 ## Scheduler and requeue
 
@@ -276,6 +295,9 @@ async def traced_charge(user_id: int) -> None:
 When the final application registers this definition, Taskiq creates the bound
 task using `TracingTask`. If `base_cls` is not provided, Taskiq uses the native
 decorated task class.
+
+Custom task classes do not bypass broker middleware. Send and execute lifecycle
+hooks are still owned by the selected broker and worker path.
 
 For low-level integrations, `TaskDefinition.message(...)` builds a
 `TaskiqMessage` without binding the task. It uses the same argument and label
