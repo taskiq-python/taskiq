@@ -81,7 +81,7 @@ class Receiver:
         self.wait_tasks_timeout = wait_tasks_timeout
         for task in self.broker.get_all_tasks().values():
             self._prepare_task(task.task_name, task.original_func)
-        self.sem: asyncio.Semaphore | None = None
+        self.sem: asyncio.BoundedSemaphore | None = None
         if max_async_tasks is not None and max_async_tasks > 0:
             # Apply jitter to prevent all workers from hitting the limit simultaneously
             actual_limit = max_async_tasks
@@ -91,7 +91,7 @@ class Receiver:
                     0,
                     max_async_tasks_jitter,
                 )
-            self.sem = asyncio.Semaphore(actual_limit)
+            self.sem = asyncio.BoundedSemaphore(actual_limit)
         else:
             logger.warning(
                 "Setting unlimited number of async tasks "
@@ -237,13 +237,12 @@ class Receiver:
         messages: "Sequence[bytes | AckableMessage]",
     ) -> None:
         """
-        Execute a batch of accumulated messages as a single call.
+        Run a batch of accumulated messages as a single task call.
 
-        All messages must belong to the same batched task. Each message
-        contributes its first positional argument as one element of the list
-        passed to the task. The single result (or error) is stored under every
-        task_id, and every message is acknowledged according to the configured
-        AcknowledgeType.
+        All messages must belong to the same batched task. Each contributes its
+        first positional argument to the list passed to the handler. The single
+        result (or error) is stored under every task_id, and every message is
+        acked according to the configured AcknowledgeType.
 
         :param task_name: name of the batched task.
         :param messages: raw or ackable messages collected for this batch.
@@ -320,10 +319,10 @@ class Receiver:
         result: "TaskiqResult[Any]",
     ) -> None:
         """
-        Run error/post-execute middlewares and store the result for one message.
+        Run per-message middlewares and store the shared result for one message.
 
-        Shared by every message in a batch: `on_error` (on real failures),
-        `post_execute`, then result persistence with `post_save`.
+        Runs ``on_error`` (on real failures), ``post_execute``, then saves the
+        result with ``post_save``. Called for each message in a batch.
 
         :param message: parsed task message.
         :param result: shared batch result.
@@ -634,22 +633,66 @@ class Receiver:
         except Exception:
             return None
 
+    async def _acquire_batch_permit(self, task_name: str, shutdown: bool) -> bool:
+        """
+        Acquire a semaphore permit for a batch; return whether one is held.
+
+        The runtime path waits for a free permit. The shutdown path is
+        best-effort and never blocks forever, so a saturated semaphore can't
+        hang teardown; the permit is released later (in ``_flush_batch``) only
+        if it was acquired here.
+
+        :param task_name: name of the batched task (used in log messages).
+        :param shutdown: best-effort acquire during shutdown.
+        :return: whether a permit is now held.
+        """
+        if self.sem is None:
+            return False
+        if not shutdown:
+            await self.sem.acquire()
+            return True
+        # Best-effort shutdown: with no timeout configured, skip the acquire
+        # entirely rather than block forever on a held permit.
+        if self.wait_tasks_timeout is None:
+            logger.warning(
+                "No wait_tasks_timeout set; flushing batch %s without "
+                "acquiring a semaphore permit during shutdown.",
+                task_name,
+            )
+            return False
+        try:
+            await asyncio.wait_for(
+                self.sem.acquire(),
+                timeout=self.wait_tasks_timeout,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Could not acquire semaphore for batch %s during shutdown; "
+                "flushing without a permit.",
+                task_name,
+            )
+            return False
+        return True
+
     async def _flush_batch(
         self,
         task_name: str,
         messages: "Sequence[bytes | AckableMessage]",
+        shutdown: bool = False,
     ) -> None:
         """
-        Flush handler invoked by the Batcher: run a batch as one task.
+        Run a batch as one task, holding a semaphore permit while it runs.
 
-        Acquires the semaphore once for the whole batch and releases it when
-        the batch task completes.
+        During shutdown the permit is best-effort (see ``_acquire_batch_permit``):
+        the batch runs even if no permit could be acquired, and the permit is
+        released afterwards only if it was held.
 
         :param task_name: name of the batched task.
         :param messages: messages collected for this batch.
+        :param shutdown: best-effort flush during shutdown.
         """
-        if self.sem is not None:
-            await self.sem.acquire()
+        acquired = await self._acquire_batch_permit(task_name, shutdown)
+
         task = asyncio.create_task(
             self.batched_callback(task_name=task_name, messages=messages),
         )
@@ -657,7 +700,7 @@ class Receiver:
 
         def _done(finished: "asyncio.Task[Any]") -> None:
             self._batch_tasks.discard(finished)
-            if self.sem is not None:
+            if acquired and self.sem is not None:
                 self.sem.release()
 
         task.add_done_callback(_done)
@@ -712,6 +755,27 @@ class Receiver:
         # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
         task.add_done_callback(task_cb)
 
+    async def _shutdown_drain(self, tasks: "set[asyncio.Task[Any]]") -> None:
+        """
+        Drain buffered batches and wait for in-flight tasks on shutdown.
+
+        Flushes any buffered batches, then waits (bounded by
+        ``wait_tasks_timeout``) for both the in-flight immediate callbacks and
+        the batch tasks they produce to finish.
+
+        :param tasks: set of in-flight immediate callback tasks.
+        """
+        await self.batcher.flush_all()
+        all_tasks = tasks | self._batch_tasks
+        if not all_tasks:
+            return
+        logger.info(
+            "Waiting for %d running tasks to complete...",
+            len(all_tasks),
+        )
+        await asyncio.wait(all_tasks, timeout=self.wait_tasks_timeout)
+        logger.info("No more tasks to wait for. Shutting down.")
+
     async def runner(
         self,
         queue: "asyncio.Queue[bytes | AckableMessage]",
@@ -746,18 +810,7 @@ class Receiver:
                 self.sem_prefetch.release()
                 message = await queue.get()
                 if message is QUEUE_DONE:
-                    await self.batcher.flush_all()
-                    all_tasks = tasks | self._batch_tasks
-                    if all_tasks:
-                        logger.info(
-                            "Waiting for %d running tasks to complete...",
-                            len(all_tasks),
-                        )
-                        await asyncio.wait(
-                            all_tasks,
-                            timeout=self.wait_tasks_timeout,
-                        )
-                        logger.info("No more tasks to wait for. Shutting down.")
+                    await self._shutdown_drain(tasks)
                     break
 
                 # Custom hooks for OTel and any future instrumentations

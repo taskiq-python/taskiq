@@ -291,6 +291,62 @@ async def test_batch_acks_when_executed() -> None:
     assert acked.index(-1) < acked.index(2)
 
 
+async def test_shutdown_does_not_hang_when_semaphore_saturated() -> None:
+    """Shutdown batch flush must not block forever on sem.acquire.
+
+    All semaphore permits are held (here: the only permit is acquired
+    externally to simulate long-running normal tasks at shutdown). A batched
+    message is buffered. The shutdown flush path must complete within
+    wait_tasks_timeout instead of blocking forever on the held permit.
+    """
+    broker = InMemoryBroker()
+
+    @broker.task(batch=True, batch_size=5, batch_timeout=None)
+    async def my_task(items: list[int]) -> int:
+        return sum(items)
+
+    receiver = _receiver(broker, max_async_tasks=1)
+    receiver.wait_tasks_timeout = 0.2
+
+    # Buffer one batched message (size 5 not reached -> only flush_all drains it).
+    msg = _msg(broker, my_task.task_name, 1)
+    await receiver.batcher.add(my_task.task_name, msg, 5, None)
+
+    # Exhaust the single permit, as if a long-running normal task held it.
+    assert receiver.sem is not None
+    await receiver.sem.acquire()
+
+    # Shutdown flush. Before the fix this blocks forever on sem.acquire inside
+    # _flush_batch; wait_for would then time out (RED). After the fix it
+    # proceeds without the permit within wait_tasks_timeout.
+    await asyncio.wait_for(receiver.batcher.flush_all(), timeout=2)
+
+
+async def test_shutdown_does_not_hang_when_no_wait_timeout_set() -> None:
+    """With wait_tasks_timeout=None, shutdown must still not block on sem.
+
+    wait_for(acquire(), timeout=None) would wait forever, so the shutdown
+    path must skip the permit entirely when no timeout is configured.
+    """
+    broker = InMemoryBroker()
+
+    @broker.task(batch=True, batch_size=5, batch_timeout=None)
+    async def my_task(items: list[int]) -> int:
+        return sum(items)
+
+    receiver = _receiver(broker, max_async_tasks=1)
+    # Default: no wait_tasks_timeout.
+    assert receiver.wait_tasks_timeout is None
+
+    msg = _msg(broker, my_task.task_name, 1)
+    await receiver.batcher.add(my_task.task_name, msg, 5, None)
+
+    assert receiver.sem is not None
+    await receiver.sem.acquire()
+
+    await asyncio.wait_for(receiver.batcher.flush_all(), timeout=2)
+
+
 async def test_buffering_not_blocked_by_saturated_semaphore() -> None:
     """Batched messages buffer freely even when the semaphore is exhausted."""
     broker = InMemoryBroker()

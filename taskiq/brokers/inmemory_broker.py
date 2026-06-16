@@ -225,9 +225,10 @@ class InMemoryBroker(AsyncBroker):
 
         Useful when used in testing and you need to await all sent tasks
         before asserting results. Any buffered batched tasks are flushed
-        first so their results become available too.
+        first so their results become available too. The batcher is drained
+        without being closed, so it stays usable for subsequent sends.
         """
-        await self.receiver.batcher.flush_all()
+        await self.receiver.batcher.flush_all(closing=False)
         to_await = list(self._running_tasks)
         for task in to_await:
             await task
