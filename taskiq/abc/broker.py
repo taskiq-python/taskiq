@@ -10,6 +10,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
+    Literal,
     ParamSpec,
     TypeAlias,
     TypeVar,
@@ -21,9 +22,9 @@ from uuid import uuid4
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.abc.serializer import TaskiqSerializer
 from taskiq.acks import AckableMessage
-from taskiq.decor import AsyncTaskiqDecoratedTask
+from taskiq.decor import AsyncBatchedTaskiqDecoratedTask, AsyncTaskiqDecoratedTask
 from taskiq.events import TaskiqEvents
-from taskiq.exceptions import TaskBrokerMismatchError
+from taskiq.exceptions import TaskBrokerMismatchError, TaskiqBatchConfigError
 from taskiq.formatters.proxy_formatter import ProxyFormatter
 from taskiq.message import BrokerMessage
 from taskiq.result_backends.dummy import DummyResultBackend
@@ -43,6 +44,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.result_backend import AsyncResultBackend
 
 _T = TypeVar("_T")
+_Item = TypeVar("_Item")
 _FuncParams = ParamSpec("_FuncParams")
 _ReturnType = TypeVar("_ReturnType")
 
@@ -255,6 +257,40 @@ class AsyncBroker(ABC):
         :return: nothing.
         """
 
+    @staticmethod
+    def _validate_batch_labels(labels: dict[str, Any]) -> None:
+        """
+        Validate batch related labels.
+
+        :param labels: labels passed to the task decorator.
+        :raises TaskiqBatchConfigError: if batch configuration is invalid.
+        """
+        if not labels.get("batch"):
+            return
+        batch_size = labels.get("batch_size")
+        batch_timeout = labels.get("batch_timeout")
+        invalid = (
+            (batch_size is None and batch_timeout is None)
+            or (batch_size is not None and batch_size < 1)
+            or (batch_timeout is not None and batch_timeout <= 0)
+        )
+        if invalid:
+            raise TaskiqBatchConfigError
+
+    @overload
+    def task(
+        self,
+        *,
+        batch: Literal[True],
+        batch_size: int | None = None,
+        batch_timeout: float | None = None,
+        **labels: Any,
+    ) -> Callable[
+        [Callable[[list[_Item]], Awaitable[_ReturnType]]],
+        AsyncBatchedTaskiqDecoratedTask[_Item, ..., _ReturnType],
+    ]:  # pragma: no cover
+        ...
+
     @overload
     def task(
         self,
@@ -301,6 +337,7 @@ class AsyncBroker(ABC):
 
         :returns: decorator function or AsyncTaskiqDecoratedTask.
         """
+        self._validate_batch_labels(labels)
 
         def make_decorated_task(
             inner_labels: dict[str, str | int],
@@ -332,8 +369,11 @@ class AsyncBroker(ABC):
                 if "return" in sign:
                     return_type = sign["return"]
 
+                decorator_cls = self.decorator_class
+                if inner_labels.get("batch"):
+                    decorator_cls = AsyncBatchedTaskiqDecoratedTask
                 decorated_task = wrapper(
-                    self.decorator_class(
+                    decorator_cls(
                         broker=self,
                         original_func=func,
                         labels=inner_labels,
