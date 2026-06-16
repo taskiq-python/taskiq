@@ -82,6 +82,7 @@ async def test_batch_acks_each_message() -> None:
     def make_ack(i: int) -> Callable[[], None]:
         def _ack() -> None:
             acked.append(i)
+
         return _ack
 
     msgs = [
@@ -127,7 +128,7 @@ async def test_runner_routes_and_flushes_on_shutdown() -> None:
 
     receiver = _receiver(broker)
 
-    queue: asyncio.Queue = asyncio.Queue()
+    queue: asyncio.Queue[bytes | AckableMessage] = asyncio.Queue()
     for i in (1, 2):
         await queue.put(_msg(broker, my_task.task_name, i))
     await queue.put(QUEUE_DONE)
@@ -149,7 +150,7 @@ async def test_runner_flushes_on_size_during_run() -> None:
 
     receiver = _receiver(broker)
 
-    queue: asyncio.Queue = asyncio.Queue()
+    queue: asyncio.Queue[bytes | AckableMessage] = asyncio.Queue()
     for i in (1, 2):
         await queue.put(_msg(broker, my_task.task_name, i))
     await queue.put(QUEUE_DONE)
@@ -171,7 +172,7 @@ async def test_runner_still_runs_normal_tasks() -> None:
 
     receiver = _receiver(broker)
 
-    queue: asyncio.Queue = asyncio.Queue()
+    queue: asyncio.Queue[bytes | AckableMessage] = asyncio.Queue()
     await queue.put(_msg(broker, normal_task.task_name, 7))
     await queue.put(QUEUE_DONE)
 
@@ -246,6 +247,7 @@ async def test_batch_acks_when_received() -> None:
     def make_ack(i: int) -> Callable[[], None]:
         def _ack() -> None:
             acked.append(i)
+
         return _ack
 
     msgs = [
@@ -274,6 +276,7 @@ async def test_batch_acks_when_executed() -> None:
     def make_ack(i: int) -> Callable[[], None]:
         def _ack() -> None:
             acked.append(i)
+
         return _ack
 
     msgs = [
@@ -309,7 +312,7 @@ async def test_buffering_not_blocked_by_saturated_semaphore() -> None:
     # Only one concurrent slot.
     receiver = _receiver(broker, max_async_tasks=1)
 
-    queue: asyncio.Queue = asyncio.Queue()
+    queue: asyncio.Queue[bytes | AckableMessage] = asyncio.Queue()
     await queue.put(_msg(broker, blocker.task_name, 99))
     # These 3 batched messages must buffer and flush even though the single
     # semaphore slot is held by `blocker`.

@@ -4,7 +4,7 @@ import functools
 import inspect
 import random
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from concurrent.futures import Executor, ProcessPoolExecutor
 from logging import getLogger
 from time import time
@@ -234,7 +234,7 @@ class Receiver:
     async def batched_callback(  # noqa: C901
         self,
         task_name: str,
-        messages: "list[bytes | AckableMessage]",
+        messages: "Sequence[bytes | AckableMessage]",
     ) -> None:
         """
         Execute a batch of accumulated messages as a single call.
@@ -637,7 +637,7 @@ class Receiver:
     async def _flush_batch(
         self,
         task_name: str,
-        messages: "list[bytes | AckableMessage]",
+        messages: "Sequence[bytes | AckableMessage]",
     ) -> None:
         """
         Flush handler invoked by the Batcher: run a batch as one task.
@@ -689,9 +689,7 @@ class Receiver:
         :param task_cb: done-callback that releases the semaphore for a task.
         """
         batched_name = self._peek_task_name(message)
-        cfg = (
-            self.get_batch_config(batched_name) if batched_name is not None else None
-        )
+        cfg = self.get_batch_config(batched_name) if batched_name is not None else None
         if batched_name is not None and cfg is not None:
             size, timeout = cfg
             # Buffering is not execution: release the slot acquired for this

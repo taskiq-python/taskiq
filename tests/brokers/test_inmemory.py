@@ -180,4 +180,3 @@ async def test_batch_error_marks_all() -> None:
     results = [await t.wait_result(timeout=2) for t in tasks]
 
     assert all(r.is_err for r in results)
-
