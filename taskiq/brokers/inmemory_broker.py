@@ -153,6 +153,10 @@ class InMemoryBroker(AsyncBroker):
 
         This method just executes given task.
 
+        For batched tasks the message is buffered and the batch is executed
+        once the batch size is reached (or immediately when `await_inplace`
+        is enabled). Call `wait_all` to flush any remaining buffered batches.
+
         :param message: incoming message.
 
         :raises TaskiqError: if someone wants to kick unknown task.
@@ -160,6 +164,11 @@ class InMemoryBroker(AsyncBroker):
         target_task = self.find_task(message.task_name)
         if target_task is None:
             raise UnknownTaskError(task_name=message.task_name)
+
+        batch_config = self.receiver.get_batch_config(message.task_name)
+        if batch_config is not None:
+            await self._kick_batched(message, batch_config)
+            return
 
         receiver_cb = self.receiver.callback(message=message.message)
         if self.await_inplace:
@@ -169,6 +178,35 @@ class InMemoryBroker(AsyncBroker):
         task = asyncio.create_task(receiver_cb)
         self._running_tasks.add(task)
         task.add_done_callback(self._running_tasks.discard)
+
+    async def _kick_batched(
+        self,
+        message: BrokerMessage,
+        batch_config: "tuple[int | None, float | None]",
+    ) -> None:
+        """
+        Buffer a batched task message and flush according to its config.
+
+        With `await_inplace` each message is flushed immediately as a
+        one-item batch so that results are available right after `kiq`.
+
+        :param message: incoming message.
+        :param batch_config: (batch_size, batch_timeout) of the task.
+        """
+        size, timeout = batch_config
+        if self.await_inplace:
+            # Flush immediately: one message becomes a one-item batch.
+            await self.receiver.batched_callback(
+                task_name=message.task_name,
+                messages=[message.message],
+            )
+            return
+        await self.receiver.batcher.add(
+            message.task_name,
+            message.message,
+            size,
+            timeout,
+        )
 
     def listen(self) -> AsyncGenerator[bytes, None]:
         """
@@ -186,11 +224,15 @@ class InMemoryBroker(AsyncBroker):
         Wait for all currently running tasks to complete.
 
         Useful when used in testing and you need to await all sent tasks
-        before asserting results.
+        before asserting results. Any buffered batched tasks are flushed
+        first so their results become available too. The batcher is drained
+        without being closed, so it stays usable for subsequent sends.
         """
+        await self.receiver.batcher.flush_all(closing=False)
         to_await = list(self._running_tasks)
         for task in to_await:
             await task
+        await self.receiver.wait_for_batch_tasks()
 
     async def startup(self) -> None:
         """Runs startup events for client and worker side."""

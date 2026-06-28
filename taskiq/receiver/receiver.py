@@ -4,7 +4,7 @@ import functools
 import inspect
 import random
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from concurrent.futures import Executor, ProcessPoolExecutor
 from logging import getLogger
 from time import time
@@ -19,6 +19,7 @@ from taskiq.acks import AcknowledgeType
 from taskiq.context import Context
 from taskiq.exceptions import NoResultError
 from taskiq.message import TaskiqMessage
+from taskiq.receiver.batcher import Batcher
 from taskiq.receiver.params_parser import parse_params
 from taskiq.result import TaskiqResult
 from taskiq.state import TaskiqState
@@ -80,7 +81,7 @@ class Receiver:
         self.wait_tasks_timeout = wait_tasks_timeout
         for task in self.broker.get_all_tasks().values():
             self._prepare_task(task.task_name, task.original_func)
-        self.sem: asyncio.Semaphore | None = None
+        self.sem: asyncio.BoundedSemaphore | None = None
         if max_async_tasks is not None and max_async_tasks > 0:
             # Apply jitter to prevent all workers from hitting the limit simultaneously
             actual_limit = max_async_tasks
@@ -90,7 +91,7 @@ class Receiver:
                     0,
                     max_async_tasks_jitter,
                 )
-            self.sem = asyncio.Semaphore(actual_limit)
+            self.sem = asyncio.BoundedSemaphore(actual_limit)
         else:
             logger.warning(
                 "Setting unlimited number of async tasks "
@@ -98,8 +99,72 @@ class Receiver:
             )
         self.sem_prefetch = asyncio.Semaphore(max_prefetch)
         self.is_process_pool = isinstance(executor, ProcessPoolExecutor)
+        self.batcher = Batcher(self._flush_batch)
+        self._batch_tasks: set[asyncio.Task[Any]] = set()
 
-    async def callback(  # noqa: C901, PLR0912
+    async def _ack_if(
+        self,
+        message: "bytes | AckableMessage",
+        when: AcknowledgeType,
+    ) -> None:
+        """
+        Acknowledge a message if the configured ack time matches.
+
+        :param message: raw or ackable message.
+        :param when: ack time this call corresponds to.
+        """
+        if self.ack_time == when and isinstance(message, AckableMessage):
+            await maybe_awaitable(message.ack())
+
+    async def _run_post_execute(
+        self,
+        message: TaskiqMessage,
+        result: "TaskiqResult[Any]",
+    ) -> None:
+        """
+        Run `post_execute` middlewares for a single message.
+
+        :param message: parsed task message.
+        :param result: result of the execution.
+        """
+        for middleware in reversed(self.broker.middlewares):
+            if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
+                await maybe_awaitable(middleware.post_execute(message, result))
+
+    async def _save_result(
+        self,
+        message: TaskiqMessage,
+        result: "TaskiqResult[Any]",
+        raise_err: bool = False,
+    ) -> None:
+        """
+        Persist a result and run `post_save` middlewares for one message.
+
+        Skips persistence when the task asked for no result. Errors from the
+        result backend are logged, and re-raised only when `raise_err` is set.
+
+        :param message: parsed task message.
+        :param result: result to store.
+        :param raise_err: re-raise result backend errors.
+        :raises Exception: if storing fails and `raise_err` is True.
+        """
+        if isinstance(result.error, NoResultError):
+            return
+        try:
+            await self.broker.result_backend.set_result(message.task_id, result)
+            for middleware in reversed(self.broker.middlewares):
+                if middleware.__class__.post_save != TaskiqMiddleware.post_save:
+                    await maybe_awaitable(middleware.post_save(message, result))
+        except Exception as exc:
+            logger.exception(
+                "Can't set result in result backend. Cause: %s",
+                exc,
+                exc_info=True,
+            )
+            if raise_err:
+                raise
+
+    async def callback(
         self,
         message: bytes | AckableMessage,
         raise_err: bool = False,
@@ -154,54 +219,124 @@ class Receiver:
             taskiq_msg.task_id,
         )
 
-        if self.ack_time == AcknowledgeType.WHEN_RECEIVED and isinstance(
-            message,
-            AckableMessage,
-        ):
-            await maybe_awaitable(message.ack())
+        await self._ack_if(message, AcknowledgeType.WHEN_RECEIVED)
 
         result = await self.run_task(
             target=task.original_func,
             message=taskiq_msg,
         )
 
-        if self.ack_time == AcknowledgeType.WHEN_EXECUTED and isinstance(
-            message,
-            AckableMessage,
-        ):
-            await maybe_awaitable(message.ack())
+        await self._ack_if(message, AcknowledgeType.WHEN_EXECUTED)
+        await self._run_post_execute(taskiq_msg, result)
+        await self._save_result(taskiq_msg, result, raise_err=raise_err)
+        await self._ack_if(message, AcknowledgeType.WHEN_SAVED)
 
-        for middleware in reversed(self.broker.middlewares):
-            if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
-                await maybe_awaitable(middleware.post_execute(taskiq_msg, result))
+    async def batched_callback(  # noqa: C901
+        self,
+        task_name: str,
+        messages: "Sequence[bytes | AckableMessage]",
+    ) -> None:
+        """
+        Run a batch of accumulated messages as a single task call.
 
-        try:
-            if not isinstance(result.error, NoResultError):
-                await self.broker.result_backend.set_result(taskiq_msg.task_id, result)
+        All messages must belong to the same batched task. Each contributes its
+        first positional argument to the list passed to the handler. The single
+        result (or error) is stored under every task_id, and every message is
+        acked according to the configured AcknowledgeType.
 
-                for middleware in reversed(self.broker.middlewares):
-                    if middleware.__class__.post_save != TaskiqMiddleware.post_save:
-                        await maybe_awaitable(middleware.post_save(taskiq_msg, result))
-
-        except Exception as exc:
-            logger.exception(
-                "Can't set result in result backend. Cause: %s",
-                exc,
-                exc_info=True,
+        :param task_name: name of the batched task.
+        :param messages: raw or ackable messages collected for this batch.
+        """
+        task = self.broker.find_task(task_name)
+        if task is None:
+            logger.warning(
+                'Batched task "%s" is not found. Dropping batch.',
+                task_name,
             )
-            if raise_err:
-                raise exc
+            return
 
-        if self.ack_time == AcknowledgeType.WHEN_SAVED and isinstance(
-            message,
-            AckableMessage,
-        ):
-            await maybe_awaitable(message.ack())
+        parsed: list[TaskiqMessage] = []
+        ackables: list[AckableMessage] = []
+        for message in messages:
+            data = message.data if isinstance(message, AckableMessage) else message
+            try:
+                tmsg = self.broker.formatter.loads(message=data)
+                tmsg.parse_labels()
+            except Exception as exc:
+                logger.warning(
+                    "Cannot parse batched message: %s. Skipping.",
+                    exc,
+                    exc_info=True,
+                )
+                continue
+            parsed.append(tmsg)
+            if isinstance(message, AckableMessage):
+                ackables.append(message)
+
+        if not parsed:
+            return
+
+        for middleware in self.broker.middlewares:
+            if middleware.__class__.pre_execute != TaskiqMiddleware.pre_execute:
+                for idx, tmsg in enumerate(parsed):
+                    # Reassign so a middleware that returns a transformed
+                    # message takes effect (same as the non-batched path).
+                    parsed[idx] = await maybe_awaitable(
+                        middleware.pre_execute(tmsg),
+                    )
+
+        for ack in ackables:
+            await self._ack_if(ack, AcknowledgeType.WHEN_RECEIVED)
+
+        items = [tmsg.args[0] if tmsg.args else None for tmsg in parsed]
+        batch_message = TaskiqMessage(
+            task_id=parsed[0].task_id,
+            task_name=task_name,
+            labels=parsed[0].labels,
+            args=[items],
+            kwargs={},
+        )
+
+        # `on_error` is run per message below, not for the synthetic message.
+        result = await self.run_task(
+            target=task.original_func,
+            message=batch_message,
+            run_on_error=False,
+        )
+
+        for ack in ackables:
+            await self._ack_if(ack, AcknowledgeType.WHEN_EXECUTED)
+
+        for tmsg in parsed:
+            await self._finalize_batch_message(tmsg, result)
+
+        for ack in ackables:
+            await self._ack_if(ack, AcknowledgeType.WHEN_SAVED)
+
+    async def _finalize_batch_message(
+        self,
+        message: TaskiqMessage,
+        result: "TaskiqResult[Any]",
+    ) -> None:
+        """
+        Run per-message middlewares and store the shared result for one message.
+
+        Runs ``on_error`` (on real failures), ``post_execute``, then saves the
+        result with ``post_save``. Called for each message in a batch.
+
+        :param message: parsed task message.
+        :param result: shared batch result.
+        """
+        if result.error is not None and not isinstance(result.error, NoResultError):
+            await self._run_on_error(message, result, result.error)
+        await self._run_post_execute(message, result)
+        await self._save_result(message, result)
 
     async def run_task(  # noqa: C901, PLR0912, PLR0915
         self,
         target: Callable[..., Any],
         message: TaskiqMessage,
+        run_on_error: bool = True,
     ) -> TaskiqResult[Any]:
         """
         This function actually executes functions.
@@ -219,6 +354,8 @@ class Receiver:
 
         :param target: function to execute.
         :param message: received message.
+        :param run_on_error: run `on_error` middlewares here. Batched execution
+            sets this to False and runs them per message instead.
         :return: result of execution.
         """
         loop = asyncio.get_running_loop()
@@ -348,18 +485,29 @@ class Receiver:
             labels=message.labels,
         )
         # If exception is found we execute middlewares.
-        if found_exception is not None:
-            for middleware in reversed(self.broker.middlewares):
-                if middleware.__class__.on_error != TaskiqMiddleware.on_error:
-                    await maybe_awaitable(
-                        middleware.on_error(
-                            message,
-                            result,
-                            found_exception,
-                        ),
-                    )
+        if found_exception is not None and run_on_error:
+            await self._run_on_error(message, result, found_exception)
 
         return result
+
+    async def _run_on_error(
+        self,
+        message: TaskiqMessage,
+        result: "TaskiqResult[Any]",
+        exception: BaseException,
+    ) -> None:
+        """
+        Run `on_error` middlewares for a single message.
+
+        :param message: parsed task message.
+        :param result: result of the failed execution.
+        :param exception: exception raised during execution.
+        """
+        for middleware in reversed(self.broker.middlewares):
+            if middleware.__class__.on_error != TaskiqMiddleware.on_error:
+                await maybe_awaitable(
+                    middleware.on_error(message, result, exception),
+                )
 
     async def listen(self, finish_event: asyncio.Event) -> None:  # pragma: no cover
         """
@@ -439,6 +587,195 @@ class Receiver:
         await queue.put(QUEUE_DONE)
         self.sem_prefetch.release()
 
+    def get_batch_config(
+        self,
+        task_name: str,
+    ) -> "tuple[int | None, float | None] | None":
+        """
+        Return (batch_size, batch_timeout) if the task is batched, else None.
+
+        A task with malformed batch labels is treated as non-batched (returns
+        None) and logged, so a single bad message cannot crash the runner.
+
+        :param task_name: name of the task.
+        :return: batch config tuple or None for non-batched tasks.
+        """
+        task = self.broker.find_task(task_name)
+        if task is None or not task.labels.get("batch"):
+            return None
+        size = task.labels.get("batch_size")
+        timeout = task.labels.get("batch_timeout")
+        try:
+            return (
+                int(size) if size is not None else None,
+                float(timeout) if timeout is not None else None,
+            )
+        except (TypeError, ValueError):
+            logger.warning(
+                "Invalid batch config for task %s (size=%r, timeout=%r). "
+                "Treating as non-batched.",
+                task_name,
+                size,
+                timeout,
+            )
+            return None
+
+    def _peek_task_name(self, message: "bytes | AckableMessage") -> str | None:
+        """
+        Cheaply read the task name from a raw message for batch routing.
+
+        :param message: raw or ackable message.
+        :return: task name, or None if it cannot be parsed.
+        """
+        data = message.data if isinstance(message, AckableMessage) else message
+        try:
+            return self.broker.formatter.loads(message=data).task_name
+        except Exception:
+            return None
+
+    async def _acquire_batch_permit(self, task_name: str, shutdown: bool) -> bool:
+        """
+        Acquire a semaphore permit for a batch; return whether one is held.
+
+        The runtime path waits for a free permit. The shutdown path is
+        best-effort and never blocks forever, so a saturated semaphore can't
+        hang teardown; the permit is released later (in ``_flush_batch``) only
+        if it was acquired here.
+
+        :param task_name: name of the batched task (used in log messages).
+        :param shutdown: best-effort acquire during shutdown.
+        :return: whether a permit is now held.
+        """
+        if self.sem is None:
+            return False
+        if not shutdown:
+            await self.sem.acquire()
+            return True
+        # Best-effort shutdown: with no timeout configured, skip the acquire
+        # entirely rather than block forever on a held permit.
+        if self.wait_tasks_timeout is None:
+            logger.warning(
+                "No wait_tasks_timeout set; flushing batch %s without "
+                "acquiring a semaphore permit during shutdown.",
+                task_name,
+            )
+            return False
+        try:
+            await asyncio.wait_for(
+                self.sem.acquire(),
+                timeout=self.wait_tasks_timeout,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Could not acquire semaphore for batch %s during shutdown; "
+                "flushing without a permit.",
+                task_name,
+            )
+            return False
+        return True
+
+    async def _flush_batch(
+        self,
+        task_name: str,
+        messages: "Sequence[bytes | AckableMessage]",
+        shutdown: bool = False,
+    ) -> None:
+        """
+        Run a batch as one task, holding a semaphore permit while it runs.
+
+        During shutdown the permit is best-effort (see ``_acquire_batch_permit``):
+        the batch runs even if no permit could be acquired, and the permit is
+        released afterwards only if it was held.
+
+        :param task_name: name of the batched task.
+        :param messages: messages collected for this batch.
+        :param shutdown: best-effort flush during shutdown.
+        """
+        acquired = await self._acquire_batch_permit(task_name, shutdown)
+
+        task = asyncio.create_task(
+            self.batched_callback(task_name=task_name, messages=messages),
+        )
+        self._batch_tasks.add(task)
+
+        def _done(finished: "asyncio.Task[Any]") -> None:
+            self._batch_tasks.discard(finished)
+            if acquired and self.sem is not None:
+                self.sem.release()
+
+        task.add_done_callback(_done)
+
+    async def wait_for_batch_tasks(self) -> None:
+        """
+        Await all currently running batch executions.
+
+        Used by inplace brokers (e.g. InMemoryBroker) so that tests can wait
+        for flushed batches to finish before asserting results.
+        """
+        for task in list(self._batch_tasks):
+            await task
+
+    async def _dispatch_message(
+        self,
+        message: "bytes | AckableMessage",
+        tasks: "set[asyncio.Task[Any]]",
+        task_cb: "Callable[[asyncio.Task[Any]], None]",
+    ) -> None:
+        """
+        Route a dequeued message to batching or immediate execution.
+
+        Batched messages are buffered (and flushed later by the Batcher);
+        everything else is executed right away via `callback`.
+
+        :param message: message taken from the prefetch queue.
+        :param tasks: set tracking in-flight immediate callbacks.
+        :param task_cb: done-callback that releases the semaphore for a task.
+        """
+        batched_name = self._peek_task_name(message)
+        cfg = self.get_batch_config(batched_name) if batched_name is not None else None
+        if batched_name is not None and cfg is not None:
+            size, timeout = cfg
+            # Buffering is not execution: release the slot acquired for this
+            # dequeue. The batch acquires its own slot at flush time.
+            if self.sem is not None:
+                self.sem.release()
+            await self.batcher.add(batched_name, message, size, timeout)
+            return
+
+        task = asyncio.create_task(
+            self.callback(message=message, raise_err=False),
+        )
+        tasks.add(task)
+
+        # We want the task to remove itself from the set when it's done.
+        #
+        # Because if we won't save it anywhere,
+        # python's GC can silently cancel task
+        # and this behaviour considered to be a Hisenbug.
+        # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
+        task.add_done_callback(task_cb)
+
+    async def _shutdown_drain(self, tasks: "set[asyncio.Task[Any]]") -> None:
+        """
+        Drain buffered batches and wait for in-flight tasks on shutdown.
+
+        Flushes any buffered batches, then waits (bounded by
+        ``wait_tasks_timeout``) for both the in-flight immediate callbacks and
+        the batch tasks they produce to finish.
+
+        :param tasks: set of in-flight immediate callback tasks.
+        """
+        await self.batcher.flush_all()
+        all_tasks = tasks | self._batch_tasks
+        if not all_tasks:
+            return
+        logger.info(
+            "Waiting for %d running tasks to complete...",
+            len(all_tasks),
+        )
+        await asyncio.wait(all_tasks, timeout=self.wait_tasks_timeout)
+        logger.info("No more tasks to wait for. Shutting down.")
+
     async def runner(
         self,
         queue: "asyncio.Queue[bytes | AckableMessage]",
@@ -473,13 +810,7 @@ class Receiver:
                 self.sem_prefetch.release()
                 message = await queue.get()
                 if message is QUEUE_DONE:
-                    # asyncio.wait will throw an error if there is nothing to wait for
-                    if tasks:
-                        logger.info(
-                            f"Waiting for {len(tasks)} running tasks to complete...",
-                        )
-                        await asyncio.wait(tasks, timeout=self.wait_tasks_timeout)
-                        logger.info("No more tasks to wait for. Shutting down.")
+                    await self._shutdown_drain(tasks)
                     break
 
                 # Custom hooks for OTel and any future instrumentations
@@ -489,18 +820,7 @@ class Receiver:
                             middleware.on_prefetch_queue_remove(),  # type: ignore
                         )
 
-                task = asyncio.create_task(
-                    self.callback(message=message, raise_err=False),
-                )
-                tasks.add(task)
-
-                # We want the task to remove itself from the set when it's done.
-                #
-                # Because if we won't save it anywhere,
-                # python's GC can silently cancel task
-                # and this behaviour considered to be a Hisenbug.
-                # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
-                task.add_done_callback(task_cb)
+                await self._dispatch_message(message, tasks, task_cb)
 
             except asyncio.CancelledError:
                 break

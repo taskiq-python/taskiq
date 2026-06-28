@@ -14,6 +14,7 @@ from taskiq.brokers.inmemory_broker import InMemoryBroker
 from taskiq.brokers.shared_broker import async_shared_broker
 from taskiq.brokers.zmq_broker import ZeroMQBroker
 from taskiq.context import Context
+from taskiq.decor import AsyncBatchedTaskiqDecoratedTask
 from taskiq.events import TaskiqEvents
 from taskiq.exceptions import (
     NoResultError,
@@ -41,6 +42,7 @@ __version__ = version("taskiq")
 
 __all__ = [
     "AckableMessage",
+    "AsyncBatchedTaskiqDecoratedTask",
     "AsyncBroker",
     "AsyncResultBackend",
     "AsyncTaskiqDecoratedTask",

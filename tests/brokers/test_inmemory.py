@@ -114,3 +114,99 @@ async def test_wait_all() -> None:
     assert slept
     assert await task.is_ready()
     assert not broker._running_tasks
+
+
+async def test_batch_flush_on_size() -> None:
+    broker = InMemoryBroker()
+    seen: list[list[int]] = []
+
+    @broker.task(batch=True, batch_size=3)
+    async def batched(items: list[int]) -> int:
+        seen.append(items)
+        return sum(items)
+
+    tasks = [await batched.kiq(i) for i in range(3)]
+    results = [await t.wait_result(timeout=2) for t in tasks]
+
+    assert seen == [[0, 1, 2]]
+    assert [r.return_value for r in results] == [3, 3, 3]
+
+
+async def test_batch_flush_on_wait_all() -> None:
+    broker = InMemoryBroker()
+    seen: list[list[int]] = []
+
+    @broker.task(batch=True, batch_size=100, batch_timeout=30)
+    async def batched(items: list[int]) -> int:
+        seen.append(items)
+        return sum(items)
+
+    # Fewer than batch_size, so nothing runs until we flush.
+    tasks = [await batched.kiq(i) for i in (10, 20)]
+    assert seen == []
+
+    await broker.wait_all()
+
+    assert seen == [[10, 20]]
+    results = [await t.wait_result(timeout=2) for t in tasks]
+    assert [r.return_value for r in results] == [30, 30]
+
+
+async def test_batch_await_inplace_flushes_immediately() -> None:
+    broker = InMemoryBroker(await_inplace=True)
+    seen: list[list[int]] = []
+
+    @broker.task(batch=True, batch_size=100, batch_timeout=30)
+    async def batched(items: list[int]) -> int:
+        seen.append(items)
+        return sum(items)
+
+    task = await batched.kiq(7)
+    # With await_inplace each kiq flushes a one-item batch right away.
+    assert seen == [[7]]
+    assert await task.is_ready()
+    result = await task.wait_result(timeout=2)
+    assert result.return_value == 7
+
+
+async def test_batch_timer_flush_after_wait_all() -> None:
+    """wait_all must not permanently disable timeout-based flushing.
+
+    wait_all drains buffers for testing but must leave the batcher usable.
+    After a first wait_all, a new batch armed with a timeout must still flush
+    on timeout. Before the fix, flush_all sets _closing forever, so the timer
+    never fires again and ``seen`` stays [[1]] (RED).
+    """
+    broker = InMemoryBroker()
+    seen: list[list[int]] = []
+
+    @broker.task(batch=True, batch_size=100, batch_timeout=0.05)
+    async def batched(items: list[int]) -> int:
+        seen.append(items)
+        return sum(items)
+
+    await batched.kiq(1)
+    await broker.wait_all()
+    assert seen == [[1]]
+
+    # New batch after wait_all; the timer alone must flush it (no second
+    # wait_all, otherwise the drain would mask a dead timer).
+    await batched.kiq(2)
+    await batched.kiq(3)
+    await asyncio.sleep(0.15)
+
+    assert seen == [[1], [2, 3]]
+    await broker.wait_all()
+
+
+async def test_batch_error_marks_all() -> None:
+    broker = InMemoryBroker()
+
+    @broker.task(batch=True, batch_size=2)
+    async def batched(items: list[int]) -> int:
+        raise ValueError("boom")
+
+    tasks = [await batched.kiq(i) for i in (1, 2)]
+    results = [await t.wait_result(timeout=2) for t in tasks]
+
+    assert all(r.is_err for r in results)

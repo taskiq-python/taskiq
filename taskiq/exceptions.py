@@ -107,3 +107,12 @@ class TaskBrokerMismatchError(TaskRejectedError):
 
     __template__ = "Task already has a different broker ({broker})"
     broker: Any
+
+
+class TaskiqBatchConfigError(TaskiqError):
+    """Error if the batch configuration of a task is invalid."""
+
+    __template__ = (
+        "Invalid batch configuration: when batch=True you must provide a "
+        "positive batch_size and/or a positive batch_timeout."
+    )

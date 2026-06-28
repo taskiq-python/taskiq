@@ -10,6 +10,7 @@ from typing import (
     ParamSpec,
     TypeVar,
     Union,
+    cast,
     overload,
 )
 
@@ -23,6 +24,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from taskiq.scheduler.scheduled_task import CronSpec
 
 _T = TypeVar("_T")
+_Item = TypeVar("_Item")
 _FuncParams = ParamSpec("_FuncParams")
 _ReturnType = TypeVar("_ReturnType")
 
@@ -232,3 +234,37 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
 
     def __repr__(self) -> str:
         return f"AsyncTaskiqDecoratedTask({self.task_name})"
+
+
+class AsyncBatchedTaskiqDecoratedTask(
+    AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType],
+    Generic[_Item, _FuncParams, _ReturnType],
+):
+    """
+    Task that is executed in batches.
+
+    The decorated function receives ``list[_Item]``, but each ``kiq`` call
+    sends a single ``_Item``. The worker accumulates these items and invokes
+    the function once with the collected list, flushing when ``batch_size`` is
+    reached or ``batch_timeout`` seconds elapse since the first buffered item.
+    """
+
+    # The base `kiq` takes the function's full params (`list[_Item]`).
+    # A batched task is enqueued one element at a time, so we deliberately
+    # narrow the signature to a single `_Item`. mypy flags this as an
+    # incompatible override, which is intended here.
+    async def kiq(  # type: ignore[override]
+        self,
+        item: _Item,
+    ) -> AsyncTaskiqTask[_ReturnType]:
+        """
+        Send a single item to be processed as part of a batch.
+
+        :param item: one element that becomes a member of the batched list.
+        :returns: taskiq task for this individual message.
+        """
+        kicker = cast(
+            "AsyncKicker[..., _ReturnType]",
+            self.kicker(),
+        )
+        return await kicker.kiq(item)
