@@ -26,7 +26,6 @@ scheduler = TaskiqScheduler(broker, sources=[redis_source])
 
 For more information on how to use dynamic schedule sources read [Dynamic scheduling section](../guide/scheduling-tasks.md#dynamic-scheduling).
 
-
 ### LabelScheduleSource
 
 This source parses labels of tasks, and if it finds a `schedule` label, it considers this task as scheduled.
@@ -37,9 +36,9 @@ The format of the schedule label is the following:
 @broker.task(
     schedule=[
         {
-            "cron": "* * * * *", # type: str, either cron, interval or time should be specified.
+            "cron": "* * * * *", # type: str | None, either cron, interval or time should be specified.
             "cron_offset": None, # type: str | timedelta | None, can be omitted.
-            "interval": None,  # type: int | timedelta, either cron, interval or time should be specified.
+            "interval": None,  # type: int | timedelta | None, either cron, interval or time should be specified.
             "time": None,  # type: datetime | None, either cron, interval or time should be specified.
             "args": [], # type List[Any] | None, can be omitted.
             "kwargs": {}, # type: Dict[str, Any] | None, can be omitted.
