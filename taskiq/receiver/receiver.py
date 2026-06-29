@@ -436,9 +436,14 @@ class Receiver:
                     break
                 except Exception:
                     logger.exception("Error while prefetching.")
-                    current_message = None
-                    iterator = self.broker.listen()
-                    self.sem_prefetch.release()
+                    # current_message set => fetch failed before enqueue, so we
+                    # still own the permit and a (possibly broken) iterator.
+                    # Otherwise it's queued and the runner owns the permit;
+                    # releasing here would leak a prefetch slot.
+                    if current_message is not None:
+                        current_message = None
+                        iterator = self.broker.listen()
+                        self.sem_prefetch.release()
                     continue
         finally:
             # We don't want to fetch new messages if we are shutting down.
