@@ -435,9 +435,7 @@ class Receiver:
                 except (asyncio.CancelledError, StopAsyncIteration):
                     break
                 except Exception:
-                    logger.exception(
-                        "Error while prefetching a message, recovering.",
-                    )
+                    logger.exception("Error while prefetching.")
                     current_message = None
                     iterator = self.broker.listen()
                     self.sem_prefetch.release()
