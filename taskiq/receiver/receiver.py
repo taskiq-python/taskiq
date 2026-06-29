@@ -434,6 +434,14 @@ class Receiver:
                             )
                 except (asyncio.CancelledError, StopAsyncIteration):
                     break
+                except Exception:
+                    logger.exception(
+                        "Error while prefetching a message, recovering.",
+                    )
+                    current_message = None
+                    iterator = self.broker.listen()
+                    self.sem_prefetch.release()
+                    continue
         finally:
             # We don't want to fetch new messages if we are shutting down.
             logger.info("Stopping prefetching messages...")
