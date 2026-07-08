@@ -13,6 +13,8 @@ from taskiq_dependencies import Depends
 
 from taskiq.abc.broker import AckableMessage, AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
+from taskiq.abc.result_backend import AsyncResultBackend
+from taskiq.acks import AcknowledgeType
 from taskiq.brokers.inmemory_broker import InMemoryBroker
 from taskiq.exceptions import NoResultError, TaskiqResultTimeoutError
 from taskiq.message import TaskiqMessage
@@ -26,6 +28,7 @@ def get_receiver(
     no_parse: bool = False,
     max_async_tasks: int | None = None,
     max_async_tasks_jitter: int = 0,
+    ack_type: AcknowledgeType | None = None,
 ) -> Receiver:
     """
     Returns receiver with custom broker and args.
@@ -44,7 +47,48 @@ def get_receiver(
         validate_params=not no_parse,
         max_async_tasks=max_async_tasks,
         max_async_tasks_jitter=max_async_tasks_jitter,
+        ack_type=ack_type,
     )
+
+
+class _EventResultBackend(AsyncResultBackend[Any]):
+    def __init__(self, events: list[str]) -> None:
+        self.events = events
+        self.results: dict[str, TaskiqResult[Any]] = {}
+
+    async def set_result(self, task_id: str, result: TaskiqResult[Any]) -> None:
+        self.events.append("save")
+        self.results[task_id] = result
+
+    async def is_result_ready(self, task_id: str) -> bool:
+        return task_id in self.results
+
+    async def get_result(
+        self,
+        task_id: str,
+        with_logs: bool = False,
+    ) -> TaskiqResult[Any]:
+        return self.results[task_id]
+
+
+class _EventMiddleware(TaskiqMiddleware):
+    def __init__(self, events: list[str]) -> None:
+        super().__init__()
+        self.events = events
+
+    def post_execute(
+        self,
+        message: TaskiqMessage,
+        result: TaskiqResult[Any],
+    ) -> None:
+        self.events.append("post_execute")
+
+    def post_save(
+        self,
+        message: TaskiqMessage,
+        result: TaskiqResult[Any],
+    ) -> None:
+        self.events.append("post_save")
 
 
 async def test_run_task_successful_async() -> None:
@@ -325,6 +369,192 @@ async def test_callback_success_ackable_async() -> None:
     )
     assert called_times == 1
     assert acked
+
+
+async def test_task_ack_type_when_received_overrides_worker_ack_type() -> None:
+    """Task ack_type label overrides worker-level ack type."""
+    events: list[str] = []
+    broker = (
+        InMemoryBroker()
+        .with_result_backend(
+            _EventResultBackend(events),
+        )
+        .with_middlewares(_EventMiddleware(events))
+    )
+
+    @broker.task
+    async def my_task() -> int:
+        events.append("task")
+        return 1
+
+    def ack_callback() -> None:
+        events.append("ack")
+
+    receiver = get_receiver(broker, ack_type=AcknowledgeType.WHEN_SAVED)
+    broker_message = broker.formatter.dumps(
+        TaskiqMessage(
+            task_id="task_id",
+            task_name=my_task.task_name,
+            labels={"ack_type": "when_received"},
+            args=[],
+            kwargs={},
+        ),
+    )
+
+    await receiver.callback(
+        AckableMessage(
+            data=broker_message.message,
+            ack=ack_callback,
+        ),
+    )
+
+    assert events == ["ack", "task", "post_execute", "save", "post_save"]
+
+
+async def test_task_ack_type_when_executed_overrides_worker_ack_type() -> None:
+    """Task ack_type label can delay a worker-level when_received ack."""
+    events: list[str] = []
+    broker = (
+        InMemoryBroker()
+        .with_result_backend(
+            _EventResultBackend(events),
+        )
+        .with_middlewares(_EventMiddleware(events))
+    )
+
+    @broker.task(ack_type="when_executed")
+    async def my_task() -> int:
+        events.append("task")
+        return 1
+
+    def ack_callback() -> None:
+        events.append("ack")
+
+    receiver = get_receiver(broker, ack_type=AcknowledgeType.WHEN_RECEIVED)
+    broker_message = broker.formatter.dumps(my_task.kicker()._prepare_message())
+
+    await receiver.callback(
+        AckableMessage(
+            data=broker_message.message,
+            ack=ack_callback,
+        ),
+    )
+
+    assert events == ["task", "ack", "post_execute", "save", "post_save"]
+
+
+async def test_task_ack_type_when_saved_overrides_worker_ack_type() -> None:
+    """Task ack_type label can use when_saved with an early-ack worker."""
+    events: list[str] = []
+    broker = (
+        InMemoryBroker()
+        .with_result_backend(
+            _EventResultBackend(events),
+        )
+        .with_middlewares(_EventMiddleware(events))
+    )
+
+    @broker.task
+    async def my_task() -> int:
+        events.append("task")
+        return 1
+
+    def ack_callback() -> None:
+        events.append("ack")
+
+    receiver = get_receiver(broker, ack_type=AcknowledgeType.WHEN_RECEIVED)
+    broker_message = broker.formatter.dumps(
+        TaskiqMessage(
+            task_id="task_id",
+            task_name=my_task.task_name,
+            labels={"ack_type": "when_saved"},
+            args=[],
+            kwargs={},
+        ),
+    )
+
+    await receiver.callback(
+        AckableMessage(
+            data=broker_message.message,
+            ack=ack_callback,
+        ),
+    )
+
+    assert events == ["task", "post_execute", "save", "post_save", "ack"]
+
+
+async def test_worker_ack_type_is_used_without_task_ack_type() -> None:
+    """Worker-level ack_type is used when the task has no ack_type label."""
+    events: list[str] = []
+    broker = (
+        InMemoryBroker()
+        .with_result_backend(
+            _EventResultBackend(events),
+        )
+        .with_middlewares(_EventMiddleware(events))
+    )
+
+    @broker.task
+    async def my_task() -> int:
+        events.append("task")
+        return 1
+
+    def ack_callback() -> None:
+        events.append("ack")
+
+    receiver = get_receiver(broker, ack_type=AcknowledgeType.WHEN_RECEIVED)
+    broker_message = broker.formatter.dumps(
+        TaskiqMessage(
+            task_id="task_id",
+            task_name=my_task.task_name,
+            labels={},
+            args=[],
+            kwargs={},
+        ),
+    )
+
+    await receiver.callback(
+        AckableMessage(
+            data=broker_message.message,
+            ack=ack_callback,
+        ),
+    )
+
+    assert events == ["ack", "task", "post_execute", "save", "post_save"]
+
+
+async def test_invalid_task_ack_type_raises_before_execution() -> None:
+    """Invalid task ack_type fails before task execution and acknowledgement."""
+    events: list[str] = []
+    broker = InMemoryBroker()
+
+    @broker.task
+    async def my_task() -> None:
+        events.append("task")
+
+    def ack_callback() -> None:
+        events.append("ack")
+
+    receiver = get_receiver(broker, ack_type=AcknowledgeType.WHEN_RECEIVED)
+    broker_message = broker.formatter.dumps(
+        TaskiqMessage(
+            task_id="task_id",
+            task_name=my_task.task_name,
+            labels={"ack_type": "when_save"},
+            args=[],
+            kwargs={},
+        ),
+    )
+
+    with pytest.raises(ValueError, match="Invalid ack_type label"):
+        await receiver.callback(
+            AckableMessage(
+                data=broker_message.message,
+                ack=ack_callback,
+            ),
+        )
+
+    assert events == []
 
 
 async def test_callback_wrong_format() -> None:
