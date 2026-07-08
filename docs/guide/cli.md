@@ -58,6 +58,21 @@ This can be configured using `--ack-type` parameter. For example:
 taskiq worker --ack-type when_executed mybroker:broker
 ```
 
+It can also be overridden per task using the `ack_type` task label:
+
+```python
+@broker.task(ack_type="when_received")
+async def best_effort_task() -> None:
+    ...
+
+
+@broker.task(ack_type="when_saved")
+async def critical_task() -> None:
+    ...
+```
+
+If a task has no `ack_type` label, the worker-level `--ack-type` value is used.
+
 ### Type casts
 
 One of features taskiq have is automatic type casts. For example you have a type-hinted task like this:

@@ -1,5 +1,6 @@
 import enum
 from collections.abc import Awaitable, Callable
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -18,6 +19,20 @@ class AcknowledgeType(str, enum.Enum):
     # acknowledged when the task will be saved
     # only after it's saved in the result backend.
     WHEN_SAVED = "when_saved"
+
+
+def parse_acknowledge_type(value: Any) -> AcknowledgeType:
+    """Parse acknowledge type from a task label value."""
+    if isinstance(value, AcknowledgeType):
+        return value
+    if isinstance(value, str):
+        try:
+            return AcknowledgeType(value.lower())
+        except ValueError as exc:
+            raise ValueError(f"Unknown acknowledge type value: {value}.") from exc
+    raise ValueError(
+        f"Unsupported acknowledge type: {value} use str or AcknowledgeType",
+    )
 
 
 class AckableMessage(BaseModel):
