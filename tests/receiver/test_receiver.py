@@ -16,6 +16,7 @@ from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.abc.result_backend import AsyncResultBackend
 from taskiq.acks import AcknowledgeType
 from taskiq.brokers.inmemory_broker import InMemoryBroker
+from taskiq.context import Context
 from taskiq.exceptions import NoResultError, TaskiqResultTimeoutError
 from taskiq.message import TaskiqMessage
 from taskiq.receiver import Receiver
@@ -521,6 +522,112 @@ async def test_worker_ack_type_is_used_without_task_ack_type() -> None:
     )
 
     assert events == ["ack", "task", "post_execute", "save", "post_save"]
+
+
+async def test_manual_task_ack_from_context() -> None:
+    """Manual ack lets a task acknowledge the message through context."""
+    events: list[str] = []
+    broker = (
+        InMemoryBroker()
+        .with_result_backend(
+            _EventResultBackend(events),
+        )
+        .with_middlewares(_EventMiddleware(events))
+    )
+
+    @broker.task(ack_type="manual")
+    async def my_task(context: Context = Depends()) -> int:
+        events.append("task")
+        assert context.is_ackable
+        assert not context.is_acked
+        await context.ack()
+        assert context.is_acked
+        return 1
+
+    def ack_callback() -> None:
+        events.append("ack")
+
+    receiver = get_receiver(broker, ack_type=AcknowledgeType.WHEN_SAVED)
+    broker_message = broker.formatter.dumps(my_task.kicker()._prepare_message())
+
+    await receiver.callback(
+        AckableMessage(
+            data=broker_message.message,
+            ack=ack_callback,
+        ),
+    )
+
+    assert events == ["task", "ack", "post_execute", "save", "post_save"]
+
+
+async def test_manual_task_ack_is_idempotent() -> None:
+    """Calling Context.ack twice acknowledges the message once."""
+    events: list[str] = []
+    broker = (
+        InMemoryBroker()
+        .with_result_backend(
+            _EventResultBackend(events),
+        )
+        .with_middlewares(_EventMiddleware(events))
+    )
+
+    @broker.task(ack_type="manual")
+    async def my_task(context: Context = Depends()) -> int:
+        events.append("task")
+        await context.ack()
+        await context.ack()
+        return 1
+
+    def ack_callback() -> None:
+        events.append("ack")
+
+    receiver = get_receiver(broker, ack_type=AcknowledgeType.WHEN_SAVED)
+    broker_message = broker.formatter.dumps(my_task.kicker()._prepare_message())
+
+    await receiver.callback(
+        AckableMessage(
+            data=broker_message.message,
+            ack=ack_callback,
+        ),
+    )
+
+    assert events == ["task", "ack", "post_execute", "save", "post_save"]
+
+
+async def test_manual_task_ack_without_ackable_message_saves_error() -> None:
+    """Context.ack fails clearly when broker messages do not support acking."""
+    events: list[str] = []
+    result_backend = _EventResultBackend(events)
+    broker = (
+        InMemoryBroker()
+        .with_result_backend(result_backend)
+        .with_middlewares(_EventMiddleware(events))
+    )
+
+    @broker.task(ack_type="manual")
+    async def my_task(context: Context = Depends()) -> int:
+        assert not context.is_ackable
+        await context.ack()
+        return 1
+
+    receiver = get_receiver(broker)
+    broker_message = broker.formatter.dumps(
+        TaskiqMessage(
+            task_id="task_id",
+            task_name=my_task.task_name,
+            labels={"ack_type": "manual"},
+            args=[],
+            kwargs={},
+        ),
+    )
+
+    await receiver.callback(broker_message.message)
+
+    result = result_backend.results["task_id"]
+    assert result.is_err
+    assert isinstance(result.error, RuntimeError)
+    assert str(result.error) == "Current message is not ackable."
+    assert events == ["post_execute", "save", "post_save"]
 
 
 async def test_invalid_task_ack_type_raises_before_execution() -> None:
