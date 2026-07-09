@@ -169,6 +169,8 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
             if middleware.__class__.post_send != TaskiqMiddleware.post_send:
                 await maybe_awaitable(middleware.post_send(message))
 
+        await self.broker._finish_kick()  # noqa: SLF001
+
         return AsyncTaskiqTask(
             task_id=message.task_id,
             result_backend=self.broker.result_backend,
