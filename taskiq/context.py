@@ -34,6 +34,14 @@ class Context:
         """Whether the current message has already been acknowledged."""
         return self._ack_controller is not None and self._ack_controller.is_acked
 
+    @property
+    def is_ack_progressable(self) -> bool:
+        """Whether the current message supports acknowledgement progress."""
+        return (
+            self._ack_controller is not None
+            and self._ack_controller.is_ack_progressable
+        )
+
     async def ack(self) -> None:
         """
         Acknowledge current message.
@@ -43,6 +51,16 @@ class Context:
         if self._ack_controller is None:
             raise RuntimeError("Current message is not ackable.")
         await self._ack_controller.ack()
+
+    async def ack_progress(self) -> None:
+        """
+        Report that the current message is still being processed.
+
+        :raises RuntimeError: if acknowledgement progress is not supported.
+        """
+        if self._ack_controller is None:
+            raise RuntimeError("Current message does not support ack progress.")
+        await self._ack_controller.ack_progress()
 
     async def requeue(self) -> None:
         """

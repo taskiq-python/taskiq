@@ -55,19 +55,30 @@ class AckableMessage(BaseModel):
 
     data: bytes
     ack: Callable[[], None | Awaitable[None]]
+    ack_progress: Callable[[], None | Awaitable[None]] | None = None
 
 
 class AckController:
     """Controls acknowledgement state for a received message."""
 
-    def __init__(self, ack: Callable[[], None | Awaitable[None]] | None) -> None:
+    def __init__(
+        self,
+        ack: Callable[[], None | Awaitable[None]] | None,
+        ack_progress: Callable[[], None | Awaitable[None]] | None = None,
+    ) -> None:
         self._ack = ack
+        self._ack_progress = ack_progress
         self.is_acked = False
 
     @property
     def is_ackable(self) -> bool:
         """Whether the current message supports acknowledgement."""
         return self._ack is not None
+
+    @property
+    def is_ack_progressable(self) -> bool:
+        """Whether the current message supports acknowledgement progress."""
+        return self._ack_progress is not None
 
     async def ack(self) -> None:
         """Acknowledge the current message once."""
@@ -77,3 +88,11 @@ class AckController:
             return
         await maybe_awaitable(self._ack())
         self.is_acked = True
+
+    async def ack_progress(self) -> None:
+        """Report that the current message is still being processed."""
+        if self._ack_progress is None:
+            raise RuntimeError("Current message does not support ack progress.")
+        if self.is_acked:
+            return
+        await maybe_awaitable(self._ack_progress())

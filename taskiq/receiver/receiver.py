@@ -118,6 +118,7 @@ class Receiver:
         """
         ack_controller = AckController(
             message.ack if isinstance(message, AckableMessage) else None,
+            message.ack_progress if isinstance(message, AckableMessage) else None,
         )
         message_data = message.data if isinstance(message, AckableMessage) else message
         try:
