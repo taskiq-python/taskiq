@@ -74,7 +74,7 @@ class TaskiqScheduler:
         send through the scheduler broker instead of the router default broker.
         """
         router = getattr(self.broker, "router", None)
-        if isinstance(router, TaskiqRouter) and task_name in router.routes:
+        if isinstance(router, TaskiqRouter) and router.has_route(task_name):
             kicker.with_route(router.resolve_route(task_name))
             return
 

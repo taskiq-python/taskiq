@@ -1,8 +1,26 @@
+from typing import Any
+
 import pytest
 
 from taskiq import AsyncTaskiqDecoratedTask, Flow, task_builder
+from taskiq.brokers.shared_broker import AsyncSharedBroker, SharedDecoratedTask
 from tests.routing.models import RecordingMiddleware, TracingTask
 from tests.utils import RecordingBroker
+
+
+class StorageError(Exception):
+    """Marker error for broker-owned registration storage tests."""
+
+
+class FailingStorageBroker(RecordingBroker):
+    """Broker whose registration storage fails before publishing a task."""
+
+    def store_registered_task(
+        self,
+        task: AsyncTaskiqDecoratedTask[Any, Any],
+    ) -> None:
+        """Fail broker-owned task storage."""
+        raise StorageError("storage failed")
 
 
 async def test_task_builder_can_be_registered_later() -> None:
@@ -114,3 +132,62 @@ def test_register_task_definition_rejects_overrides() -> None:
 
     with pytest.raises(ValueError, match="TaskDefinition already defines"):
         broker.register_task(add, queue="other")
+
+
+async def test_task_definition_uses_shared_broker_registration_contract() -> None:
+    task_name = "shared.global.definition"
+    broker = AsyncSharedBroker()
+    target = RecordingBroker()
+    broker.default_broker(target)
+    broker.global_task_registry.pop(task_name, None)
+
+    @task_builder(task_name)
+    async def shared_task() -> None:
+        return None
+
+    try:
+        registered = broker.register_task(shared_task)
+
+        assert isinstance(registered, SharedDecoratedTask)
+        assert broker.global_task_registry[task_name] is registered
+        assert task_name not in broker.local_task_registry
+        assert broker.router.find_task(task_name) is registered
+
+        await registered.kiq()
+
+        assert target.sent[0][0].task_name == task_name
+    finally:
+        broker.global_task_registry.pop(task_name, None)
+
+
+def test_storage_failure_does_not_publish_partial_router_state() -> None:
+    broker = FailingStorageBroker()
+
+    @task_builder("shared.storage.failure")
+    def shared_task() -> None:
+        return None
+
+    with pytest.raises(StorageError, match="storage failed"):
+        broker.register_task(shared_task)
+
+    assert broker.router.find_task(shared_task.task_name) is None
+    assert not broker.router.has_route(shared_task.task_name)
+    assert shared_task.task_name not in broker.local_task_registry
+
+
+def test_repeated_task_definition_binding_keeps_first_registration() -> None:
+    broker = RecordingBroker()
+
+    @task_builder("shared.duplicate")
+    def shared_task() -> None:
+        return None
+
+    registered = broker.register_task(shared_task)
+    bound_function_name = shared_task.original_func.__name__
+
+    with pytest.raises(ValueError, match="already registered"):
+        broker.register_task(shared_task)
+
+    assert shared_task.original_func.__name__ == bound_function_name
+    assert broker.router.find_task(shared_task.task_name) is registered
+    assert broker.local_task_registry[shared_task.task_name] is registered

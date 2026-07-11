@@ -1,4 +1,6 @@
-from taskiq import Flow, FlowProtocol, InMemoryBroker, TaskiqRouter
+import pytest
+
+from taskiq import Flow, FlowProtocol, InMemoryBroker, TaskiqRoute, TaskiqRouter
 from tests.routing.models import (
     BrokerQueue,
     OldStyleRecordingBroker,
@@ -37,6 +39,49 @@ async def test_broker_task_api_uses_default_flow() -> None:
     assert broker.sent[0][0].task_name == "demo.task"
     assert broker.sent[0][1] == flow
     assert broker.get_subscribed_flows() == (flow,)
+
+
+async def test_registered_task_resolves_current_default_flow_at_send_time() -> None:
+    first_flow = Flow("first")
+    second_flow = Flow("second")
+    broker = RecordingBroker(default_flow=first_flow)
+
+    @broker.task(task_name="demo.task")
+    async def demo_task() -> None:
+        return None
+
+    initial_route = broker.router.resolve_route(demo_task)
+    broker.default_flow = second_flow
+
+    await demo_task.kiq()
+    await demo_task.kicker().with_route(initial_route).kiq()
+
+    assert initial_route.flow == first_flow
+    assert broker.router.resolve_route(demo_task).flow == second_flow
+    assert broker.router.routes[demo_task.task_name].flow == second_flow
+    assert [flow for _, flow in broker.sent] == [second_flow, first_flow]
+
+
+async def test_explicit_task_route_does_not_follow_default_flow_changes() -> None:
+    router = TaskiqRouter()
+    broker = RecordingBroker(
+        router=router,
+        broker_name="broker",
+        default_flow=Flow("default.first"),
+    )
+    explicit_flow = Flow("explicit")
+
+    @broker.task(task_name="demo.task")
+    async def demo_task() -> None:
+        return None
+
+    router.route_task(demo_task, broker=broker, flow=explicit_flow)
+    broker.default_flow = Flow("default.second")
+
+    await demo_task.kiq()
+
+    assert router.resolve_route(demo_task).flow == explicit_flow
+    assert broker.sent[0][1] == explicit_flow
 
 
 def test_router_set_broker_can_configure_default_flow() -> None:
@@ -136,6 +181,69 @@ async def test_kicker_broker_override_wins_over_registered_route() -> None:
 
     assert first.sent == []
     assert second.sent[0][1] == second_flow
+
+
+async def test_kicker_broker_override_clears_earlier_flow_override() -> None:
+    router = TaskiqRouter()
+    source = RecordingBroker(router=router, broker_name="source")
+    target_flow = Flow("target.default")
+    target = RecordingBroker(
+        router=router,
+        broker_name="target",
+        default_flow=target_flow,
+    )
+
+    @source.task(task_name="demo.task")
+    async def demo_task() -> None:
+        return None
+
+    await demo_task.kicker().with_flow(Flow("stale")).with_broker(target).kiq()
+
+    assert source.sent == []
+    assert target.sent[0][1] == target_flow
+
+
+async def test_kicker_flow_override_after_broker_override_wins() -> None:
+    router = TaskiqRouter()
+    source = RecordingBroker(router=router, broker_name="source")
+    target = RecordingBroker(
+        router=router,
+        broker_name="target",
+        default_flow=Flow("target.default"),
+    )
+    explicit_flow = Flow("target.explicit")
+
+    @source.task(task_name="demo.task")
+    async def demo_task() -> None:
+        return None
+
+    await demo_task.kicker().with_broker(target).with_flow(explicit_flow).kiq()
+
+    assert source.sent == []
+    assert target.sent[0][1] == explicit_flow
+
+
+def test_kicker_rejects_ambiguous_none_flow_override() -> None:
+    broker = RecordingBroker(default_flow=Flow("default"))
+
+    @broker.task(task_name="demo.task")
+    async def demo_task() -> None:
+        return None
+
+    with pytest.raises(TypeError, match="flow cannot be None"):
+        demo_task.kicker().with_flow(None)  # type: ignore[arg-type]
+
+
+async def test_explicit_route_can_bypass_broker_default_flow() -> None:
+    broker = RecordingBroker(default_flow=Flow("default"))
+
+    @broker.task(task_name="demo.task")
+    async def demo_task() -> None:
+        return None
+
+    await demo_task.kicker().with_route(TaskiqRoute(broker, flow=None)).kiq()
+
+    assert broker.sent[0][1] is None
 
 
 async def test_router_uses_explicit_broker_lookup_for_config_names() -> None:
@@ -258,6 +366,24 @@ async def test_prepared_invocation_resolves_default_route_snapshot() -> None:
     assert source.sent == []
     assert first.sent[0][1] == first_flow
     assert second.sent == []
+
+
+async def test_prepared_invocation_snapshots_current_default_flow() -> None:
+    first_flow = Flow("default.first")
+    second_flow = Flow("default.second")
+    broker = RecordingBroker(default_flow=first_flow)
+
+    @broker.task(task_name="demo.task")
+    async def demo_task() -> None:
+        return None
+
+    prepared = demo_task.kicker().prepare()
+    broker.default_flow = second_flow
+
+    await prepared.kiq()
+    await demo_task.kiq()
+
+    assert [flow for _, flow in broker.sent] == [first_flow, second_flow]
 
 
 async def test_router_task_decorator_can_choose_broker_and_flow() -> None:

@@ -1,15 +1,31 @@
+import inspect
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
+from multiprocessing import get_context
 from typing import Any
 
 import pytest
 from pydantic import BaseModel
 
-from taskiq import AsyncTaskiqDecoratedTask, InMemoryBroker, task_builder
+from taskiq import (
+    AsyncTaskiqDecoratedTask,
+    InMemoryBroker,
+    TaskDefinition,
+    task_builder,
+)
 from taskiq.labels import LabelType
 
 
 class CustomBrokerTask(AsyncTaskiqDecoratedTask[Any, Any]):
     """Custom broker-level task class used by old decorator tests."""
+
+    def broker_extension(self) -> str:
+        """Return a marker exposed by the broker-specific task class."""
+        return self.task_name
+
+
+class ExplicitTask(AsyncTaskiqDecoratedTask[Any, Any]):
+    """Task class explicitly selected by a shared task declaration."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,6 +41,35 @@ class User(BaseModel):
     name: str
 
 
+@task_builder("shared.process_pool")
+def shared_process_pool_add(left: int, right: int) -> int:
+    """Add values in a spawned worker process."""
+    return left + right
+
+
+def build_process_pool_task(
+    task_name: str,
+    increment: int,
+) -> TaskDefinition[..., int]:
+    """Build one shared closure from a reusable declaration factory."""
+
+    @task_builder(task_name)
+    def generated(value: int) -> int:
+        return value + increment
+
+    return generated
+
+
+factory_process_pool_add_one = build_process_pool_task(
+    "shared.factory_add_one",
+    1,
+)
+factory_process_pool_add_two = build_process_pool_task(
+    "shared.factory_add_two",
+    2,
+)
+
+
 async def test_task_definition_call_executes_sync_and_async_functions() -> None:
     @task_builder("shared.add")
     def add(left: int, right: int) -> int:
@@ -38,6 +83,105 @@ async def test_task_definition_call_executes_sync_and_async_functions() -> None:
     assert await add.call(1, 2) == 3
     assert await multiply(2, 3) == 6
     assert await multiply.call(2, 3) == 6
+
+    broker = InMemoryBroker()
+    registered_add = broker.register_task(add)
+    registered_multiply = broker.register_task(multiply)
+
+    assert not inspect.iscoroutinefunction(registered_add.original_func)
+    assert inspect.iscoroutinefunction(registered_multiply.original_func)
+
+
+def test_task_definition_preserves_metadata_across_broker_bindings() -> None:
+    @task_builder("shared.metadata")
+    def calculate(left: int, right: int = 2) -> int:
+        """Calculate a shared result."""
+        return left * right
+
+    source = calculate.original_func
+    source_metadata = (
+        source.__name__,
+        source.__qualname__,
+        source.__module__,
+        source.__doc__,
+        inspect.signature(source),
+    )
+
+    first_registered = InMemoryBroker().register_task(calculate)
+    second_registered = InMemoryBroker().register_task(calculate)
+
+    assert calculate.__name__ == source.__name__
+    assert calculate.__qualname__ == source.__qualname__
+    assert calculate.__module__ == source.__module__
+    assert calculate.__doc__ == source.__doc__
+    assert calculate.__wrapped__ is source
+    assert inspect.signature(calculate) == inspect.signature(source)
+    assert (
+        source.__name__,
+        source.__qualname__,
+        source.__module__,
+        source.__doc__,
+        inspect.signature(source),
+    ) == source_metadata
+
+    for registered in (first_registered, second_registered):
+        assert registered.__name__ == source.__name__
+        assert registered.__qualname__ == source.__qualname__
+        assert registered.__module__ == source.__module__
+        assert registered.__doc__ == source.__doc__
+        assert registered.__wrapped__ is source
+        assert inspect.signature(registered) == inspect.signature(source)
+
+    assert first_registered.original_func is second_registered.original_func
+
+
+def test_task_definition_binding_runs_in_spawned_process_pool() -> None:
+    registered = InMemoryBroker().register_task(shared_process_pool_add)
+
+    with ProcessPoolExecutor(
+        max_workers=1,
+        mp_context=get_context("spawn"),
+    ) as executor:
+        result = executor.submit(registered.original_func, 2, 3).result(timeout=10)
+
+    assert result == 5
+
+
+def test_factory_task_bindings_run_in_spawned_process_pool() -> None:
+    first_registered = InMemoryBroker().register_task(factory_process_pool_add_one)
+    second_registered = InMemoryBroker().register_task(factory_process_pool_add_two)
+
+    assert first_registered.original_func is not second_registered.original_func
+    assert (
+        first_registered.original_func.__name__
+        != second_registered.original_func.__name__
+    )
+
+    with ProcessPoolExecutor(
+        max_workers=1,
+        mp_context=get_context("spawn"),
+    ) as executor:
+        first_result = executor.submit(
+            first_registered.original_func,
+            10,
+        ).result(timeout=10)
+        second_result = executor.submit(
+            second_registered.original_func,
+            10,
+        ).result(timeout=10)
+
+    assert first_result == 11
+    assert second_result == 12
+
+
+def test_factory_task_bindings_reject_duplicate_task_names() -> None:
+    build_process_pool_task("shared.factory_duplicate", 1)
+
+    with pytest.raises(
+        ValueError,
+        match="Factory-generated TaskDefinitions must use unique task names",
+    ):
+        build_process_pool_task("shared.factory_duplicate", 2)
 
 
 def test_task_definition_message_matches_registered_kicker_message() -> None:
@@ -91,7 +235,7 @@ def test_task_definition_message_rejects_dataclass_types() -> None:
         process.message("task-id", Payload)  # type: ignore[arg-type]
 
 
-def test_shared_task_without_base_cls_uses_native_task_class() -> None:
+def test_shared_task_without_base_cls_uses_broker_task_class() -> None:
     broker = InMemoryBroker()
     broker.decorator_class = CustomBrokerTask
 
@@ -106,7 +250,22 @@ def test_shared_task_without_base_cls_uses_native_task_class() -> None:
     registered = broker.register_task(shared_task)
 
     assert isinstance(old_task, CustomBrokerTask)
-    assert type(registered) is AsyncTaskiqDecoratedTask
+    assert isinstance(registered, CustomBrokerTask)
+    assert registered.broker_extension() == "shared.default"
+
+
+def test_explicit_base_cls_overrides_broker_task_class() -> None:
+    broker = InMemoryBroker()
+    broker.decorator_class = CustomBrokerTask
+
+    @task_builder("shared.explicit", base_cls=ExplicitTask)
+    async def shared_task() -> None:
+        return None
+
+    registered = broker.register_task(shared_task)
+
+    assert isinstance(registered, ExplicitTask)
+    assert not isinstance(registered, CustomBrokerTask)
 
 
 @pytest.mark.parametrize(

@@ -138,7 +138,10 @@ async def test_scheduler_removed_route_uses_scheduler_broker() -> None:
         kwargs={},
         cron="* * * * *",
     )
-    del router.routes["demo.task"]
+    removed_route = router.remove_route("demo.task")
+
+    assert removed_route is not None
+    assert removed_route.broker is target_broker
 
     await scheduler.on_ready(source, scheduled_task)
 

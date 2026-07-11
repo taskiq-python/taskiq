@@ -2,11 +2,14 @@ from typing import TYPE_CHECKING
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.acks import AckController
+from taskiq.compat import model_copy
 from taskiq.exceptions import NoResultError, TaskRejectedError
 from taskiq.message import TaskiqMessage
 
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.state import TaskiqState
+
+_REQUEUE_LABEL = "X-Taskiq-requeue"
 
 
 class Context:
@@ -46,18 +49,39 @@ class Context:
 
     async def requeue(self) -> None:
         """
-        Requeue task.
+        Publish a replacement task and settle the current delivery.
 
-        This function creates a task with
-        the same message and sends it using
-        current broker.
+        The current message is acknowledged only after the replacement has
+        been published successfully. Non-ackable messages are still republished
+        but cannot be settled by Taskiq.
 
         :raises NoResultError: to not store result for current task.
         """
-        requeue_count = int(self.message.labels.get("X-Taskiq-requeue", 0))
+        requeue_count = int(self.message.labels.get(_REQUEUE_LABEL, 0))
         requeue_count += 1
-        self.message.labels["X-Taskiq-requeue"] = str(requeue_count)
-        await self.broker.router.requeue(self.message, broker=self.broker)
+        requeue_value = str(requeue_count)
+        requeued_message = model_copy(
+            self.message,
+            update={
+                "labels": {
+                    **self.message.labels,
+                    _REQUEUE_LABEL: requeue_value,
+                },
+            },
+        )
+
+        if self._ack_controller is not None:
+            self._ack_controller.start_requeue()
+        try:
+            await self.broker.router.requeue(requeued_message, broker=self.broker)
+        except BaseException:
+            if self._ack_controller is not None:
+                self._ack_controller.fail_requeue()
+            raise
+
+        self.message.labels[_REQUEUE_LABEL] = requeue_value
+        if self._ack_controller is not None:
+            self._ack_controller.complete_requeue()
         raise NoResultError
 
     def reject(self) -> None:

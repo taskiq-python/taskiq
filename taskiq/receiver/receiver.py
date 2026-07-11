@@ -4,8 +4,9 @@ import functools
 import inspect
 import random
 import sys
-from collections.abc import Callable
+from collections.abc import AsyncGenerator, Callable
 from concurrent.futures import Executor, ProcessPoolExecutor
+from dataclasses import dataclass
 from logging import getLogger
 from time import time
 from typing import Any, get_type_hints
@@ -20,13 +21,30 @@ from taskiq.context import Context
 from taskiq.exceptions import NoResultError
 from taskiq.message import TaskiqMessage
 from taskiq.receiver.params_parser import parse_params
+from taskiq.receiver.runtime import ReceiverRuntimeState
 from taskiq.result import TaskiqResult
 from taskiq.state import TaskiqState
 from taskiq.utils import maybe_awaitable
 
 logger = getLogger(__name__)
 PY_VERSION = sys.version_info
-QUEUE_DONE = b"-1"
+QUEUE_DONE = object()
+
+
+@dataclass(frozen=True, slots=True)
+class _PrefetchedMessage:
+    """A delivery admitted to the runner with its prefetch-slot ownership."""
+
+    data: bytes | AckableMessage
+    owns_prefetch_slot: bool
+
+
+@dataclass(slots=True)
+class _PrefetchState:
+    """Own one broker iterator and its pending read task."""
+
+    iterator: AsyncGenerator[bytes | AckableMessage, None]
+    current_message: asyncio.Task[bytes | AckableMessage] | None
 
 
 def _execute_sync_task_in_executor(
@@ -78,6 +96,9 @@ class Receiver:
         self.known_tasks: set[str] = set()
         self.max_tasks_to_execute = max_tasks_to_execute
         self.wait_tasks_timeout = wait_tasks_timeout
+        self._runtime_state: ReceiverRuntimeState | None = None
+        self._listen_error: BaseException | None = None
+        self._active_tasks: set[asyncio.Task[Any]] = set()
         for task in self.broker.get_all_tasks().values():
             self._prepare_task(task.task_name, task.original_func)
         self.sem: asyncio.Semaphore | None = None
@@ -96,8 +117,31 @@ class Receiver:
                 "Setting unlimited number of async tasks "
                 "can result in undefined behavior",
             )
-        self.sem_prefetch = asyncio.Semaphore(max_prefetch)
+        if max_prefetch < 0:
+            raise ValueError("max_prefetch cannot be negative.")
+        self.sem_prefetch = asyncio.Semaphore(max_prefetch + 1)
         self.is_process_pool = isinstance(executor, ProcessPoolExecutor)
+
+    def attach_runtime_state(
+        self,
+        runtime_state: ReceiverRuntimeState,
+    ) -> ReceiverRuntimeState:
+        """Attach process-wide limits supplied by a multi-broker runtime."""
+        self._runtime_state = runtime_state
+        self.sem = runtime_state.execution_semaphore
+        self.sem_prefetch = runtime_state.prefetch_semaphore
+        return runtime_state
+
+    def is_runtime_state_attached(
+        self,
+        runtime_state: ReceiverRuntimeState,
+    ) -> bool:
+        """Return whether this Receiver uses all supplied process-wide state."""
+        return (
+            self._runtime_state is runtime_state
+            and self.sem is runtime_state.execution_semaphore
+            and self.sem_prefetch is runtime_state.prefetch_semaphore
+        )
 
     async def callback(  # noqa: C901, PLR0912
         self,
@@ -167,7 +211,11 @@ class Receiver:
             ack_controller=ack_controller,
         )
 
-        if ack_time == AcknowledgeType.WHEN_EXECUTED and ack_controller.is_ackable:
+        if (
+            ack_time == AcknowledgeType.WHEN_EXECUTED
+            and ack_controller.is_ackable
+            and not ack_controller.requeue_failed
+        ):
             await ack_controller.ack()
 
         for middleware in reversed(self.broker.middlewares):
@@ -191,7 +239,15 @@ class Receiver:
             if raise_err:
                 raise exc
 
-        if ack_time == AcknowledgeType.WHEN_SAVED and ack_controller.is_ackable:
+        should_ack_saved = (
+            ack_time == AcknowledgeType.WHEN_SAVED and not ack_controller.requeue_failed
+        )
+        should_ack_manual_requeue = (
+            ack_time == AcknowledgeType.MANUAL and ack_controller.requeue_published
+        )
+        if (
+            should_ack_saved or should_ack_manual_requeue
+        ) and ack_controller.is_ackable:
             await ack_controller.ack()
 
     def _get_ack_time(self, message: TaskiqMessage) -> AcknowledgeType:
@@ -386,19 +442,23 @@ class Receiver:
         """
         if self.run_startup:
             await self.broker.startup()
+        self._listen_error = None
         logger.info("Listening started.")
-        queue: asyncio.Queue[bytes | AckableMessage] = asyncio.Queue()
+        queue: asyncio.Queue[_PrefetchedMessage | object] = asyncio.Queue()
 
         async with anyio.create_task_group() as gr:
             gr.start_soon(self.prefetcher, queue, finish_event)
             gr.start_soon(self.runner, queue)
+
+        if self._listen_error is not None:
+            raise self._listen_error
 
         if self.on_exit is not None:
             self.on_exit(self)
 
     async def prefetcher(
         self,
-        queue: "asyncio.Queue[bytes | AckableMessage]",
+        queue: "asyncio.Queue[_PrefetchedMessage | object]",
         finish_event: asyncio.Event,
     ) -> None:
         """
@@ -407,117 +467,301 @@ class Receiver:
         :param queue: queue for prefetched data.
         :param finish_event: event to indicate that we need to stop prefetching.
         """
-        fetched_tasks: int = 0
-        iterator = self.broker.listen()
-        current_message: asyncio.Task[bytes | AckableMessage] = asyncio.create_task(
-            iterator.__anext__(),  # type: ignore
-        )
+        try:
+            iterator = await self._open_broker_iterator()
+            state = _PrefetchState(
+                iterator=iterator,
+                current_message=None,
+            )
+        except BaseException as exc:
+            self._record_listen_error(exc)
+            await queue.put(QUEUE_DONE)
+            return
+        fetched_tasks = 0
 
-        while True:
-            if finish_event.is_set():
-                break
-            try:
-                await self.sem_prefetch.acquire()
-                if (
-                    self.max_tasks_to_execute
-                    and fetched_tasks >= self.max_tasks_to_execute
-                ):
-                    logger.info("Max number of tasks executed.")
-                    break
-                # Here we wait for the message to be fetched,
-                # but we make it with timeout so it can be interrupted
-                done, _ = await asyncio.wait({current_message}, timeout=0.3)
-                # If the message is not fetched, we release the semaphore
-                # and continue the loop. So it will check if finished event was set.
-                if not done:
-                    self.sem_prefetch.release()
+        try:
+            while not self._should_stop_prefetch(finish_event, fetched_tasks):
+                message = await self._get_prefetched_message(state, finish_event)
+                if message is None:
                     continue
-                # We're done, so now we need to check
-                # whether task has returned an error.
-                message = current_message.result()
-                current_message = asyncio.create_task(iterator.__anext__())  # type: ignore
                 fetched_tasks += 1
-                await queue.put(message)
-                # Custom hooks for OTel and any future instrumentations
-                for middleware in reversed(self.broker.middlewares):
-                    if hasattr(middleware, "on_prefetch_queue_add"):
-                        await maybe_awaitable(
-                            middleware.on_prefetch_queue_add(),  # type: ignore
-                        )
-            except (asyncio.CancelledError, StopAsyncIteration):
-                break
-        # We don't want to fetch new messages if we are shutting down.
-        logger.info("Stopping prefetching messages...")
-        current_message.cancel()
-        await queue.put(QUEUE_DONE)
+                if self._runtime_state is not None:
+                    self._runtime_state.record_fetched_task()
+                await queue.put(
+                    _PrefetchedMessage(
+                        data=message,
+                        owns_prefetch_slot=True,
+                    ),
+                )
+                await self._notify_prefetch_hook("on_prefetch_queue_add")
+        except StopAsyncIteration:
+            pass
+        except asyncio.CancelledError:
+            raise
+        except BaseException as exc:
+            self._record_listen_error(exc)
+        finally:
+            logger.info("Stopping prefetching messages...")
+            try:
+                await self._enqueue_late_prefetched_message(queue, state)
+            finally:
+                await queue.put(QUEUE_DONE)
+
+    async def _enqueue_late_prefetched_message(
+        self,
+        queue: "asyncio.Queue[_PrefetchedMessage | object]",
+        state: _PrefetchState,
+    ) -> None:
+        """Drain a delivery that completed concurrently with listener stop."""
+        late_message = await self._close_prefetch_state(state)
+        if late_message is None:
+            return
+        if self._runtime_state is not None:
+            self._runtime_state.record_fetched_task()
+        await queue.put(
+            _PrefetchedMessage(
+                data=late_message,
+                owns_prefetch_slot=False,
+            ),
+        )
+        try:
+            await self._notify_prefetch_hook("on_prefetch_queue_add")
+        except BaseException as exc:
+            self._record_listen_error(exc)
+
+    async def _open_broker_iterator(
+        self,
+    ) -> AsyncGenerator[bytes | AckableMessage, None]:
+        """Open and validate the transport listener owned by this Receiver."""
+        iterator: object = self.broker.listen()
+        if inspect.isawaitable(iterator):
+            iterator = await iterator
+        if not isinstance(iterator, AsyncGenerator):
+            raise TypeError("Broker.listen() must return an async generator.")
+        return iterator
+
+    def _should_stop_prefetch(
+        self,
+        finish_event: asyncio.Event,
+        fetched_tasks: int,
+    ) -> bool:
+        """Return whether this Receiver should stop requesting deliveries."""
+        if finish_event.is_set():
+            return True
+        if (
+            self._runtime_state is None
+            and self.max_tasks_to_execute
+            and fetched_tasks >= self.max_tasks_to_execute
+        ):
+            logger.info("Max number of tasks executed.")
+            return True
+        return False
+
+    async def _get_prefetched_message(
+        self,
+        state: _PrefetchState,
+        finish_event: asyncio.Event,
+    ) -> bytes | AckableMessage | None:
+        """Wait briefly for one delivery while holding a prefetch slot."""
+        await self.sem_prefetch.acquire()
+        if state.current_message is None:
+            state.current_message = asyncio.create_task(
+                state.iterator.__anext__(),
+            )
+        current_message = state.current_message
+        finish_waiter = asyncio.create_task(finish_event.wait())
+        try:
+            try:
+                done, _ = await asyncio.wait(
+                    {current_message, finish_waiter},
+                    timeout=0.3,
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+            finally:
+                finish_waiter.cancel()
+                await asyncio.gather(finish_waiter, return_exceptions=True)
+        except BaseException:
+            self.sem_prefetch.release()
+            raise
+
+        if current_message in done:
+            state.current_message = None
+            try:
+                return current_message.result()
+            except BaseException:
+                self.sem_prefetch.release()
+                raise
+
+        if not done:
+            self.sem_prefetch.release()
+            return None
+
         self.sem_prefetch.release()
+        return None
+
+    async def _close_prefetch_state(
+        self,
+        state: _PrefetchState,
+    ) -> bytes | AckableMessage | None:
+        """Close the broker iterator and return a concurrently finished read."""
+        late_message: bytes | AckableMessage | None = None
+        current_message = state.current_message
+        state.current_message = None
+        if current_message is not None:
+            current_message.cancel()
+            try:
+                late_message = await current_message
+            except (asyncio.CancelledError, StopAsyncIteration):
+                pass
+            except BaseException as exc:
+                self._record_listen_error(exc)
+
+        try:
+            await state.iterator.aclose()
+        except (asyncio.CancelledError, StopAsyncIteration):
+            pass
+        except BaseException as exc:
+            self._record_listen_error(exc)
+        return late_message
+
+    async def _notify_prefetch_hook(self, hook_name: str) -> None:
+        """Run one optional prefetch instrumentation hook in reverse order."""
+        for middleware in reversed(self.broker.middlewares):
+            hook = getattr(middleware, hook_name, None)
+            if hook is not None:
+                await maybe_awaitable(hook())
 
     async def runner(
         self,
-        queue: "asyncio.Queue[bytes | AckableMessage]",
+        queue: "asyncio.Queue[_PrefetchedMessage | object]",
     ) -> None:
         """
         Run tasks.
 
         :param queue: queue with prefetched data.
         """
-        tasks: set[asyncio.Task[Any]] = set()
-
-        def task_cb(task: "asyncio.Task[Any]") -> None:
-            """
-            Callback for tasks.
-
-            This function used to remove task
-            from the list of active tasks and release
-            the semaphore, so other tasks can use it.
-
-            :param task: finished task
-            """
-            tasks.discard(task)
-            if self.sem is not None:
-                self.sem.release()
-
-        while True:
-            try:
-                # Waits for semaphore to be released.
-                if self.sem is not None:
-                    await self.sem.acquire()
-
-                self.sem_prefetch.release()
-                message = await queue.get()
-                if message is QUEUE_DONE:
-                    # asyncio.wait will throw an error if there is nothing to wait for
-                    if tasks:
-                        logger.info(
-                            f"Waiting for {len(tasks)} running tasks to complete...",
-                        )
-                        await asyncio.wait(tasks, timeout=self.wait_tasks_timeout)
-                        logger.info("No more tasks to wait for. Shutting down.")
+        cancelled = False
+        try:
+            while True:
+                queued_message = await queue.get()
+                if queued_message is QUEUE_DONE:
                     break
+                if not isinstance(queued_message, _PrefetchedMessage):
+                    raise TypeError("Receiver queue contains an invalid message.")
+                await self._start_callback(queued_message)
 
-                # Custom hooks for OTel and any future instrumentations
-                for middleware in reversed(self.broker.middlewares):
-                    if hasattr(middleware, "on_prefetch_queue_remove"):
-                        await maybe_awaitable(
-                            middleware.on_prefetch_queue_remove(),  # type: ignore
-                        )
-
-                task = asyncio.create_task(
-                    self.callback(message=message, raise_err=False),
-                )
-                tasks.add(task)
-
-                # We want the task to remove itself from the set when it's done.
-                #
-                # Because if we won't save it anywhere,
-                # python's GC can silently cancel task
-                # and this behaviour considered to be a Hisenbug.
-                # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
-                task.add_done_callback(task_cb)
-
-            except asyncio.CancelledError:
-                break
+        except asyncio.CancelledError:
+            cancelled = True
+            raise
+        finally:
+            await self._drain_active_tasks(cancel_immediately=cancelled)
         logger.info("The runner is stopped.")
+
+    async def _start_callback(self, message: _PrefetchedMessage) -> None:
+        """Transfer one prefetched delivery into an owned callback task."""
+        owns_prefetch_slot = message.owns_prefetch_slot
+        owns_execution_slot = False
+        try:
+            await self._notify_prefetch_hook("on_prefetch_queue_remove")
+            if self.sem is not None:
+                await self.sem.acquire()
+                owns_execution_slot = True
+
+            if owns_prefetch_slot:
+                self.sem_prefetch.release()
+                owns_prefetch_slot = False
+            task = asyncio.create_task(
+                self.callback(message=message.data, raise_err=False),
+            )
+        except BaseException:
+            if owns_prefetch_slot:
+                self.sem_prefetch.release()
+            if owns_execution_slot and self.sem is not None:
+                self.sem.release()
+            raise
+
+        self._active_tasks.add(task)
+
+        # Keep a strong reference until completion. Otherwise Python may
+        # garbage-collect a detached task while it is still running.
+        task.add_done_callback(self._on_callback_done)
+
+    def _on_callback_done(self, task: "asyncio.Task[Any]") -> None:
+        """Release shared capacity and retrieve callback failures."""
+        self._active_tasks.discard(task)
+        if self.sem is not None:
+            self.sem.release()
+        if task.cancelled():
+            return
+        task_exception = task.exception()
+        if task_exception is not None:
+            logger.error(
+                "Receiver callback failed outside task execution handling.",
+                exc_info=(
+                    type(task_exception),
+                    task_exception,
+                    task_exception.__traceback__,
+                ),
+            )
+
+    async def _drain_active_tasks(self, *, cancel_immediately: bool) -> None:
+        """Wait for owned callbacks and cancel them after the graceful boundary."""
+        tasks = set(self._active_tasks)
+        if not tasks:
+            return
+
+        logger.info("Waiting for %d running tasks to complete...", len(tasks))
+        cancellation: asyncio.CancelledError | None = None
+        if cancel_immediately:
+            pending = tasks
+        else:
+            try:
+                _, pending = await asyncio.wait(
+                    tasks,
+                    timeout=self.wait_tasks_timeout,
+                )
+            except asyncio.CancelledError as exc:
+                cancellation = exc
+                pending = {task for task in tasks if not task.done()}
+
+        if pending:
+            logger.warning(
+                "Cancelling %d tasks that exceeded the graceful wait boundary.",
+                len(pending),
+            )
+            cleanup_cancellation = await self._cancel_callback_tasks(pending)
+            if cancellation is None:
+                cancellation = cleanup_cancellation
+        logger.info("No more tasks to wait for. Shutting down.")
+        if cancellation is not None:
+            raise cancellation
+
+    @staticmethod
+    async def _cancel_callback_tasks(
+        tasks: set[asyncio.Task[Any]],
+    ) -> asyncio.CancelledError | None:
+        """Cancel callback tasks and await cleanup despite one outer cancellation."""
+        for task in tasks:
+            task.cancel()
+        try:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        except asyncio.CancelledError as exc:
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            return exc
+        return None
+
+    def _record_listen_error(self, error: BaseException) -> None:
+        """Preserve the first transport error while allowing iterator cleanup."""
+        if self._listen_error is None:
+            self._listen_error = error
+            return
+        logger.error(
+            "Additional error while closing broker listener.",
+            exc_info=(type(error), error, error.__traceback__),
+        )
 
     def _prepare_task(self, name: str, handler: Callable[..., Any]) -> None:
         """

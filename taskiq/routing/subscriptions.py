@@ -23,8 +23,8 @@ class SubscriptionPlan:
     """
 
     def __init__(self, brokers: BrokerRegistry) -> None:
-        self.brokers = brokers
-        self.subscriptions: list[TaskiqSubscription] = []
+        self._brokers = brokers
+        self._subscriptions: list[TaskiqSubscription] = []
 
     def subscribe(
         self,
@@ -33,9 +33,9 @@ class SubscriptionPlan:
         task_names: Iterable[str],
     ) -> TaskiqSubscription:
         """Register an inbound flow subscription for a broker."""
-        target_broker = self.brokers.resolve(broker)
+        target_broker = self._brokers.resolve(broker)
         resolved_task_names = frozenset(task_names)
-        default_flow = self.brokers.default_flow(target_broker)
+        default_flow = self._brokers.default_flow(target_broker)
         if default_flow is not None:
             self._ensure_compatible_flow(
                 broker=target_broker,
@@ -43,7 +43,7 @@ class SubscriptionPlan:
                 new_flow=flow,
             )
 
-        for subscription_index, subscription in enumerate(self.subscriptions):
+        for subscription_index, subscription in enumerate(self._subscriptions):
             if subscription.broker is target_broker and self._is_same_flow(
                 subscription.flow,
                 flow,
@@ -57,7 +57,7 @@ class SubscriptionPlan:
                     subscription,
                     task_names=subscription.task_names | resolved_task_names,
                 )
-                self.subscriptions[subscription_index] = updated
+                self._subscriptions[subscription_index] = updated
                 return updated
 
         subscription = TaskiqSubscription(
@@ -65,8 +65,28 @@ class SubscriptionPlan:
             flow=flow,
             task_names=resolved_task_names,
         )
-        self.subscriptions.append(subscription)
+        self._subscriptions.append(subscription)
         return subscription
+
+    def unsubscribe(
+        self,
+        broker: AsyncBroker,
+        flow: FlowProtocol,
+    ) -> TaskiqSubscription | None:
+        """Remove and return one compatible broker/flow subscription."""
+        target_broker = self._brokers.resolve(broker)
+        for index, subscription in enumerate(self._subscriptions):
+            if subscription.broker is target_broker and self._is_same_flow(
+                subscription.flow,
+                flow,
+            ):
+                self._ensure_compatible_flow(
+                    broker=target_broker,
+                    registered_flow=subscription.flow,
+                    new_flow=flow,
+                )
+                return self._subscriptions.pop(index)
+        return None
 
     def get(
         self,
@@ -74,19 +94,19 @@ class SubscriptionPlan:
     ) -> tuple[TaskiqSubscription, ...]:
         """Return registered inbound subscriptions."""
         if broker is None:
-            return tuple(self.subscriptions)
-        target_broker = self.brokers.resolve(broker)
+            return tuple(self._subscriptions)
+        target_broker = self._brokers.resolve(broker)
         return tuple(
             subscription
-            for subscription in self.subscriptions
+            for subscription in self._subscriptions
             if subscription.broker is target_broker
         )
 
     def get_broker_flows(self, broker: AsyncBroker) -> tuple[FlowProtocol, ...]:
         """Return flows a broker should subscribe to."""
-        target_broker = self.brokers.resolve(broker)
+        target_broker = self._brokers.resolve(broker)
         flows = [subscription.flow for subscription in self.get(target_broker)]
-        default_flow = self.brokers.default_flow(target_broker)
+        default_flow = self._brokers.default_flow(target_broker)
         if default_flow is not None and not self._contains_flow_identity(
             flows,
             default_flow,

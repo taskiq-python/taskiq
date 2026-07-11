@@ -12,6 +12,12 @@ This is a special broker for local development. It uses the same functions to ex
 but all tasks are executed locally in the current thread.
 By default it uses `InMemoryResultBackend` but this can be overridden.
 
+Because one `InMemoryBroker` instance acts as both client and worker, its
+startup and shutdown run both event-handler phases. Middleware and result
+backend lifecycle hooks still run once per broker lifecycle. Shutdown waits for
+background in-memory tasks before closing those resources and the sync-task
+executor.
+
 ## ZeroMQBroker
 
 This broker uses [ZMQ](https://zeromq.org/) to communicate between worker and client processes.

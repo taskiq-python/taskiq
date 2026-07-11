@@ -3,9 +3,11 @@ from __future__ import annotations
 import inspect
 from collections.abc import Callable, Coroutine, Mapping
 from dataclasses import dataclass, field
+from functools import WRAPPER_ASSIGNMENTS
 from types import CoroutineType, MappingProxyType
 from typing import TYPE_CHECKING, Any, Generic, ParamSpec, TypeVar, overload
 
+from taskiq._task_function import ensure_task_binding_function
 from taskiq.message import TaskiqMessage, _build_taskiq_message
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -18,8 +20,22 @@ _T = TypeVar("_T")
 _ReturnType = TypeVar("_ReturnType")
 
 
+class _CallableMetadata(Generic[_FuncParams, _ReturnType]):
+    """Type declarations for function metadata populated on task definitions."""
+
+    __name__: str
+    __qualname__: str
+    __module__: str
+    __doc__: str | None
+    __annotations__: dict[str, Any]
+    __wrapped__: Callable[_FuncParams, _ReturnType]
+
+
 @dataclass(frozen=True, slots=True)
-class TaskDefinition(Generic[_FuncParams, _ReturnType]):
+class TaskDefinition(
+    _CallableMetadata[_FuncParams, _ReturnType],
+    Generic[_FuncParams, _ReturnType],
+):
     """Unbound task declaration that can be registered later."""
 
     task_name: str
@@ -29,8 +45,20 @@ class TaskDefinition(Generic[_FuncParams, _ReturnType]):
     base_cls: type[AsyncTaskiqDecoratedTask[Any, Any]] | None = None
 
     def __post_init__(self) -> None:
-        """Freeze labels to make task definitions stable declarations."""
+        """Freeze declaration state and preserve the wrapped callable contract."""
         object.__setattr__(self, "labels", MappingProxyType(dict(self.labels)))
+        for attribute in WRAPPER_ASSIGNMENTS:
+            if hasattr(self.original_func, attribute):
+                object.__setattr__(
+                    self,
+                    attribute,
+                    getattr(self.original_func, attribute),
+                )
+        object.__setattr__(self, "__wrapped__", self.original_func)
+        ensure_task_binding_function(
+            self.original_func,
+            binding_key=self.task_name,
+        )
 
     def __call__(
         self,
@@ -86,6 +114,16 @@ class TaskDefinition(Generic[_FuncParams, _ReturnType]):
             args=args,
             kwargs=kwargs,
         )
+
+
+def _get_task_binding_function(
+    task: TaskDefinition[_FuncParams, _ReturnType],
+) -> Callable[_FuncParams, _ReturnType]:
+    """Return the framework-owned callable used for broker execution."""
+    return ensure_task_binding_function(
+        task.original_func,
+        binding_key=task.task_name,
+    )
 
 
 @overload

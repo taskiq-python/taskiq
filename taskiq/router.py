@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import warnings
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, overload
 
 from taskiq.flow import FlowProtocol
@@ -44,9 +45,9 @@ class TaskiqRouter:
         self._dispatcher = RouterDispatcher(self._routes)
 
     @property
-    def brokers(self) -> dict[str, AsyncBroker]:
-        """Return mutable broker registry for compatibility."""
-        return self._brokers.brokers
+    def brokers(self) -> Mapping[str, AsyncBroker]:
+        """Return an immutable snapshot of registered brokers."""
+        return MappingProxyType(self._brokers.get_all())
 
     @property
     def default_broker(self) -> AsyncBroker | None:
@@ -55,24 +56,24 @@ class TaskiqRouter:
 
     @default_broker.setter
     def default_broker(self, broker: AsyncBroker | None) -> None:
-        if broker is not None:
-            self._brokers.resolve(broker)
-        self._brokers.default_broker = broker
+        self._brokers.set_default(broker)
 
     @property
-    def task_registry(self) -> dict[str, AsyncTaskiqDecoratedTask[Any, Any]]:
-        """Return mutable task registry for compatibility."""
-        return self._tasks.tasks
+    def task_registry(
+        self,
+    ) -> Mapping[str, AsyncTaskiqDecoratedTask[Any, Any]]:
+        """Return an immutable snapshot of registered tasks."""
+        return MappingProxyType(self._tasks.get_all())
 
     @property
-    def routes(self) -> dict[str, TaskiqRoute]:
-        """Return mutable route registry for compatibility."""
-        return self._routes.routes
+    def routes(self) -> Mapping[str, TaskiqRoute]:
+        """Return an immutable snapshot of resolved task routes."""
+        return MappingProxyType(self._routes.get_all())
 
     @property
-    def subscriptions(self) -> list[TaskiqSubscription]:
-        """Return mutable subscription registry for compatibility."""
-        return self._subscriptions.subscriptions
+    def subscriptions(self) -> tuple[TaskiqSubscription, ...]:
+        """Return an immutable snapshot of inbound subscriptions."""
+        return self._subscriptions.get()
 
     @property
     def default_broker_name(self) -> str | None:
@@ -123,17 +124,17 @@ class TaskiqRouter:
         """Register a bound task or bind a task definition to a broker."""
         if isinstance(task, TaskDefinition):
             target_broker = self._brokers.resolve(broker)
+            self._tasks.ensure_name_available(task.task_name)
             registered_task = target_broker.bind_task_definition(
                 task,
                 register=False,
             )
-            self._register_bound_task(
+            target_broker.store_registered_task(registered_task)
+            return self._register_bound_task(
                 registered_task,
                 broker=target_broker,
                 flow=flow,
             )
-            target_broker.store_registered_task(registered_task)
-            return registered_task
 
         return self._register_bound_task(task, broker=broker, flow=flow)
 
@@ -217,6 +218,20 @@ class TaskiqRouter:
         """Resolve outbound route for a task invocation."""
         return self._routes.resolve_route(task, broker=broker, flow=flow)
 
+    def has_route(
+        self,
+        task: str | AsyncTaskiqDecoratedTask[Any, Any],
+    ) -> bool:
+        """Return whether a task has an explicit outbound route policy."""
+        return self._routes.has_route(task)
+
+    def remove_route(
+        self,
+        task: str | AsyncTaskiqDecoratedTask[Any, Any],
+    ) -> TaskiqRoute | None:
+        """Remove and return a task's resolved outbound route, if present."""
+        return self._routes.remove_route(task)
+
     def subscribe(
         self,
         broker: AsyncBroker,
@@ -230,6 +245,14 @@ class TaskiqRouter:
             flow,
             task_names,
         )
+
+    def unsubscribe(
+        self,
+        broker: AsyncBroker,
+        flow: FlowProtocol,
+    ) -> TaskiqSubscription | None:
+        """Remove and return one inbound broker/flow subscription."""
+        return self._subscriptions.unsubscribe(broker, flow)
 
     def get_subscriptions(
         self,
@@ -286,11 +309,11 @@ class TaskiqRouter:
         if route_broker is None:
             route_broker = getattr(task, "broker", None)
 
-        route = None
-        if route_broker is not None or flow is not None:
-            route = self._routes.build_route(broker=route_broker, flow=flow)
-
         self._tasks.register(task)
-        if route is not None:
-            self._routes.set_resolved_route(task.task_name, route)
+        if route_broker is not None or flow is not None:
+            self._routes.set_route(
+                task.task_name,
+                broker=route_broker,
+                flow=flow,
+            )
         return task

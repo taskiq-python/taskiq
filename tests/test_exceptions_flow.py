@@ -1,3 +1,4 @@
+import asyncio
 import re
 
 import pytest
@@ -11,6 +12,7 @@ from taskiq.exceptions import (
     UnknownTaskError,
 )
 from taskiq.message import BrokerMessage
+from taskiq.receiver import Receiver
 
 
 def _broker_message(task_name: str) -> BrokerMessage:
@@ -49,6 +51,14 @@ async def test_shared_broker_raises_listen_error() -> None:
 
     with pytest.raises(SharedBrokerListenError, match="Shared broker cannot listen"):
         await broker.listen()
+
+
+async def test_receiver_preserves_awaitable_listen_error() -> None:
+    broker = AsyncSharedBroker()
+    receiver = Receiver(broker, max_async_tasks=1, run_startup=False)
+
+    with pytest.raises(SharedBrokerListenError, match="Shared broker cannot listen"):
+        await receiver.listen(asyncio.Event())
 
 
 def test_registering_task_in_another_broker_raises_mismatch_error() -> None:

@@ -4,6 +4,7 @@ import logging
 import os
 import signal
 import sys
+import warnings
 from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from multiprocessing import get_start_method, set_start_method
 from sys import platform
@@ -14,6 +15,14 @@ from taskiq.cli.utils import import_object, import_tasks
 from taskiq.cli.worker.args import WorkerArgs
 from taskiq.cli.worker.process_manager import ProcessManager
 from taskiq.receiver import Receiver
+from taskiq.receiver.runtime import (
+    BrokerSelection,
+    WorkerRuntime,
+    WorkerRuntimeOptions,
+    _shutdown_broker,
+    normalize_broker_source,
+)
+from taskiq.warnings import TaskiqDeprecationWarning
 
 try:
     import uvloop
@@ -30,30 +39,16 @@ logger = logging.getLogger("taskiq.worker")
 
 
 async def shutdown_broker(broker: AsyncBroker, timeout: float) -> None:
-    """
-    This function used to shutdown broker.
-
-    Broker can throw errors during shutdown,
-    or it may return some value.
-
-    We need to handle such situations.
-
-    :param broker: current broker.
-    :param timeout: maximum amount of time to shutdown the broker.
-    """
-    logger.info("Shutting down the broker.")
-    try:
-        ret_val = await asyncio.wait_for(broker.shutdown(), timeout)  # type: ignore
-        if ret_val is not None:
-            logger.info("Broker has returned value on shutdown: '%s'", str(ret_val))
-    except asyncio.TimeoutError:
-        logger.warning("Broker.shutdown cannot be completed in %s seconds.", timeout)
-    except Exception as exc:
-        logger.warning(
-            "Exception found while shutting down broker: %s",
-            exc,
-            exc_info=True,
-        )
+    """Shut down one broker through the legacy CLI helper."""
+    warnings.warn(
+        "taskiq.cli.worker.run.shutdown_broker() is deprecated; worker resource "
+        "lifecycle is owned by WorkerRuntime.",
+        TaskiqDeprecationWarning,
+        stacklevel=2,
+    )
+    cancellation = await _shutdown_broker(broker, timeout)
+    if cancellation is not None:
+        raise cancellation
 
 
 def get_receiver_type(args: WorkerArgs) -> type[Receiver]:
@@ -68,6 +63,17 @@ def get_receiver_type(args: WorkerArgs) -> type[Receiver]:
     if not (isinstance(receiver_type, type) and issubclass(receiver_type, Receiver)):
         raise ValueError("Unknown receiver type. Please use Receiver class.")
     return receiver_type
+
+
+def get_broker_selection(args: WorkerArgs) -> BrokerSelection:
+    """Resolve one broker or an explicit broker-listener sequence."""
+    if isinstance(args.broker, str):
+        broker_source = import_object(args.broker, app_dir=args.app_dir)
+        if inspect.isfunction(broker_source):
+            broker_source = broker_source()
+    else:
+        broker_source = args.broker
+    return normalize_broker_source(broker_source)
 
 
 def start_listen(args: WorkerArgs) -> None:
@@ -133,19 +139,8 @@ def start_listen(args: WorkerArgs) -> None:
     # We must set this field before importing tasks,
     # so broker will remember all tasks it's related to.
 
-    if isinstance(args.broker, AsyncBroker):
-        broker = args.broker
-    else:
-        broker = import_object(args.broker, app_dir=args.app_dir)
-        if inspect.isfunction(broker):
-            broker = broker()
-        if not isinstance(broker, AsyncBroker):
-            raise ValueError(
-                "Unknown broker type. Please use AsyncBroker instance "
-                "or pass broker factory function that returns an AsyncBroker instance.",
-            )
-
-    broker.is_worker_process = True
+    selection = get_broker_selection(args)
+    selection.mark_listener_brokers()
     import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
 
     receiver_type = get_receiver_type(args)
@@ -157,12 +152,13 @@ def start_listen(args: WorkerArgs) -> None:
     else:
         executor = ThreadPoolExecutor(max_workers=args.max_threadpool_threads)
 
-    try:
-        logger.debug("Initialize receiver.")
-        with executor as pool:
-            receiver = receiver_type(
-                broker=broker,
-                executor=pool,
+    logger.debug("Initialize worker runtime.")
+    with executor as pool:
+        runtime = WorkerRuntime(
+            selection=selection,
+            receiver_type=receiver_type,
+            executor=pool,
+            options=WorkerRuntimeOptions(
                 validate_params=not args.no_parse,
                 max_async_tasks=args.max_async_tasks,
                 max_async_tasks_jitter=args.max_async_tasks_jitter,
@@ -171,11 +167,11 @@ def start_listen(args: WorkerArgs) -> None:
                 ack_type=args.ack_type,
                 max_tasks_to_execute=args.max_tasks_per_child,
                 wait_tasks_timeout=args.wait_tasks_timeout,
-                **receiver_kwargs,  # type: ignore
-            )
-            loop.run_until_complete(receiver.listen(shutdown_event))
-    finally:
-        loop.run_until_complete(shutdown_broker(broker, args.shutdown_timeout))
+                shutdown_timeout=args.shutdown_timeout,
+                receiver_kwargs=receiver_kwargs,
+            ),
+        )
+        loop.run_until_complete(runtime.run(shutdown_event))
 
 
 def run_worker(args: WorkerArgs) -> int | None:

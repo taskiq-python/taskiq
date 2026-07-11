@@ -13,7 +13,6 @@ from taskiq.flow import FlowProtocol
 from taskiq.message import BrokerMessage
 from taskiq.receiver import Receiver
 from taskiq.router import TaskiqRouter
-from taskiq.utils import maybe_awaitable
 
 _ReturnType = TypeVar("_ReturnType")
 
@@ -198,19 +197,45 @@ class InMemoryBroker(AsyncBroker):
         Useful when used in testing and you need to await all sent tasks
         before asserting results.
         """
-        to_await = list(self._running_tasks)
-        for task in to_await:
-            await task
+        task_errors: list[BaseException] = []
+        while self._running_tasks:
+            results = await asyncio.gather(
+                *tuple(self._running_tasks),
+                return_exceptions=True,
+            )
+            task_errors.extend(
+                result for result in results if isinstance(result, BaseException)
+            )
 
-    async def startup(self) -> None:
-        """Runs startup events for client and worker side."""
-        for event in (TaskiqEvents.CLIENT_STARTUP, TaskiqEvents.WORKER_STARTUP):
-            for handler in self.event_handlers.get(event, []):
-                await maybe_awaitable(handler(self.state))
+        if task_errors:
+            raise task_errors[0]
+
+    def _get_startup_events(self) -> tuple[TaskiqEvents, ...]:
+        """Run both sides because this broker executes tasks in the client process."""
+        return (TaskiqEvents.CLIENT_STARTUP, TaskiqEvents.WORKER_STARTUP)
+
+    def _get_shutdown_events(self) -> tuple[TaskiqEvents, ...]:
+        """Shut down both client and worker event phases in their legacy order."""
+        return (TaskiqEvents.CLIENT_SHUTDOWN, TaskiqEvents.WORKER_SHUTDOWN)
 
     async def shutdown(self) -> None:
-        """Runs shutdown events for client and worker side."""
-        for event in (TaskiqEvents.CLIENT_SHUTDOWN, TaskiqEvents.WORKER_SHUTDOWN):
-            for handler in self.event_handlers.get(event, []):
-                await maybe_awaitable(handler(self.state))
-        self.executor.shutdown()
+        """Drain local execution, close broker resources and stop the executor."""
+        shutdown_error: BaseException | None = None
+
+        try:
+            await self.wait_all()
+        except BaseException as exc:
+            shutdown_error = exc
+
+        try:
+            await super().shutdown()
+        except BaseException as exc:
+            shutdown_error = self._remember_shutdown_error(shutdown_error, exc)
+
+        try:
+            self.executor.shutdown()
+        except BaseException as exc:  # pragma: no cover
+            shutdown_error = self._remember_shutdown_error(shutdown_error, exc)
+
+        if shutdown_error is not None:
+            raise shutdown_error

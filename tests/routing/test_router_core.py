@@ -51,6 +51,46 @@ def test_router_rejects_string_broker_references() -> None:
         router.route_task("demo.task", broker="broker")  # type: ignore[arg-type]
 
 
+def test_router_routes_are_immutable_resolved_snapshots() -> None:
+    router = TaskiqRouter()
+    broker = RecordingBroker(router=router, broker_name="broker")
+    route = router.route_task("demo.task", broker=broker)
+
+    routes = router.routes
+
+    assert routes == {"demo.task": route}
+    with pytest.raises(TypeError):
+        routes["other.task"] = route  # type: ignore[index]
+
+    assert router.has_route("demo.task")
+    assert router.remove_route("demo.task") == route
+    assert not router.has_route("demo.task")
+    assert router.remove_route("demo.task") is None
+
+
+def test_broker_and_task_registries_are_immutable_snapshots() -> None:
+    router = TaskiqRouter()
+    first = RecordingBroker(router=router, broker_name="first")
+    broker_snapshot = router.brokers
+    task_snapshot = router.task_registry
+
+    @first.task(task_name="demo.task")
+    async def demo_task() -> None:
+        return None
+
+    second = RecordingBroker(router=router, broker_name="second")
+
+    assert broker_snapshot == {"first": first}
+    assert task_snapshot == {}
+    assert router.brokers == {"first": first, "second": second}
+    assert router.task_registry == {"demo.task": demo_task}
+
+    with pytest.raises(TypeError):
+        broker_snapshot["other"] = first  # type: ignore[index]
+    with pytest.raises(TypeError):
+        task_snapshot["other.task"] = demo_task  # type: ignore[index]
+
+
 def test_router_rejects_duplicate_task_names() -> None:
     router = TaskiqRouter()
     first = RecordingBroker(router=router, broker_name="first")

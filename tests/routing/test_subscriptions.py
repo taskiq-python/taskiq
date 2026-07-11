@@ -33,6 +33,37 @@ def test_route_task_does_not_register_subscription_by_default() -> None:
     assert broker.get_subscribed_flows() == ()
 
 
+def test_subscription_snapshot_and_explicit_unsubscribe() -> None:
+    router = TaskiqRouter()
+    broker = RecordingBroker(router=router, broker_name="broker")
+    first_flow = Flow("events.first")
+    second_flow = Flow("events.second")
+
+    first = router.subscribe(broker, first_flow, "first.task")
+    snapshot = router.subscriptions
+    second = router.subscribe(broker, second_flow, "second.task")
+
+    assert snapshot == (first,)
+    assert router.subscriptions == (first, second)
+    assert router.unsubscribe(broker, first_flow) == first
+    assert router.subscriptions == (second,)
+    assert router.unsubscribe(broker, first_flow) is None
+
+
+def test_unsubscribe_rejects_conflicting_flow_declaration() -> None:
+    router = TaskiqRouter()
+    broker = RecordingBroker(router=router, broker_name="broker")
+    registered_flow = Flow("events").with_options(durable=True)
+    conflicting_flow = Flow("events").with_options(durable=False)
+
+    subscription = router.subscribe(broker, registered_flow)
+
+    with pytest.raises(ValueError, match="different broker options"):
+        router.unsubscribe(broker, conflicting_flow)
+
+    assert router.subscriptions == (subscription,)
+
+
 def test_route_task_subscribe_true_is_deprecated_shim() -> None:
     router = TaskiqRouter()
     broker = RecordingBroker(router=router, broker_name="broker")

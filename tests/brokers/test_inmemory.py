@@ -1,11 +1,64 @@
 import asyncio
 import uuid
+from typing import Any
 
 import pytest
 
 from taskiq import InMemoryBroker
+from taskiq.abc.middleware import TaskiqMiddleware
+from taskiq.brokers.inmemory_broker import InmemoryResultBackend
 from taskiq.events import TaskiqEvents
 from taskiq.state import TaskiqState
+
+
+class LifecycleError(Exception):
+    """Marker exception for lifecycle fault tests."""
+
+
+class RecordingLifecycleMiddleware(TaskiqMiddleware):
+    """Record middleware resource lifecycle calls."""
+
+    def __init__(
+        self,
+        events: list[str],
+        shutdown_error: Exception | None = None,
+    ) -> None:
+        super().__init__()
+        self.events = events
+        self.shutdown_error = shutdown_error
+
+    async def startup(self) -> None:
+        """Record startup."""
+        self.events.append("middleware.startup")
+
+    async def shutdown(self) -> None:
+        """Record shutdown."""
+        self.events.append("middleware.shutdown")
+        if self.shutdown_error is not None:
+            raise self.shutdown_error
+
+
+class RecordingResultBackend(InmemoryResultBackend[Any]):
+    """Record result backend lifecycle calls and optional startup failure."""
+
+    def __init__(
+        self,
+        events: list[str],
+        startup_error: Exception | None = None,
+    ) -> None:
+        super().__init__()
+        self.events = events
+        self.startup_error = startup_error
+
+    async def startup(self) -> None:
+        """Record startup and raise the configured error."""
+        self.events.append("backend.startup")
+        if self.startup_error is not None:
+            raise self.startup_error
+
+    async def shutdown(self) -> None:
+        """Record shutdown."""
+        self.events.append("backend.shutdown")
 
 
 async def test_inmemory_success() -> None:
@@ -46,6 +99,88 @@ async def test_startup() -> None:
 
     assert broker.state.from_worker == test_value
     assert broker.state.from_client == test_value
+
+
+async def test_lifecycle_runs_events_and_resources_once_in_order() -> None:
+    events: list[str] = []
+    broker = InMemoryBroker()
+    broker.with_middlewares(RecordingLifecycleMiddleware(events))
+    broker.with_result_backend(RecordingResultBackend(events))
+
+    for event, event_name in (
+        (TaskiqEvents.CLIENT_STARTUP, "client.startup"),
+        (TaskiqEvents.WORKER_STARTUP, "worker.startup"),
+        (TaskiqEvents.CLIENT_SHUTDOWN, "client.shutdown"),
+        (TaskiqEvents.WORKER_SHUTDOWN, "worker.shutdown"),
+    ):
+
+        @broker.on_event(event)
+        def record_event(
+            state: TaskiqState,
+            lifecycle_event: str = event_name,
+        ) -> None:
+            events.append(lifecycle_event)
+
+    await broker.startup()
+    await broker.shutdown()
+
+    assert events == [
+        "client.startup",
+        "worker.startup",
+        "middleware.startup",
+        "backend.startup",
+        "client.shutdown",
+        "worker.shutdown",
+        "middleware.shutdown",
+        "backend.shutdown",
+    ]
+
+
+async def test_shutdown_cleans_resources_after_startup_failure() -> None:
+    events: list[str] = []
+    startup_error = LifecycleError("backend startup failed")
+    broker = InMemoryBroker()
+    broker.with_middlewares(RecordingLifecycleMiddleware(events))
+    broker.with_result_backend(RecordingResultBackend(events, startup_error))
+
+    with pytest.raises(LifecycleError) as exc_info:
+        await broker.startup()
+
+    assert exc_info.value is startup_error
+
+    await broker.shutdown()
+
+    assert events == [
+        "middleware.startup",
+        "backend.startup",
+        "middleware.shutdown",
+        "backend.shutdown",
+    ]
+
+
+async def test_shutdown_closes_remaining_resources_after_middleware_failure() -> None:
+    events: list[str] = []
+    shutdown_error = LifecycleError("middleware shutdown failed")
+    broker = InMemoryBroker()
+    broker.with_middlewares(
+        RecordingLifecycleMiddleware(events, shutdown_error=shutdown_error),
+    )
+    broker.with_result_backend(RecordingResultBackend(events))
+
+    await broker.startup()
+
+    with pytest.raises(LifecycleError) as exc_info:
+        await broker.shutdown()
+
+    assert exc_info.value is shutdown_error
+    assert events == [
+        "middleware.startup",
+        "backend.startup",
+        "middleware.shutdown",
+        "backend.shutdown",
+    ]
+    with pytest.raises(RuntimeError, match="cannot schedule new futures"):
+        broker.executor.submit(int)
 
 
 async def test_shutdown() -> None:
@@ -113,4 +248,47 @@ async def test_wait_all() -> None:
     await broker.wait_all()
     assert slept
     assert await task.is_ready()
+    assert not broker._running_tasks
+
+
+async def test_shutdown_waits_for_running_tasks_before_resource_cleanup() -> None:
+    task_started = asyncio.Event()
+    finish_task = asyncio.Event()
+    events: list[str] = []
+    broker = InMemoryBroker()
+    broker.with_middlewares(RecordingLifecycleMiddleware(events))
+    broker.with_result_backend(RecordingResultBackend(events))
+
+    @broker.on_event(TaskiqEvents.CLIENT_SHUTDOWN)
+    def record_client_shutdown(state: TaskiqState) -> None:
+        events.append("client.shutdown")
+
+    @broker.task
+    async def running_task() -> None:
+        events.append("task.started")
+        task_started.set()
+        await finish_task.wait()
+        events.append("task.finished")
+
+    await broker.startup()
+    await running_task.kiq()
+    await task_started.wait()
+
+    shutdown_task = asyncio.create_task(broker.shutdown())
+    await asyncio.sleep(0)
+
+    assert not shutdown_task.done()
+
+    finish_task.set()
+    await shutdown_task
+
+    assert events == [
+        "middleware.startup",
+        "backend.startup",
+        "task.started",
+        "task.finished",
+        "client.shutdown",
+        "middleware.shutdown",
+        "backend.shutdown",
+    ]
     assert not broker._running_tasks

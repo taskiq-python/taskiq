@@ -57,17 +57,47 @@ class AckableMessage(BaseModel):
     ack: Callable[[], None | Awaitable[None]]
 
 
+class _RequeueState(enum.Enum):
+    NOT_REQUESTED = enum.auto()
+    PUBLISHING = enum.auto()
+    PUBLISHED = enum.auto()
+    FAILED = enum.auto()
+
+
 class AckController:
     """Controls acknowledgement state for a received message."""
 
     def __init__(self, ack: Callable[[], None | Awaitable[None]] | None) -> None:
         self._ack = ack
+        self._requeue_state = _RequeueState.NOT_REQUESTED
         self.is_acked = False
 
     @property
     def is_ackable(self) -> bool:
         """Whether the current message supports acknowledgement."""
         return self._ack is not None
+
+    @property
+    def requeue_published(self) -> bool:
+        """Whether a replacement message was published successfully."""
+        return self._requeue_state == _RequeueState.PUBLISHED
+
+    @property
+    def requeue_failed(self) -> bool:
+        """Whether replacement publication failed or was cancelled."""
+        return self._requeue_state == _RequeueState.FAILED
+
+    def start_requeue(self) -> None:
+        """Mark replacement publication as in progress."""
+        self._requeue_state = _RequeueState.PUBLISHING
+
+    def complete_requeue(self) -> None:
+        """Mark replacement publication as successful."""
+        self._requeue_state = _RequeueState.PUBLISHED
+
+    def fail_requeue(self) -> None:
+        """Mark replacement publication as failed or cancelled."""
+        self._requeue_state = _RequeueState.FAILED
 
     async def ack(self) -> None:
         """Acknowledge the current message once."""

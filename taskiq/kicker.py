@@ -11,20 +11,16 @@ from typing import (
     Generic,
     ParamSpec,
     TypeVar,
-    cast,
     overload,
 )
 
-from taskiq.abc.middleware import TaskiqMiddleware
-from taskiq.abc.result_backend import AsyncResultBackend
-from taskiq.exceptions import SendTaskError
 from taskiq.flow import FlowProtocol
 from taskiq.message import TaskiqMessage, _build_taskiq_message
 from taskiq.router import TaskiqRoute, TaskiqRouter
 from taskiq.scheduler.created_schedule import CreatedSchedule
 from taskiq.scheduler.scheduled_task import CronSpec, ScheduledTask
+from taskiq.sending import send_task_message
 from taskiq.task import AsyncTaskiqTask
-from taskiq.utils import maybe_awaitable
 
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.broker import AsyncBroker
@@ -132,7 +128,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         broker: AsyncBroker,
     ) -> AsyncKicker[_FuncParams, _ReturnType]:
         """
-        Replace broker for the function.
+        Replace broker for the function and clear earlier route/flow overrides.
 
         This method can be used with
         shared tasks.
@@ -148,14 +144,22 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
 
     def with_flow(
         self,
-        flow: FlowProtocol | None,
+        flow: FlowProtocol,
     ) -> AsyncKicker[_FuncParams, _ReturnType]:
         """
         Replace flow for the current invocation.
 
-        :param flow: flow to send message to.
+        Use an explicit `TaskiqRoute(broker=..., flow=None)` when an invocation
+        must bypass a broker default flow.
+
+        :param flow: non-null flow to send message to.
         :return: Kicker with a route flow override.
         """
+        if flow is None:
+            raise TypeError(
+                "flow cannot be None; pass an explicit TaskiqRoute with "
+                "flow=None to bypass the broker default flow.",
+            )
         if self.route is not None:
             self.route = replace(self.route, flow=flow)
         self.route_flow = flow
@@ -253,36 +257,31 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         use_current_route: bool = True,
     ) -> AsyncTaskiqTask[_ReturnType]:
         """Send a prepared message."""
-        try:
-            target_broker = broker or self.broker
-            if use_current_route:
-                target_route = self.route if route is None else route
-                target_flow = self.route_flow if flow is None else flow
-            else:
-                target_route = route
-                target_flow = flow
-            if target_route is not None:
-                if broker is not None and broker is not target_route.broker:
-                    raise ValueError("Pass either route or broker override.")
-                target_broker = target_route.broker
-                target_flow = None
-            router = getattr(target_broker, "router", None)
-            if isinstance(router, TaskiqRouter):
-                broker_override = None
-                if target_route is None and (
-                    broker is not None or self._broker_overridden
-                ):
-                    broker_override = target_broker
-                return await router.kiq(
-                    message,
-                    route=target_route,
-                    broker=broker_override,
-                    flow=target_flow,
-                    return_type=self.return_type,
-                )
-            return await self._legacy_kiq(target_broker, message)
-        except Exception as exc:
-            raise SendTaskError from exc
+        target_broker = broker or self.broker
+        if use_current_route:
+            target_route = self.route if route is None else route
+            target_flow = self.route_flow if flow is None else flow
+        else:
+            target_route = route
+            target_flow = flow
+        if target_route is not None:
+            if broker is not None and broker is not target_route.broker:
+                raise ValueError("Pass either route or broker override.")
+            target_broker = target_route.broker
+            target_flow = None
+        router = getattr(target_broker, "router", None)
+        if isinstance(router, TaskiqRouter):
+            broker_override = None
+            if target_route is None and (broker is not None or self._broker_overridden):
+                broker_override = target_broker
+            return await router.kiq(
+                message,
+                route=target_route,
+                broker=broker_override,
+                flow=target_flow,
+                return_type=self.return_type,
+            )
+        return await self._legacy_kiq(target_broker, message)
 
     async def _legacy_kiq(
         self,
@@ -295,26 +294,10 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         This keeps middleware tests and external broker-like mocks compatible
         while real AsyncBroker instances use TaskiqRouter.
         """
-        middlewares = getattr(broker, "middlewares", [])
-        if not isinstance(middlewares, list):
-            middlewares = []
-
-        for middleware in middlewares:
-            if middleware.__class__.pre_send != TaskiqMiddleware.pre_send:
-                message = await maybe_awaitable(middleware.pre_send(message))
-
-        await broker.kick(broker.formatter.dumps(message))
-
-        for middleware in reversed(middlewares):
-            if middleware.__class__.post_send != TaskiqMiddleware.post_send:
-                await maybe_awaitable(middleware.post_send(message))
-
-        return AsyncTaskiqTask(
-            task_id=message.task_id,
-            result_backend=cast(
-                AsyncResultBackend[_ReturnType],
-                broker.result_backend,
-            ),
+        return await send_task_message(
+            broker,
+            message,
+            send=broker.kick,
             return_type=self.return_type,
         )
 
