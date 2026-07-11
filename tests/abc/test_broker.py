@@ -68,6 +68,18 @@ def test_decorator_with_labels_success() -> None:
     }
 
 
+def test_decorator_generates_unique_lambda_task_names() -> None:
+    """Anonymous tasks must not collide in the broker task registry."""
+    broker = _TestBroker()
+
+    first_task = broker.task(lambda: None)
+    second_task = broker.task(lambda: None)
+
+    assert ":lambda_" in first_task.task_name
+    assert ":lambda_" in second_task.task_name
+    assert first_task.task_name != second_task.task_name
+
+
 def test_kicker_labels_modification() -> None:
     """Test that using kicker.with_labels doesn't modify task's labels globally."""
     broker = _TestBroker()

@@ -4,7 +4,7 @@ import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import AsyncGenerator, Awaitable, Callable
-from functools import wraps
+from functools import WRAPPER_ASSIGNMENTS, update_wrapper
 from logging import getLogger
 from typing import (
     TYPE_CHECKING,
@@ -13,6 +13,7 @@ from typing import (
     ParamSpec,
     TypeAlias,
     TypeVar,
+    cast,
     get_type_hints,
     overload,
 )
@@ -532,12 +533,20 @@ class AsyncBroker(ABC):
         ):
             raise TypeError("base_cls must be a subclass of AsyncTaskiqDecoratedTask.")
 
-        sign = get_type_hints(metadata_source)
+        hint_source = metadata_source
+        if not hasattr(hint_source, "__annotations__"):
+            hint_source = cast(Any, metadata_source).__call__
+        sign = get_type_hints(hint_source)
         return_type = None
         if "return" in sign:
             return_type = sign["return"]
 
-        decorated_task = wraps(metadata_source)(
+        assigned_metadata = tuple(
+            attribute
+            for attribute in WRAPPER_ASSIGNMENTS
+            if hasattr(metadata_source, attribute)
+        )
+        decorated_task = update_wrapper(
             task_cls(
                 broker=self,
                 original_func=func,
@@ -545,6 +554,8 @@ class AsyncBroker(ABC):
                 task_name=real_task_name,
                 return_type=return_type,  # type: ignore
             ),
+            metadata_source,
+            assigned=assigned_metadata,
         )
 
         if register:

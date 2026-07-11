@@ -45,6 +45,7 @@ def test_subscription_snapshot_and_explicit_unsubscribe() -> None:
 
     assert snapshot == (first,)
     assert router.subscriptions == (first, second)
+    assert first.broker_name == "broker"
     assert router.unsubscribe(broker, first_flow) == first
     assert router.subscriptions == (second,)
     assert router.unsubscribe(broker, first_flow) is None
@@ -177,6 +178,21 @@ def test_subscribe_rejects_default_flow_option_conflict() -> None:
             BrokerQueue(name="events", durable=False),
             "demo.task",
         )
+
+
+def test_subscribe_preserves_distinct_default_flow() -> None:
+    router = TaskiqRouter()
+    default_flow = Flow("default")
+    subscribed_flow = Flow("events")
+    broker = RecordingBroker(
+        router=router,
+        broker_name="broker",
+        default_flow=default_flow,
+    )
+
+    router.subscribe(broker, subscribed_flow, "demo.task")
+
+    assert broker.get_subscribed_flows() == (default_flow, subscribed_flow)
 
 
 def test_subscribe_allows_same_identity_on_different_brokers() -> None:

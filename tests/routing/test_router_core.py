@@ -9,6 +9,7 @@ def test_broker_creates_default_router() -> None:
     broker = RecordingBroker()
 
     assert broker.router.brokers[broker.broker_name] is broker
+    assert broker.router.default_broker is broker
     assert broker.router.default_broker_name == broker.broker_name
 
 
@@ -23,6 +24,33 @@ def test_router_rejects_duplicate_broker_names() -> None:
 
     with pytest.raises(ValueError, match="already registered"):
         RecordingBroker(router=router, broker_name="broker")
+
+
+def test_router_rejects_registering_same_broker_under_another_name() -> None:
+    router = TaskiqRouter()
+    broker = RecordingBroker(router=router, broker_name="broker")
+
+    with pytest.raises(ValueError, match="already registered as 'broker'"):
+        router.set_broker(broker, name="alias")
+
+
+def test_router_rejects_unknown_broker_lookup() -> None:
+    router = TaskiqRouter()
+
+    with pytest.raises(ValueError, match="Unknown broker 'missing'"):
+        router.get_broker("missing")
+
+
+def test_router_can_clear_default_broker_explicitly() -> None:
+    router = TaskiqRouter()
+    RecordingBroker(router=router, broker_name="broker")
+
+    router.default_broker = None
+
+    assert router.default_broker is None
+    assert router.default_broker_name is None
+    with pytest.raises(ValueError, match="doesn't have registered brokers"):
+        router.resolve_route("demo.task")
 
 
 def test_router_rejects_broker_attached_to_another_router() -> None:
@@ -49,6 +77,14 @@ def test_router_rejects_string_broker_references() -> None:
 
     with pytest.raises(TypeError, match="Broker string references"):
         router.route_task("demo.task", broker="broker")  # type: ignore[arg-type]
+
+
+def test_router_rejects_invalid_task_reference() -> None:
+    router = TaskiqRouter()
+    broker = RecordingBroker(router=router, broker_name="broker")
+
+    with pytest.raises(TypeError, match="task name or decorated task"):
+        router.route_task(object(), broker=broker)  # type: ignore[arg-type]
 
 
 def test_router_routes_are_immutable_resolved_snapshots() -> None:
@@ -121,3 +157,19 @@ def test_task_definition_binding_does_not_reenter_router_registration() -> None:
     assert router.register_task_calls == 1
     assert broker.router.find_task("shared.once") is registered
     assert broker.find_task("shared.once") is registered
+
+
+def test_router_infers_broker_from_prebound_task() -> None:
+    router = TaskiqRouter()
+    broker = RecordingBroker(router=router, broker_name="broker")
+
+    @task_builder("shared.prebound")
+    def shared_task() -> None:
+        return None
+
+    bound_task = broker.bind_task_definition(shared_task, register=False)
+
+    registered = router.register_task(bound_task)
+
+    assert registered is bound_task
+    assert router.resolve_route(registered).broker is broker

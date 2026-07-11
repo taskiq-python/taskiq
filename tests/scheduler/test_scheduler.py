@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timezone
 
 import pytest
@@ -199,6 +200,58 @@ async def test_scheduler_rejects_duplicate_startup() -> None:
 
     await scheduler.shutdown()
     assert events == ["startup:broker", "shutdown:broker"]
+
+
+async def test_scheduler_rejects_shutdown_while_startup_is_in_progress() -> None:
+    events: list[str] = []
+    startup_started = asyncio.Event()
+    release_startup = asyncio.Event()
+
+    class BlockingStartupBroker(LifecycleBroker):
+        async def startup(self) -> None:
+            startup_started.set()
+            await release_startup.wait()
+            await super().startup()
+
+    router = TaskiqRouter()
+    broker = BlockingStartupBroker(events, router=router, broker_name="broker")
+    scheduler = TaskiqScheduler(broker=broker, sources=[])
+    startup_task = asyncio.create_task(scheduler.startup())
+    await startup_started.wait()
+
+    with pytest.raises(RuntimeError, match="still starting"):
+        await scheduler.shutdown()
+
+    release_startup.set()
+    await startup_task
+    await scheduler.shutdown()
+
+
+async def test_scheduler_rejects_operations_while_shutdown_is_in_progress() -> None:
+    events: list[str] = []
+    shutdown_started = asyncio.Event()
+    release_shutdown = asyncio.Event()
+
+    class BlockingShutdownBroker(LifecycleBroker):
+        async def shutdown(self) -> None:
+            shutdown_started.set()
+            await release_shutdown.wait()
+            await super().shutdown()
+
+    router = TaskiqRouter()
+    broker = BlockingShutdownBroker(events, router=router, broker_name="broker")
+    scheduler = TaskiqScheduler(broker=broker, sources=[])
+    await scheduler.startup()
+    shutdown_task = asyncio.create_task(scheduler.shutdown())
+    await shutdown_started.wait()
+
+    with pytest.raises(RuntimeError, match="shutting down"):
+        await scheduler.startup()
+    with pytest.raises(RuntimeError, match="already shutting down"):
+        await scheduler.shutdown()
+
+    release_shutdown.set()
+    await shutdown_task
 
 
 async def test_scheduler_shutdown_before_startup_preserves_legacy_behavior() -> None:

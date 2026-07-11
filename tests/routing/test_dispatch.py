@@ -4,6 +4,7 @@ from taskiq import (
     Flow,
     FlowProtocol,
     InMemoryBroker,
+    TaskiqMessage,
     TaskiqRoute,
     TaskiqRouter,
     UnsupportedFlowError,
@@ -429,6 +430,52 @@ async def test_router_task_decorator_can_choose_broker_and_flow() -> None:
 
     assert target.sent[0][0].task_name == "demo.task"
     assert target.sent[0][1] == flow
+
+
+async def test_router_bare_task_decorator_uses_default_broker() -> None:
+    router = TaskiqRouter()
+    broker = RecordingBroker(router=router, broker_name="default")
+
+    @router.task
+    async def demo_task() -> None:
+        return None
+
+    await demo_task.kiq()
+
+    assert demo_task.broker is broker
+    assert broker.sent[0][0].task_name == f"{__name__}:demo_task"
+
+
+async def test_explicit_route_rejects_additional_broker_override() -> None:
+    router = TaskiqRouter()
+    broker = RecordingBroker(router=router, broker_name="broker")
+    route = TaskiqRoute(broker=broker, flow=Flow("events"))
+    message = TaskiqMessage(
+        task_id="task-id",
+        task_name="demo.task",
+        labels={},
+        args=[],
+        kwargs={},
+    )
+
+    with pytest.raises(ValueError, match="either route or broker/flow"):
+        await router.kiq(message, route=route, broker=broker)
+
+
+async def test_flow_override_replaces_selected_route_flow() -> None:
+    router = TaskiqRouter()
+    broker = RecordingBroker(router=router, broker_name="broker")
+
+    @broker.task(task_name="demo.task")
+    async def demo_task() -> None:
+        return None
+
+    route = TaskiqRoute(broker=broker, flow=Flow("initial"))
+    override = Flow("override")
+
+    await demo_task.kicker().with_route(route).with_flow(override).kiq()
+
+    assert broker.sent[0][1] == override
 
 
 async def test_routed_dispatch_uses_target_middleware_and_result_backend() -> None:
