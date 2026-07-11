@@ -10,6 +10,8 @@ This page describes the routing and flow contract on the
 `experiment/separate_broker` branch. The old task declaration API remains
 compatible. Broker-specific packages may keep using their existing send/listen
 implementation until they opt into flow-aware dispatch and listen-plan support.
+Legacy sends without a selected flow keep working; selecting an explicit flow
+requires the broker adapter to implement that capability.
 :::
 
 Taskiq keeps the old task declaration API:
@@ -308,6 +310,13 @@ before `on_ready(...)` runs affect that scheduled dispatch. If no router route
 exists for the scheduled task, Taskiq keeps the old behavior and sends through
 the scheduler broker.
 
+Scheduler startup owns producer lifecycle for every broker already attached to
+that router. Brokers start in registration order and shut down in reverse
+order. A partial startup failure still shuts down every broker whose startup
+was attempted. Configure the router before scheduler startup; brokers attached
+later are not part of that lifecycle snapshot. A scheduler whose broker has no
+other router members keeps the legacy single-broker lifecycle.
+
 `with_broker(...)`, `with_route(...)` and `with_flow(...)` on a kicker are not
 persisted schedule route metadata. They can affect `CreatedSchedule.kiq()`,
 which is an immediate queued invocation helper, but they do not change the
@@ -476,8 +485,13 @@ Migration guidance for broker packages:
 
 - Existing brokers that implement only `kick(message)` and `listen()` remain
   valid. The default `kick_to_flow(message, flow=None)` calls `kick(message)`.
+  If an explicit flow reaches that fallback, it raises
+  `UnsupportedFlowError` instead of silently sending to the broker's old
+  default destination.
 - Flow-aware brokers can override `kick_to_flow(...)` and map `flow.name` to a
   queue, topic, subject or stream.
+- The built-in `InMemoryBroker` explicitly accepts every Flow as local routing
+  metadata because it has one in-process execution destination.
 - A successful `kick_to_flow(...)` return is the publication boundary used by
   `Context.requeue()` before Receiver acknowledges the original delivery.
   Flow-aware adapters must not return success before their normal send contract
@@ -500,6 +514,9 @@ Scheduler and requeue compatibility:
   broker-specific flow options in this iteration.
 - Scheduled dispatch resolves the route late in the scheduler process through
   the scheduler broker's router.
+- Scheduler startup starts all brokers already attached to that router and
+  shuts them down in reverse order, including cleanup after partial startup.
+  Configure broker membership before scheduler startup.
 - `Context.requeue()` sends through the broker currently executing the task. It
   does not re-resolve a task route across brokers.
 - Taskiq does not preserve inbound source-flow provenance yet because that data

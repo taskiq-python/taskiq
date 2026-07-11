@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+import pytest
+
 from taskiq import Flow, TaskiqRouter
 from taskiq.abc.schedule_source import ScheduleSource
 from taskiq.brokers.inmemory_broker import InMemoryBroker
@@ -8,6 +10,42 @@ from taskiq.exceptions import ScheduledTaskCancelledError
 from taskiq.scheduler.scheduled_task import ScheduledTask
 from taskiq.scheduler.scheduler import TaskiqScheduler
 from tests.utils import RecordingBroker
+
+
+class LifecycleError(RuntimeError):
+    """Marker error for scheduler broker lifecycle tests."""
+
+
+class LifecycleBroker(RecordingBroker):
+    """Recording broker with observable startup and shutdown behavior."""
+
+    def __init__(
+        self,
+        events: list[str],
+        *,
+        router: TaskiqRouter,
+        broker_name: str,
+        startup_error: BaseException | None = None,
+        shutdown_error: BaseException | None = None,
+    ) -> None:
+        self.events = events
+        self.startup_error = startup_error
+        self.shutdown_error = shutdown_error
+        super().__init__(router=router, broker_name=broker_name)
+
+    async def startup(self) -> None:
+        """Record startup and raise the configured failure."""
+        self.events.append(f"startup:{self.broker_name}")
+        if self.startup_error is not None:
+            raise self.startup_error
+        await super().startup()
+
+    async def shutdown(self) -> None:
+        """Record shutdown and raise the configured failure."""
+        self.events.append(f"shutdown:{self.broker_name}")
+        await super().shutdown()
+        if self.shutdown_error is not None:
+            raise self.shutdown_error
 
 
 class RecordingScheduleSource(ScheduleSource):
@@ -36,6 +74,119 @@ class CancellingScheduleSource(ScheduleSource):
     ) -> None:
         """Raise cancelled error."""
         raise ScheduledTaskCancelledError
+
+
+async def test_scheduler_owns_all_router_broker_lifecycles() -> None:
+    events: list[str] = []
+    router = TaskiqRouter()
+    first = LifecycleBroker(events, router=router, broker_name="first")
+    second = LifecycleBroker(events, router=router, broker_name="second")
+    scheduler = TaskiqScheduler(broker=first, sources=[])
+
+    await scheduler.startup()
+
+    assert first.is_scheduler_process
+    assert second.is_scheduler_process
+    assert events == ["startup:first", "startup:second"]
+
+    await scheduler.shutdown()
+
+    assert events == [
+        "startup:first",
+        "startup:second",
+        "shutdown:second",
+        "shutdown:first",
+    ]
+
+
+async def test_scheduler_cleans_up_partial_broker_startup() -> None:
+    events: list[str] = []
+    router = TaskiqRouter()
+    cleanup_error = LifecycleError("first cleanup failed")
+    first = LifecycleBroker(
+        events,
+        router=router,
+        broker_name="first",
+        shutdown_error=cleanup_error,
+    )
+    startup_error = LifecycleError("second startup failed")
+    LifecycleBroker(
+        events,
+        router=router,
+        broker_name="second",
+        startup_error=startup_error,
+    )
+    LifecycleBroker(events, router=router, broker_name="not-started")
+    scheduler = TaskiqScheduler(broker=first, sources=[])
+
+    with pytest.raises(LifecycleError) as exc_info:
+        await scheduler.startup()
+
+    assert exc_info.value is startup_error
+
+    assert events == [
+        "startup:first",
+        "startup:second",
+        "shutdown:second",
+        "shutdown:first",
+    ]
+
+
+async def test_scheduler_shutdown_closes_all_brokers_after_failure() -> None:
+    events: list[str] = []
+    router = TaskiqRouter()
+    first = LifecycleBroker(
+        events,
+        router=router,
+        broker_name="first",
+        shutdown_error=LifecycleError("first shutdown failed"),
+    )
+    second_error = LifecycleError("second shutdown failed")
+    LifecycleBroker(
+        events,
+        router=router,
+        broker_name="second",
+        shutdown_error=second_error,
+    )
+    LifecycleBroker(events, router=router, broker_name="third")
+    scheduler = TaskiqScheduler(broker=first, sources=[])
+    await scheduler.startup()
+
+    with pytest.raises(LifecycleError) as exc_info:
+        await scheduler.shutdown()
+
+    assert exc_info.value is second_error
+
+    assert events[-3:] == [
+        "shutdown:third",
+        "shutdown:second",
+        "shutdown:first",
+    ]
+
+
+async def test_scheduler_rejects_duplicate_startup() -> None:
+    events: list[str] = []
+    router = TaskiqRouter()
+    broker = LifecycleBroker(events, router=router, broker_name="broker")
+    scheduler = TaskiqScheduler(broker=broker, sources=[])
+    await scheduler.startup()
+
+    with pytest.raises(RuntimeError, match="already started"):
+        await scheduler.startup()
+
+    await scheduler.shutdown()
+    assert events == ["startup:broker", "shutdown:broker"]
+
+
+async def test_scheduler_shutdown_before_startup_preserves_legacy_behavior() -> None:
+    events: list[str] = []
+    router = TaskiqRouter()
+    broker = LifecycleBroker(events, router=router, broker_name="broker")
+    scheduler = TaskiqScheduler(broker=broker, sources=[])
+
+    await scheduler.shutdown()
+
+    assert events == ["shutdown:broker"]
 
 
 async def test_scheduled_task_cancelled() -> None:

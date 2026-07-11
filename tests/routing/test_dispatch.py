@@ -1,6 +1,13 @@
 import pytest
 
-from taskiq import Flow, FlowProtocol, InMemoryBroker, TaskiqRoute, TaskiqRouter
+from taskiq import (
+    Flow,
+    FlowProtocol,
+    InMemoryBroker,
+    TaskiqRoute,
+    TaskiqRouter,
+    UnsupportedFlowError,
+)
 from tests.routing.models import (
     BrokerQueue,
     OldStyleRecordingBroker,
@@ -121,7 +128,24 @@ async def test_router_can_route_task_to_another_broker_flow() -> None:
     assert target.sent[0][1] == flow
 
 
-async def test_old_style_broker_uses_kick_to_flow_fallback() -> None:
+async def test_old_style_broker_uses_fallback_without_flow() -> None:
+    router = TaskiqRouter()
+    source = RecordingBroker(router=router, broker_name="source")
+    target = OldStyleRecordingBroker(router=router, broker_name="target")
+
+    @source.task(task_name="demo.task")
+    async def demo_task() -> None:
+        return None
+
+    router.route_task(demo_task, broker=target)
+
+    await demo_task.kiq()
+
+    assert source.sent == []
+    assert target.sent[0].task_name == "demo.task"
+
+
+async def test_old_style_broker_rejects_explicit_flow() -> None:
     router = TaskiqRouter()
     source = RecordingBroker(router=router, broker_name="source")
     target = OldStyleRecordingBroker(router=router, broker_name="target")
@@ -133,10 +157,16 @@ async def test_old_style_broker_uses_kick_to_flow_fallback() -> None:
 
     router.route_task(demo_task, broker=target, flow=flow)
 
-    await demo_task.kiq()
+    with pytest.raises(
+        UnsupportedFlowError,
+        match="OldStyleRecordingBroker does not support explicit flow 'legacy'",
+    ) as exc_info:
+        await demo_task.kiq()
 
+    assert exc_info.value.broker_type == "OldStyleRecordingBroker"
+    assert exc_info.value.flow_name == "legacy"
     assert source.sent == []
-    assert target.sent[0].task_name == "demo.task"
+    assert target.sent == []
 
 
 async def test_kicker_route_override_wins_over_registered_route() -> None:

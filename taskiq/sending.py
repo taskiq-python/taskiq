@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, TypeVar, cast
 
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.abc.result_backend import AsyncResultBackend
-from taskiq.exceptions import SendTaskError
+from taskiq.exceptions import SendTaskError, UnsupportedFlowError
 from taskiq.message import BrokerMessage, TaskiqMessage
 from taskiq.task import AsyncTaskiqTask
 from taskiq.utils import maybe_awaitable
@@ -27,7 +27,8 @@ async def send_task_message(
 
     Middleware failures keep their original types. Only message formatting and
     transport dispatch failures are mapped to `SendTaskError`, matching the
-    established Taskiq kicker contract.
+    established Taskiq kicker contract. `UnsupportedFlowError` keeps its
+    specific public meaning so missing adapter capability is actionable.
     """
     middlewares = getattr(broker, "middlewares", [])
     if not isinstance(middlewares, list):
@@ -40,6 +41,8 @@ async def send_task_message(
     try:
         broker_message = broker.formatter.dumps(message)
         await send(broker_message)
+    except UnsupportedFlowError:
+        raise
     except Exception as exc:
         raise SendTaskError from exc
 

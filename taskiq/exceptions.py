@@ -38,6 +38,17 @@ class SendTaskError(BrokerError):
     __template__ = "Cannot send task to the queue"
 
 
+class UnsupportedFlowError(SendTaskError):
+    """Error raised when a broker cannot dispatch to an explicit flow."""
+
+    __template__ = (
+        "Broker {broker_type} does not support explicit flow {flow_name!r}. "
+        "The broker adapter must override kick_to_flow()."
+    )
+    broker_type: str
+    flow_name: str
+
+
 class SharedBrokerSendTaskError(SendTaskError):
     """Error when someone tries to send task with shared broker."""
 

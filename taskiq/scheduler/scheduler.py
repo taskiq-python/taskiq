@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
@@ -19,22 +21,47 @@ class TaskiqScheduler:
 
     def __init__(
         self,
-        broker: "AsyncBroker",
-        sources: list["ScheduleSource"],
+        broker: AsyncBroker,
+        sources: list[ScheduleSource],
     ) -> None:  # pragma: no cover
         self.broker = broker
         self.sources = sources
+        self._started_brokers: list[AsyncBroker] = []
 
-    async def startup(self) -> None:  # pragma: no cover
+    async def startup(self) -> None:
         """
-        This method is called on startup.
+        Start every producer broker the scheduler may route through.
 
-        Here you can do stuff, like creating
-        connections or anything you'd like.
+        A scheduler with a standalone broker preserves the legacy one-broker
+        lifecycle. When brokers share a router, the scheduler owns all of their
+        producer-side resources because late route resolution may select any of
+        them.
         """
-        await self.broker.startup()
+        if self._started_brokers:
+            raise RuntimeError("TaskiqScheduler is already started.")
 
-    async def on_ready(self, source: "ScheduleSource", task: ScheduledTask) -> None:
+        try:
+            for broker in self._managed_brokers():
+                broker.is_scheduler_process = True
+                self._started_brokers.append(broker)
+                await broker.startup()
+        except BaseException:
+            cleanup_error = await self._shutdown_brokers(
+                tuple(self._started_brokers),
+            )
+            self._started_brokers.clear()
+            if cleanup_error is not None:
+                logger.error(
+                    "Error while cleaning up partially started scheduler brokers.",
+                    exc_info=(
+                        type(cleanup_error),
+                        cleanup_error,
+                        cleanup_error.__traceback__,
+                    ),
+                )
+            raise
+
+    async def on_ready(self, source: ScheduleSource, task: ScheduledTask) -> None:
         """
         This method is called when task is ready to be enqueued.
 
@@ -58,8 +85,42 @@ class TaskiqScheduler:
             await maybe_awaitable(source.post_send(task))
 
     async def shutdown(self) -> None:
-        """Shutdown the scheduler process."""
-        await self.broker.shutdown()
+        """Shut down scheduler brokers in reverse startup order."""
+        brokers = tuple(self._started_brokers)
+        if not brokers:
+            brokers = (self.broker,)
+        self._started_brokers.clear()
+        shutdown_error = await self._shutdown_brokers(brokers)
+        if shutdown_error is not None:
+            raise shutdown_error
+
+    def _managed_brokers(self) -> tuple[AsyncBroker, ...]:
+        """Return scheduler-owned producer brokers in startup order."""
+        router = getattr(self.broker, "router", None)
+        if isinstance(router, TaskiqRouter):
+            brokers = tuple(router.brokers.values())
+            if brokers:
+                return brokers
+        return (self.broker,)
+
+    @staticmethod
+    async def _shutdown_brokers(
+        brokers: tuple[AsyncBroker, ...],
+    ) -> BaseException | None:
+        """Close all brokers while preserving the first shutdown failure."""
+        first_error: BaseException | None = None
+        for broker in reversed(brokers):
+            try:
+                await broker.shutdown()
+            except BaseException as exc:
+                if first_error is None:
+                    first_error = exc
+                else:
+                    logger.error(
+                        "Additional error while shutting down scheduler brokers.",
+                        exc_info=(type(exc), exc, exc.__traceback__),
+                    )
+        return first_error
 
     def _apply_scheduled_route(
         self,

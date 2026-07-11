@@ -23,7 +23,7 @@ from taskiq.abc.serializer import TaskiqSerializer
 from taskiq.acks import AckableMessage
 from taskiq.decor import AsyncTaskiqDecoratedTask
 from taskiq.events import TaskiqEvents
-from taskiq.exceptions import TaskBrokerMismatchError
+from taskiq.exceptions import TaskBrokerMismatchError, UnsupportedFlowError
 from taskiq.flow import FlowProtocol
 from taskiq.formatters.proxy_formatter import ProxyFormatter
 from taskiq.message import BrokerMessage
@@ -320,11 +320,19 @@ class AsyncBroker(ABC):
 
         Existing brokers can keep implementing only `kick`. New brokers may
         override this method and use `flow` to route to a concrete queue, topic,
-        stream or any other transport address.
+        stream or any other transport address. The compatibility fallback is
+        valid only when no explicit flow was selected.
 
         :param message: message to send.
         :param flow: optional transport-neutral flow.
+        :raises UnsupportedFlowError: if an explicit flow requires adapter
+            support that this broker has not implemented.
         """
+        if flow is not None:
+            raise UnsupportedFlowError(
+                broker_type=type(self).__name__,
+                flow_name=flow.name,
+            )
         await self.kick(message)
 
     @abstractmethod

@@ -179,6 +179,14 @@ class InMemoryBroker(AsyncBroker):
         self._running_tasks.add(task)
         task.add_done_callback(self._running_tasks.discard)
 
+    async def kick_to_flow(
+        self,
+        message: BrokerMessage,
+        flow: FlowProtocol | None = None,
+    ) -> None:
+        """Execute locally because every flow shares one in-memory runtime."""
+        await self.kick(message)
+
     def listen(self) -> AsyncGenerator[bytes, None]:
         """
         Inmemory broker cannot listen.

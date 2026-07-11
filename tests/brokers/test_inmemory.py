@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from taskiq import InMemoryBroker
+from taskiq import Flow, InMemoryBroker
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.brokers.inmemory_broker import InmemoryResultBackend
 from taskiq.events import TaskiqEvents
@@ -73,6 +73,20 @@ async def test_inmemory_success() -> None:
     result = await kicked.wait_result()
     assert result.return_value == test_val
     assert not broker._running_tasks
+
+
+async def test_inmemory_accepts_explicit_flow_as_local_metadata() -> None:
+    flow = Flow("local.priority")
+    broker = InMemoryBroker(default_flow=flow, await_inplace=True)
+
+    @broker.task
+    async def task() -> str:
+        return flow.name
+
+    kicked = await task.kiq()
+    result = await kicked.wait_result()
+
+    assert result.return_value == "local.priority"
 
 
 async def test_cannot_listen() -> None:

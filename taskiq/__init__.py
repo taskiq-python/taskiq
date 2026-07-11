@@ -23,6 +23,7 @@ from taskiq.exceptions import (
     SendTaskError,
     TaskiqError,
     TaskiqResultTimeoutError,
+    UnsupportedFlowError,
 )
 from taskiq.flow import Flow, FlowIdentity, FlowProtocol, get_flow_identity
 from taskiq.funcs import gather
@@ -81,6 +82,7 @@ __all__ = [
     "TaskiqScheduler",
     "TaskiqState",
     "TaskiqSubscription",
+    "UnsupportedFlowError",
     "ZeroMQBroker",
     "__version__",
     "async_shared_broker",
