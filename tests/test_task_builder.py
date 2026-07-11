@@ -52,6 +52,23 @@ class CallableIncrement:
         return value + self.increment
 
 
+class CollidingCallable:
+    """Callable whose application state overlaps with the task API."""
+
+    def __init__(self, increment: int) -> None:
+        self.broker = "source-broker"
+        self.increment = increment
+        self.kiq = "source-kiq"
+        self.labels = {"source": "callable-object"}
+        self.original_func = "source-original-func"
+        self.return_type = str
+        self.task_name = "source.task-name"
+
+    def __call__(self, value: int) -> int:
+        """Increment one value without exposing state as task metadata."""
+        return value + self.increment
+
+
 @task_builder("shared.process_pool")
 def shared_process_pool_add(left: int, right: int) -> int:
     """Add values in a spawned worker process."""
@@ -144,6 +161,43 @@ async def test_callable_object_task_definition_can_be_bound_and_sent() -> None:
     assert registered.return_type is int
     assert registered.__wrapped__ is definition.original_func
     assert result.return_value == 5
+
+
+async def test_callable_object_state_cannot_replace_task_contract() -> None:
+    source = CollidingCallable(2)
+    definition = task_builder(
+        "shared.callable-owned-state",
+        queue="expected",
+    )(source)
+    broker = InMemoryBroker(await_inplace=True)
+
+    registered = broker.register_task(definition)
+    sent_task = await registered.kiq(3)
+    result = await sent_task.wait_result()
+    await broker.shutdown()
+
+    assert registered.broker is broker
+    assert registered.task_name == "shared.callable-owned-state"
+    assert registered.labels == {"queue": "expected"}
+    assert registered.return_type is int
+    assert registered.__wrapped__ is source
+    assert registered.original_func(3) == 5
+    assert callable(registered.kiq)
+    assert vars(registered)["increment"] == 2
+    assert broker.local_task_registry[registered.task_name] is registered
+    assert result.return_value == 5
+
+
+def test_task_binding_preserves_non_conflicting_custom_metadata() -> None:
+    def source(value: int) -> int:
+        return value + 1
+
+    vars(source)["custom_metadata"] = "preserved"
+    definition = task_builder("shared.custom-metadata")(source)
+
+    registered = InMemoryBroker().register_task(definition)
+
+    assert vars(registered)["custom_metadata"] == "preserved"
 
 
 def test_callable_object_binding_rejects_ambiguous_redeclaration() -> None:

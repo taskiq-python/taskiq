@@ -3,7 +3,7 @@ import sys
 import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from collections.abc import AsyncGenerator, Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable, Mapping
 from functools import WRAPPER_ASSIGNMENTS, update_wrapper
 from logging import getLogger
 from typing import (
@@ -49,10 +49,41 @@ if TYPE_CHECKING:  # pragma: no cover
 _T = TypeVar("_T")
 _FuncParams = ParamSpec("_FuncParams")
 _ReturnType = TypeVar("_ReturnType")
+_DecoratedTask = TypeVar(
+    "_DecoratedTask",
+    bound=AsyncTaskiqDecoratedTask[Any, Any],
+)
 
 EventHandler: TypeAlias = Callable[[TaskiqState], Awaitable[None] | None]
 
 logger = getLogger("taskiq")
+
+
+def _copy_callable_metadata(
+    task: _DecoratedTask,
+    source: Callable[..., Any],
+) -> _DecoratedTask:
+    """Preserve callable metadata while keeping task-owned state authoritative."""
+    assigned_metadata = tuple(
+        attribute for attribute in WRAPPER_ASSIGNMENTS if hasattr(source, attribute)
+    )
+    update_wrapper(
+        task,
+        source,
+        assigned=assigned_metadata,
+        updated=(),
+    )
+
+    protected_attributes = set(vars(task))
+    for task_type in type(task).__mro__:
+        protected_attributes.update(vars(task_type))
+
+    source_attributes = getattr(source, "__dict__", None)
+    if isinstance(source_attributes, Mapping):
+        for attribute, value in source_attributes.items():
+            if attribute not in protected_attributes:
+                setattr(task, attribute, value)
+    return task
 
 
 def default_id_generator() -> str:
@@ -541,12 +572,7 @@ class AsyncBroker(ABC):
         if "return" in sign:
             return_type = sign["return"]
 
-        assigned_metadata = tuple(
-            attribute
-            for attribute in WRAPPER_ASSIGNMENTS
-            if hasattr(metadata_source, attribute)
-        )
-        decorated_task = update_wrapper(
+        decorated_task = _copy_callable_metadata(
             task_cls(
                 broker=self,
                 original_func=func,
@@ -555,7 +581,6 @@ class AsyncBroker(ABC):
                 return_type=return_type,  # type: ignore
             ),
             metadata_source,
-            assigned=assigned_metadata,
         )
 
         if register:
