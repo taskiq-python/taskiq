@@ -719,6 +719,80 @@ async def test_runtime_cancellation_during_drain_awaits_callback_cleanup(
     assert cleaned_before_runtime_returned
 
 
+async def test_runtime_hard_cancel_awaits_multiphase_callback_cleanup(
+    runtime_executor: ThreadPoolExecutor,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    events: list[str] = []
+    cleanup_started = asyncio.Event()
+    cleanup_finished = asyncio.Event()
+    cleanup_interrupted = asyncio.Event()
+    release_cleanup = asyncio.Event()
+    callback_started = asyncio.Event()
+
+    class CleanupOrderBroker(RuntimeBroker):
+        async def shutdown(self) -> None:
+            self.events.append("broker.shutdown.started")
+            await super().shutdown()
+
+    broker = CleanupOrderBroker(
+        router=TaskiqRouter(),
+        broker_name="listener",
+        events=events,
+    )
+
+    @broker.task(task_name="runtime.multiphase_callback_cleanup")
+    async def blocked_task() -> None:
+        callback_started.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cleanup_started.set()
+            try:
+                await release_cleanup.wait()
+                for _ in range(20):
+                    await asyncio.sleep(0)
+            except asyncio.CancelledError:
+                cleanup_interrupted.set()
+                raise
+            events.append("callback.cleanup.finished")
+            cleanup_finished.set()
+
+    finish_event = asyncio.Event()
+    runtime = build_runtime(
+        (broker,),
+        runtime_executor,
+        options=runtime_options(
+            wait_tasks_timeout=0.01,
+            shutdown_timeout=0.05,
+        ),
+    )
+    caplog.set_level(logging.WARNING, logger="taskiq.worker.runtime")
+    runtime_task = asyncio.create_task(runtime.run(finish_event))
+    await broker.listen_started.wait()
+    await blocked_task.kiq()
+    await callback_started.wait()
+
+    finish_event.set()
+    await cleanup_started.wait()
+
+    async def wait_for_hard_cancel() -> None:
+        while not any(
+            "did not stop" in record.getMessage() for record in caplog.records
+        ):
+            await asyncio.sleep(0)
+
+    await asyncio.wait_for(wait_for_hard_cancel(), timeout=1)
+    release_cleanup.set()
+    await asyncio.wait_for(runtime_task, timeout=1)
+
+    assert cleanup_finished.is_set()
+    assert not cleanup_interrupted.is_set()
+    assert events.index("callback.cleanup.finished") < events.index(
+        "broker.shutdown.started",
+    )
+
+
 async def test_runtime_continues_cleanup_after_broker_shutdown_failure(
     runtime_executor: ThreadPoolExecutor,
     caplog: pytest.LogCaptureFixture,

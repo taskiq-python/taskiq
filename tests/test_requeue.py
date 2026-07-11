@@ -11,9 +11,10 @@ from taskiq import (
     TaskiqRouter,
 )
 from taskiq.acks import AckableMessage, AckController
-from taskiq.exceptions import NoResultError
+from taskiq.exceptions import NoResultError, UnsupportedFlowError
 from taskiq.message import BrokerMessage, TaskiqMessage
 from taskiq.receiver import Receiver
+from tests.routing.models import OldStyleRecordingBroker
 from tests.utils import RecordingBroker
 
 
@@ -182,6 +183,27 @@ async def test_router_requeue_accepts_explicit_flow_override() -> None:
     await router.requeue(message, broker=broker, flow=explicit_flow)
 
     assert broker.sent[0][1] == explicit_flow
+
+
+async def test_requeue_unsupported_flow_keeps_original_unacked() -> None:
+    router = TaskiqRouter()
+    broker = OldStyleRecordingBroker(router=router, broker_name="legacy")
+    flow = Flow("unsupported")
+    message = build_message()
+    ack_events: list[str] = []
+    controller = AckController(lambda: ack_events.append("ack"))
+    context = Context(message, broker, controller)
+    router.route_task(message.task_name, broker=broker, flow=flow)
+
+    with pytest.raises(UnsupportedFlowError) as exc_info:
+        await context.requeue()
+
+    assert exc_info.value.flow_name == flow.name
+    assert broker.sent == []
+    assert ack_events == []
+    assert not context.is_acked
+    assert controller.requeue_failed
+    assert "X-Taskiq-requeue" not in message.labels
 
 
 @pytest.mark.parametrize(

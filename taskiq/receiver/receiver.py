@@ -640,7 +640,7 @@ class Receiver:
 
         :param queue: queue with prefetched data.
         """
-        cancelled = False
+        cancellation: asyncio.CancelledError | None = None
         try:
             while True:
                 queued_message = await queue.get()
@@ -650,12 +650,24 @@ class Receiver:
                     raise TypeError("Receiver queue contains an invalid message.")
                 await self._start_callback(queued_message)
 
-        except asyncio.CancelledError:
-            cancelled = True
-            raise
+        except asyncio.CancelledError as exc:
+            cancellation = exc
         finally:
-            await self._drain_active_tasks(cancel_immediately=cancelled)
+            with anyio.CancelScope(shield=True):
+                cleanup_cancellation = await self._drain_active_tasks(
+                    cancel_immediately=cancellation is not None,
+                )
+            if cancellation is None:
+                cancellation = cleanup_cancellation
+
+        if cancellation is not None:
+            raise cancellation
         logger.info("The runner is stopped.")
+
+    async def _run_owned_callback(self, message: bytes | AckableMessage) -> None:
+        """Run a callback outside repeated listener-scope cancellation."""
+        with anyio.CancelScope(shield=True):
+            await self.callback(message=message, raise_err=False)
 
     async def _start_callback(self, message: _PrefetchedMessage) -> None:
         """Transfer one prefetched delivery into an owned callback task."""
@@ -671,7 +683,7 @@ class Receiver:
                 self.sem_prefetch.release()
                 owns_prefetch_slot = False
             task = asyncio.create_task(
-                self.callback(message=message.data, raise_err=False),
+                self._run_owned_callback(message.data),
             )
         except BaseException:
             if owns_prefetch_slot:
@@ -704,11 +716,15 @@ class Receiver:
                 ),
             )
 
-    async def _drain_active_tasks(self, *, cancel_immediately: bool) -> None:
+    async def _drain_active_tasks(
+        self,
+        *,
+        cancel_immediately: bool,
+    ) -> asyncio.CancelledError | None:
         """Wait for owned callbacks and cancel them after the graceful boundary."""
         tasks = set(self._active_tasks)
         if not tasks:
-            return
+            return None
 
         logger.info("Waiting for %d running tasks to complete...", len(tasks))
         cancellation: asyncio.CancelledError | None = None
@@ -733,25 +749,24 @@ class Receiver:
             if cancellation is None:
                 cancellation = cleanup_cancellation
         logger.info("No more tasks to wait for. Shutting down.")
-        if cancellation is not None:
-            raise cancellation
+        return cancellation
 
     @staticmethod
     async def _cancel_callback_tasks(
         tasks: set[asyncio.Task[Any]],
     ) -> asyncio.CancelledError | None:
-        """Cancel callback tasks and await cleanup despite one outer cancellation."""
+        """Cancel callbacks once and await cleanup despite outer cancellation."""
         for task in tasks:
             task.cancel()
-        try:
-            await asyncio.gather(*tasks, return_exceptions=True)
-        except asyncio.CancelledError as exc:
-            for task in tasks:
-                if not task.done():
-                    task.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
-            return exc
-        return None
+        waiter = asyncio.gather(*tasks, return_exceptions=True)
+        cancellation: asyncio.CancelledError | None = None
+        while not waiter.done():
+            try:
+                await asyncio.shield(waiter)
+            except asyncio.CancelledError as exc:
+                if cancellation is None:
+                    cancellation = exc
+        return cancellation
 
     def _record_listen_error(self, error: BaseException) -> None:
         """Preserve the first transport error while allowing iterator cleanup."""

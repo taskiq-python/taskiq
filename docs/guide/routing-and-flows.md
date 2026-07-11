@@ -341,6 +341,9 @@ contract:
 - A failed or cancelled publication remains unacknowledged for
   `when_executed`, `when_saved` and `manual`, allowing broker redelivery. The
   original label is not incremented.
+- `UnsupportedFlowError` follows the same failure contract. A legacy adapter
+  with an explicit same-broker Flow can therefore redeliver the original until
+  the route is corrected or the transport's dead-letter policy intervenes.
 - `when_received` is intentionally different: the original was acknowledged
   before task execution, so a later publication failure cannot restore it.
 - If acknowledgement itself fails after successful publication, that error is
@@ -519,6 +522,12 @@ Scheduler and requeue compatibility:
   Configure broker membership before scheduler startup.
 - `Context.requeue()` sends through the broker currently executing the task. It
   does not re-resolve a task route across brokers.
+- Immediate retries published by `SimpleRetryMiddleware` or
+  `SmartRetryMiddleware` stay on the broker currently executing the task, so
+  the retry keeps that broker's send lifecycle and result backend. When
+  `SmartRetryMiddleware` uses a `ScheduleSource`, it creates a normal
+  `ScheduledTask`; the scheduler then applies the late route-resolution rules
+  above.
 - Taskiq does not preserve inbound source-flow provenance yet because that data
   is not stored in `TaskiqMessage` or `Context`.
 

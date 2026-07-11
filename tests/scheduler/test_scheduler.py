@@ -132,6 +132,29 @@ async def test_scheduler_cleans_up_partial_broker_startup() -> None:
     ]
 
 
+async def test_scheduler_shutdown_after_failed_startup_does_not_repeat_cleanup() -> (
+    None
+):
+    events: list[str] = []
+    router = TaskiqRouter()
+    first = LifecycleBroker(events, router=router, broker_name="first")
+    LifecycleBroker(
+        events,
+        router=router,
+        broker_name="second",
+        startup_error=LifecycleError("second startup failed"),
+    )
+    scheduler = TaskiqScheduler(broker=first, sources=[])
+
+    with pytest.raises(LifecycleError, match="second startup failed"):
+        await scheduler.startup()
+
+    events_after_rollback = list(events)
+    await scheduler.shutdown()
+
+    assert events == events_after_rollback
+
+
 async def test_scheduler_shutdown_closes_all_brokers_after_failure() -> None:
     events: list[str] = []
     router = TaskiqRouter()

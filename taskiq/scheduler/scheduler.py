@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import Enum, auto
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
@@ -16,6 +17,16 @@ if TYPE_CHECKING:  # pragma: no cover
 logger = getLogger(__name__)
 
 
+class _SchedulerLifecycle(Enum):
+    """Internal scheduler resource lifecycle."""
+
+    CREATED = auto()
+    STARTING = auto()
+    STARTED = auto()
+    STOPPING = auto()
+    STOPPED = auto()
+
+
 class TaskiqScheduler:
     """Scheduler class."""
 
@@ -27,6 +38,7 @@ class TaskiqScheduler:
         self.broker = broker
         self.sources = sources
         self._started_brokers: list[AsyncBroker] = []
+        self._lifecycle = _SchedulerLifecycle.CREATED
 
     async def startup(self) -> None:
         """
@@ -37,9 +49,15 @@ class TaskiqScheduler:
         producer-side resources because late route resolution may select any of
         them.
         """
-        if self._started_brokers:
+        if self._lifecycle in {
+            _SchedulerLifecycle.STARTING,
+            _SchedulerLifecycle.STARTED,
+        }:
             raise RuntimeError("TaskiqScheduler is already started.")
+        if self._lifecycle is _SchedulerLifecycle.STOPPING:
+            raise RuntimeError("TaskiqScheduler is shutting down.")
 
+        self._lifecycle = _SchedulerLifecycle.STARTING
         try:
             for broker in self._managed_brokers():
                 broker.is_scheduler_process = True
@@ -50,6 +68,7 @@ class TaskiqScheduler:
                 tuple(self._started_brokers),
             )
             self._started_brokers.clear()
+            self._lifecycle = _SchedulerLifecycle.STOPPED
             if cleanup_error is not None:
                 logger.error(
                     "Error while cleaning up partially started scheduler brokers.",
@@ -60,6 +79,7 @@ class TaskiqScheduler:
                     ),
                 )
             raise
+        self._lifecycle = _SchedulerLifecycle.STARTED
 
     async def on_ready(self, source: ScheduleSource, task: ScheduledTask) -> None:
         """
@@ -86,11 +106,22 @@ class TaskiqScheduler:
 
     async def shutdown(self) -> None:
         """Shut down scheduler brokers in reverse startup order."""
+        if self._lifecycle is _SchedulerLifecycle.STOPPED:
+            return
+        if self._lifecycle is _SchedulerLifecycle.STARTING:
+            raise RuntimeError("TaskiqScheduler is still starting.")
+        if self._lifecycle is _SchedulerLifecycle.STOPPING:
+            raise RuntimeError("TaskiqScheduler is already shutting down.")
+
         brokers = tuple(self._started_brokers)
         if not brokers:
             brokers = (self.broker,)
         self._started_brokers.clear()
-        shutdown_error = await self._shutdown_brokers(brokers)
+        self._lifecycle = _SchedulerLifecycle.STOPPING
+        try:
+            shutdown_error = await self._shutdown_brokers(brokers)
+        finally:
+            self._lifecycle = _SchedulerLifecycle.STOPPED
         if shutdown_error is not None:
             raise shutdown_error
 
