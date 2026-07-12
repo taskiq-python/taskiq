@@ -9,9 +9,10 @@ from taskiq.abc.result_backend import AsyncResultBackend, TaskiqResult
 from taskiq.depends.progress_tracker import TaskProgress
 from taskiq.events import TaskiqEvents
 from taskiq.exceptions import UnknownTaskError
+from taskiq.flow import FlowProtocol
 from taskiq.message import BrokerMessage
 from taskiq.receiver import Receiver
-from taskiq.utils import maybe_awaitable
+from taskiq.router import TaskiqRouter
 
 _ReturnType = TypeVar("_ReturnType")
 
@@ -130,8 +131,16 @@ class InMemoryBroker(AsyncBroker):
         max_async_tasks_jitter: int = 0,
         propagate_exceptions: bool = True,
         await_inplace: bool = False,
+        *,
+        router: TaskiqRouter | None = None,
+        broker_name: str | None = None,
+        default_flow: FlowProtocol | None = None,
     ) -> None:
-        super().__init__()
+        super().__init__(
+            router=router,
+            broker_name=broker_name,
+            default_flow=default_flow,
+        )
         self.result_backend: InmemoryResultBackend[Any] = InmemoryResultBackend(
             max_stored_results=max_stored_results,
         )
@@ -146,6 +155,7 @@ class InMemoryBroker(AsyncBroker):
         )
         self.await_inplace = await_inplace
         self._running_tasks: set[asyncio.Task[Any]] = set()
+        self._running_task_error: BaseException | None = None
 
     async def kick(self, message: BrokerMessage) -> None:
         """
@@ -168,7 +178,15 @@ class InMemoryBroker(AsyncBroker):
 
         task = asyncio.create_task(receiver_cb)
         self._running_tasks.add(task)
-        task.add_done_callback(self._running_tasks.discard)
+        task.add_done_callback(self._on_running_task_done)
+
+    async def kick_to_flow(
+        self,
+        message: BrokerMessage,
+        flow: FlowProtocol | None = None,
+    ) -> None:
+        """Execute locally because every flow shares one in-memory runtime."""
+        await self.kick(message)
 
     def listen(self) -> AsyncGenerator[bytes, None]:
         """
@@ -188,19 +206,52 @@ class InMemoryBroker(AsyncBroker):
         Useful when used in testing and you need to await all sent tasks
         before asserting results.
         """
-        to_await = list(self._running_tasks)
-        for task in to_await:
-            await task
+        while self._running_tasks:
+            await asyncio.gather(
+                *tuple(self._running_tasks),
+                return_exceptions=True,
+            )
 
-    async def startup(self) -> None:
-        """Runs startup events for client and worker side."""
-        for event in (TaskiqEvents.CLIENT_STARTUP, TaskiqEvents.WORKER_STARTUP):
-            for handler in self.event_handlers.get(event, []):
-                await maybe_awaitable(handler(self.state))
+        if self._running_task_error is not None:
+            task_error = self._running_task_error
+            self._running_task_error = None
+            raise task_error
+
+    def _on_running_task_done(self, task: asyncio.Task[Any]) -> None:
+        """Release a completed task and retain failures until lifecycle drain."""
+        self._running_tasks.discard(task)
+        try:
+            task.result()
+        except BaseException as exc:
+            if self._running_task_error is None:
+                self._running_task_error = exc
+
+    def _get_startup_events(self) -> tuple[TaskiqEvents, ...]:
+        """Run both sides because this broker executes tasks in the client process."""
+        return (TaskiqEvents.CLIENT_STARTUP, TaskiqEvents.WORKER_STARTUP)
+
+    def _get_shutdown_events(self) -> tuple[TaskiqEvents, ...]:
+        """Shut down both client and worker event phases in their legacy order."""
+        return (TaskiqEvents.CLIENT_SHUTDOWN, TaskiqEvents.WORKER_SHUTDOWN)
 
     async def shutdown(self) -> None:
-        """Runs shutdown events for client and worker side."""
-        for event in (TaskiqEvents.CLIENT_SHUTDOWN, TaskiqEvents.WORKER_SHUTDOWN):
-            for handler in self.event_handlers.get(event, []):
-                await maybe_awaitable(handler(self.state))
-        self.executor.shutdown()
+        """Drain local execution, close broker resources and stop the executor."""
+        shutdown_error: BaseException | None = None
+
+        try:
+            await self.wait_all()
+        except BaseException as exc:
+            shutdown_error = exc
+
+        try:
+            await super().shutdown()
+        except BaseException as exc:
+            shutdown_error = self._remember_shutdown_error(shutdown_error, exc)
+
+        try:
+            self.executor.shutdown()
+        except BaseException as exc:  # pragma: no cover
+            shutdown_error = self._remember_shutdown_error(shutdown_error, exc)
+
+        if shutdown_error is not None:
+            raise shutdown_error

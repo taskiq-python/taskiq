@@ -68,6 +68,50 @@ def test_decorator_with_labels_success() -> None:
     }
 
 
+def test_decorator_metadata_cannot_replace_task_contract() -> None:
+    """Task fields must win over colliding wrapped-function attributes."""
+    broker = _TestBroker()
+
+    def source(value: int) -> int:
+        return value + 1
+
+    vars(source).update(
+        broker="source-broker",
+        custom_metadata="preserved",
+        kiq="source-kiq",
+        labels={"source": "function"},
+        original_func="source-original-func",
+        return_type=str,
+        task_name="source.task-name",
+    )
+
+    registered = broker.task(
+        task_name="expected.task-name",
+        queue="expected",
+    )(source)
+
+    assert registered.broker is broker
+    assert registered.task_name == "expected.task-name"
+    assert registered.labels == {"queue": "expected"}
+    assert registered.original_func is source
+    assert registered.return_type is int
+    assert callable(registered.kiq)
+    assert vars(registered)["custom_metadata"] == "preserved"
+    assert registered(2) == 3
+
+
+def test_decorator_generates_unique_lambda_task_names() -> None:
+    """Anonymous tasks must not collide in the broker task registry."""
+    broker = _TestBroker()
+
+    first_task = broker.task(lambda: None)
+    second_task = broker.task(lambda: None)
+
+    assert ":lambda_" in first_task.task_name
+    assert ":lambda_" in second_task.task_name
+    assert first_task.task_name != second_task.task_name
+
+
 def test_kicker_labels_modification() -> None:
     """Test that using kicker.with_labels doesn't modify task's labels globally."""
     broker = _TestBroker()

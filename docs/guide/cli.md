@@ -18,6 +18,27 @@ Like this:
 taskiq worker mybroker:broker_var my_project.module1 my_project.module2
 ```
 
+### Multiple brokers
+
+The broker import target may expose a module-level sequence of broker instances
+that use one shared Router:
+
+```python
+# my_project/worker.py
+worker_brokers = (rabbit_broker, kafka_broker)
+```
+
+```bash
+taskiq worker my_project.worker:worker_brokers my_project.tasks
+```
+
+The sequence is explicit listener configuration. Router brokers outside the
+sequence are started in client mode for routed sends and are not consumed by
+this worker. A single broker target keeps its existing lifecycle. Execution,
+prefetch and tasks-per-child limits apply to the whole worker process, not once
+per listener. See [Routing and flows](./routing-and-flows.md) for validation,
+lifecycle and adapter compatibility details.
+
 ### Sync function
 
 Taskiq can run synchronous functions. However, since it operates asynchronously, it executes them in a separate thread or process. By default, **ThreadPoolExecutor** is used. But if you're planning to use Taskiq for heavy computations, such as neural network model training or other CPU-intensive tasks, you may want to use **ProcessPoolExecutor** instead.
@@ -146,7 +167,14 @@ kill -HUP <main pid>
 If you send `SIGINT` or `SIGKILL` to the main process by pressing <kbd>Ctrl</kbd>+<kbd>C</kbd> or using the `kill` command, it will initiate the shutdown process.
 By default, it will stop fetching new messages immediately after receiving the signal but will wait for the completion of all currently executing tasks.
 
-If you don't want to wait too long for tasks to complete each time you shut down the worker, you can either send termination signals three times to the main process to perform a hard kill or configure the `--wait-tasks-timeout` to set a hard time limit for shutting down.
+If you don't want to wait indefinitely for tasks to complete during worker shutdown, you can either send termination signals three times to the main process to perform a hard kill or configure `--wait-tasks-timeout` as the graceful callback boundary.
+
+When `--wait-tasks-timeout` is omitted, Taskiq keeps the legacy behavior and
+waits for the complete listener shutdown, including running callbacks, without
+a time limit. When the task timeout is configured, `--shutdown-timeout` is also
+the post-drain listener cleanup allowance. Every managed broker then receives
+its own `--shutdown-timeout` deadline, so total multi-broker cleanup can take
+longer than that value.
 
 ::: tip Cool tip
 The number of signals before a hard kill can be configured with the `--hardkill-count` CLI argument.
@@ -170,8 +198,8 @@ The number of signals before a hard kill can be configured with the `--hardkill-
 * `--ack-type` - Type of acknowledgement. This parameter is used to set when to acknowledge the task. Possible values are `when_received`, `when_executed`, `when_saved`, `manual`. Default is `when_saved`.
 * `--max-tasks-per-child` - maximum number of tasks to be executed by a single worker process before restart.
 * `--max-fails` - Maximum number of child process exits.
-* `--shutdown-timeout` - maximum amount of time for graceful broker's shutdown in seconds (default 5).
-* `--wait-tasks-timeout` - if cannot read new messages from the broker or maximum number of tasks is reached, worker will wait for all current tasks to finish. This parameter sets the maximum amount of time to wait until shutdown.
+* `--shutdown-timeout` - maximum graceful shutdown time for each managed broker in seconds (default 5). With `--wait-tasks-timeout`, the same value is also the listener's post-drain cleanup allowance.
+* `--wait-tasks-timeout` - maximum graceful wait for active task callbacks before Taskiq cancels and awaits them. When omitted, callback and listener shutdown remains unbounded for backward compatibility.
 * `--hardkill-count` - Number of termination signals to the main process before performing a hardkill.
 
 ## Scheduler

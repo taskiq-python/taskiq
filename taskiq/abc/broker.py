@@ -3,8 +3,8 @@ import sys
 import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from collections.abc import AsyncGenerator, Awaitable, Callable
-from functools import wraps
+from collections.abc import AsyncGenerator, Awaitable, Callable, Mapping
+from functools import WRAPPER_ASSIGNMENTS, update_wrapper
 from logging import getLogger
 from typing import (
     TYPE_CHECKING,
@@ -13,6 +13,7 @@ from typing import (
     ParamSpec,
     TypeAlias,
     TypeVar,
+    cast,
     get_type_hints,
     overload,
 )
@@ -23,12 +24,15 @@ from taskiq.abc.serializer import TaskiqSerializer
 from taskiq.acks import AckableMessage
 from taskiq.decor import AsyncTaskiqDecoratedTask
 from taskiq.events import TaskiqEvents
-from taskiq.exceptions import TaskBrokerMismatchError
+from taskiq.exceptions import TaskBrokerMismatchError, UnsupportedFlowError
+from taskiq.flow import FlowProtocol
 from taskiq.formatters.proxy_formatter import ProxyFormatter
 from taskiq.message import BrokerMessage
 from taskiq.result_backends.dummy import DummyResultBackend
+from taskiq.router import TaskiqRouter
 from taskiq.serializers.json_serializer import JSONSerializer
 from taskiq.state import TaskiqState
+from taskiq.task_builder import TaskDefinition, _get_task_binding_function
 from taskiq.utils import maybe_awaitable
 from taskiq.warnings import TaskiqDeprecationWarning
 
@@ -45,10 +49,41 @@ if TYPE_CHECKING:  # pragma: no cover
 _T = TypeVar("_T")
 _FuncParams = ParamSpec("_FuncParams")
 _ReturnType = TypeVar("_ReturnType")
+_DecoratedTask = TypeVar(
+    "_DecoratedTask",
+    bound=AsyncTaskiqDecoratedTask[Any, Any],
+)
 
 EventHandler: TypeAlias = Callable[[TaskiqState], Awaitable[None] | None]
 
 logger = getLogger("taskiq")
+
+
+def _copy_callable_metadata(
+    task: _DecoratedTask,
+    source: Callable[..., Any],
+) -> _DecoratedTask:
+    """Preserve callable metadata while keeping task-owned state authoritative."""
+    assigned_metadata = tuple(
+        attribute for attribute in WRAPPER_ASSIGNMENTS if hasattr(source, attribute)
+    )
+    update_wrapper(
+        task,
+        source,
+        assigned=assigned_metadata,
+        updated=(),
+    )
+
+    protected_attributes = set(vars(task))
+    for task_type in type(task).__mro__:
+        protected_attributes.update(vars(task_type))
+
+    source_attributes = getattr(source, "__dict__", None)
+    if isinstance(source_attributes, Mapping):
+        for attribute, value in source_attributes.items():
+            if attribute not in protected_attributes:
+                setattr(task, attribute, value)
+    return task
 
 
 def default_id_generator() -> str:
@@ -78,6 +113,10 @@ class AsyncBroker(ABC):
         self,
         result_backend: "AsyncResultBackend[_T] | None" = None,
         task_id_generator: Callable[[], str] | None = None,
+        *,
+        router: TaskiqRouter | None = None,
+        broker_name: str | None = None,
+        default_flow: FlowProtocol | None = None,
     ) -> None:
         if result_backend is None:
             result_backend = DummyResultBackend()
@@ -103,6 +142,13 @@ class AsyncBroker(ABC):
         self.serializer: TaskiqSerializer = JSONSerializer()
         self.formatter: TaskiqFormatter = ProxyFormatter(self)
         self.id_generator = task_id_generator
+        self.router = router or TaskiqRouter()
+        self.default_flow = default_flow
+        self.broker_name = self.router.set_broker(
+            self,
+            name=broker_name,
+            default_flow=default_flow,
+        )
         self.local_task_registry: dict[str, AsyncTaskiqDecoratedTask[Any, Any]] = {}
         # Every event has a list of handlers.
         # Every handler is a function which takes state as a first argument.
@@ -128,23 +174,29 @@ class AsyncBroker(ABC):
 
         It searches task by name in dict of tasks that
         were registered for this broker directly.
-        If it fails, it checks global dict of all available tasks.
+        If it fails, it checks tasks registered in the broker's router,
+        then global dict of all available tasks.
 
         :param task_name: name of a task.
         :returns: found task or None.
         """
-        return self.local_task_registry.get(
-            task_name,
-        ) or self.global_task_registry.get(
-            task_name,
+        return (
+            self.local_task_registry.get(
+                task_name,
+            )
+            or self.router.find_task(task_name)
+            or self.global_task_registry.get(
+                task_name,
+            )
         )
 
     def get_all_tasks(self) -> dict[str, AsyncTaskiqDecoratedTask[Any, Any]]:
         """
         Method to fetch all tasks available in broker.
 
-        This method returns all tasks, globally and locally
-        available in broker. With local tasks having higher priority.
+        This method returns all tasks globally, through the broker's router
+        and locally available in broker. With local tasks having higher
+        priority.
 
         So, if you have two tasks with the same name,
         one registered in global registry and one registered
@@ -152,7 +204,21 @@ class AsyncBroker(ABC):
 
         :return: dict of all tasks. Keys are task names, values are tasks.
         """
-        return {**self.global_task_registry, **self.local_task_registry}
+        return {
+            **self.global_task_registry,
+            **self.router.get_all_tasks(),
+            **self.local_task_registry,
+        }
+
+    def get_subscribed_flows(self) -> tuple[FlowProtocol, ...]:
+        """
+        Return flows this broker should subscribe to.
+
+        Existing brokers can keep their current `listen` implementation. New
+        flow-aware brokers may use this method to configure queue, topic,
+        stream or subject subscriptions from router-owned rules.
+        """
+        return self.router.get_broker_flows(self)
 
     def add_dependency_context(self, new_ctx: dict[Any, Any]) -> None:
         """
@@ -186,18 +252,21 @@ class AsyncBroker(ABC):
 
     async def startup(self) -> None:
         """Do something when starting broker."""
-        event = TaskiqEvents.CLIENT_STARTUP
-        if self.is_worker_process:
-            event = TaskiqEvents.WORKER_STARTUP
-
-        for handler in self.event_handlers[event]:
-            await maybe_awaitable(handler(self.state))
+        for event in self._get_startup_events():
+            for handler in self.event_handlers[event]:
+                await maybe_awaitable(handler(self.state))
 
         for middleware in self.middlewares:
             if middleware.__class__.startup != TaskiqMiddleware.startup:
                 await maybe_awaitable(middleware.startup())
 
         await self.result_backend.startup()
+
+    def _get_startup_events(self) -> tuple[TaskiqEvents, ...]:
+        """Return event phases owned by this broker startup."""
+        if self.is_worker_process:
+            return (TaskiqEvents.WORKER_STARTUP,)
+        return (TaskiqEvents.CLIENT_STARTUP,)
 
     async def shutdown(self) -> None:
         """
@@ -206,19 +275,55 @@ class AsyncBroker(ABC):
         This method is called,
         when broker is closing.
         """
-        event = TaskiqEvents.CLIENT_SHUTDOWN
-        if self.is_worker_process:
-            event = TaskiqEvents.WORKER_SHUTDOWN
+        shutdown_error: BaseException | None = None
 
-        # Call all shutdown events.
-        for handler in self.event_handlers[event]:
-            await maybe_awaitable(handler(self.state))
+        for event in self._get_shutdown_events():
+            for handler in self.event_handlers[event]:
+                try:
+                    await maybe_awaitable(handler(self.state))
+                except BaseException as exc:
+                    shutdown_error = self._remember_shutdown_error(
+                        shutdown_error,
+                        exc,
+                    )
 
         for middleware in self.middlewares:
             if middleware.__class__.shutdown != TaskiqMiddleware.shutdown:
-                await maybe_awaitable(middleware.shutdown())
+                try:
+                    await maybe_awaitable(middleware.shutdown())
+                except BaseException as exc:
+                    shutdown_error = self._remember_shutdown_error(
+                        shutdown_error,
+                        exc,
+                    )
 
-        await self.result_backend.shutdown()
+        try:
+            await self.result_backend.shutdown()
+        except BaseException as exc:
+            shutdown_error = self._remember_shutdown_error(shutdown_error, exc)
+
+        if shutdown_error is not None:
+            raise shutdown_error
+
+    def _get_shutdown_events(self) -> tuple[TaskiqEvents, ...]:
+        """Return event phases owned by this broker shutdown."""
+        if self.is_worker_process:
+            return (TaskiqEvents.WORKER_SHUTDOWN,)
+        return (TaskiqEvents.CLIENT_SHUTDOWN,)
+
+    @staticmethod
+    def _remember_shutdown_error(
+        first_error: BaseException | None,
+        current_error: BaseException,
+    ) -> BaseException:
+        """Keep the first shutdown failure while allowing cleanup to continue."""
+        if first_error is None:
+            return current_error
+        logger.error(
+            "Additional error while shutting down broker resources.",
+            exc_info=current_error,
+        )
+        return first_error
 
     @abstractmethod
     async def kick(
@@ -236,6 +341,31 @@ class AsyncBroker(ABC):
 
         :param message: name of a task.
         """
+
+    async def kick_to_flow(
+        self,
+        message: BrokerMessage,
+        flow: FlowProtocol | None = None,
+    ) -> None:
+        """
+        Send message to a flow-aware broker.
+
+        Existing brokers can keep implementing only `kick`. New brokers may
+        override this method and use `flow` to route to a concrete queue, topic,
+        stream or any other transport address. The compatibility fallback is
+        valid only when no explicit flow was selected.
+
+        :param message: message to send.
+        :param flow: optional transport-neutral flow.
+        :raises UnsupportedFlowError: if an explicit flow requires adapter
+            support that this broker has not implemented.
+        """
+        if flow is not None:
+            raise UnsupportedFlowError(
+                broker_type=type(self).__name__,
+                flow_name=flow.name,
+            )
+        await self.kick(message)
 
     @abstractmethod
     def listen(self) -> AsyncGenerator[bytes | AckableMessage, None]:
@@ -312,39 +442,11 @@ class AsyncBroker(ABC):
             def inner(
                 func: Callable[_FuncParams, _ReturnType],
             ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]:
-                nonlocal inner_task_name
-                if inner_task_name is None:
-                    fmodule = func.__module__
-                    if fmodule == "__main__":  # pragma: no cover
-                        fmodule = ".".join(
-                            os.path.normpath(sys.argv[0])
-                            .removesuffix(".py")
-                            .split(os.path.sep),
-                        )
-                    fname = func.__name__
-                    if fname == "<lambda>":
-                        fname = f"lambda_{uuid4().hex}"
-                    inner_task_name = f"{fmodule}:{fname}"
-                wrapper = wraps(func)
-
-                sign = get_type_hints(func)
-                return_type = None
-                if "return" in sign:
-                    return_type = sign["return"]
-
-                decorated_task = wrapper(
-                    self.decorator_class(
-                        broker=self,
-                        original_func=func,
-                        labels=inner_labels,
-                        task_name=inner_task_name,
-                        return_type=return_type,  # type: ignore
-                    ),
+                return self._decorate_task(
+                    func,
+                    task_name=inner_task_name,
+                    labels=inner_labels,
                 )
-
-                self._register_task(decorated_task.task_name, decorated_task)  # type: ignore
-
-                return decorated_task  # type: ignore
 
             return inner
 
@@ -362,7 +464,10 @@ class AsyncBroker(ABC):
 
     def register_task(
         self,
-        func: Callable[_FuncParams, _ReturnType],
+        func: (
+            Callable[_FuncParams, _ReturnType]
+            | TaskDefinition[_FuncParams, _ReturnType]
+        ),
         task_name: str | None = None,
         **labels: Any,
     ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]:
@@ -380,7 +485,112 @@ class AsyncBroker(ABC):
 
         :returns: registered task.
         """
-        return self.task(task_name=task_name, **labels)(func)
+        if isinstance(func, TaskDefinition):
+            if task_name is not None or labels:
+                raise ValueError(
+                    "TaskDefinition already defines task_name and labels. "
+                    "Register it without task_name or label overrides.",
+                )
+            return self.router.register_task(
+                func,
+                broker=self,
+            )
+        return self._decorate_task(
+            func,
+            task_name=task_name,
+            labels=labels or {},
+        )
+
+    def bind_task_definition(
+        self,
+        task: TaskDefinition[_FuncParams, _ReturnType],
+        *,
+        register: bool = True,
+    ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]:
+        """Bind an unbound task definition to this broker."""
+        return self._decorate_task(
+            _get_task_binding_function(task),
+            task_name=task.task_name,
+            labels=dict(task.labels),
+            base_cls=task.base_cls,
+            register=register,
+            metadata_func=task.original_func,
+        )
+
+    def store_registered_task(
+        self,
+        task: AsyncTaskiqDecoratedTask[Any, Any],
+    ) -> None:
+        """
+        Store a task after router-owned registration accepted it.
+
+        Application code should use `task` or `register_task`. This method is
+        the broker/router integration boundary for cases where the router owns
+        registration ordering and the broker owns task storage. Brokers with a
+        custom registration store should override this method.
+        """
+        existing_task = self.local_task_registry.get(task.task_name)
+        if existing_task is not None and existing_task is not task:
+            raise ValueError(
+                f"Task name {task.task_name!r} is already stored by this broker.",
+            )
+        self._store_task(task.task_name, task)
+
+    def _decorate_task(
+        self,
+        func: Callable[_FuncParams, _ReturnType],
+        task_name: str | None,
+        labels: dict[str, Any],
+        base_cls: type[AsyncTaskiqDecoratedTask[Any, Any]] | None = None,
+        *,
+        register: bool = True,
+        metadata_func: Callable[_FuncParams, _ReturnType] | None = None,
+    ) -> AsyncTaskiqDecoratedTask[_FuncParams, _ReturnType]:
+        """Build and register a decorated task object."""
+        metadata_source = func if metadata_func is None else metadata_func
+        real_task_name = task_name
+        if real_task_name is None:
+            fmodule = func.__module__
+            if fmodule == "__main__":  # pragma: no cover
+                fmodule = ".".join(
+                    os.path.normpath(sys.argv[0])
+                    .removesuffix(".py")
+                    .split(os.path.sep),
+                )
+            fname = func.__name__
+            if fname == "<lambda>":
+                fname = f"lambda_{uuid4().hex}"
+            real_task_name = f"{fmodule}:{fname}"
+
+        task_cls = self.decorator_class if base_cls is None else base_cls
+        if not isinstance(task_cls, type) or not issubclass(
+            task_cls,
+            AsyncTaskiqDecoratedTask,
+        ):
+            raise TypeError("base_cls must be a subclass of AsyncTaskiqDecoratedTask.")
+
+        hint_source = metadata_source
+        if not hasattr(hint_source, "__annotations__"):
+            hint_source = cast(Any, metadata_source).__call__
+        sign = get_type_hints(hint_source)
+        return_type = None
+        if "return" in sign:
+            return_type = sign["return"]
+
+        decorated_task = _copy_callable_metadata(
+            task_cls(
+                broker=self,
+                original_func=func,
+                labels=labels,
+                task_name=real_task_name,
+                return_type=return_type,  # type: ignore
+            ),
+            metadata_source,
+        )
+
+        if register:
+            self._register_task(decorated_task.task_name, decorated_task)  # type: ignore
+        return decorated_task  # type: ignore
 
     def on_event(self, *events: TaskiqEvents) -> Callable[[EventHandler], EventHandler]:
         """
@@ -529,6 +739,26 @@ class AsyncBroker(ABC):
 
         :param task_name: Name of a task.
         :param task: Decorated task.
+        """
+        if task.broker != self:
+            raise TaskBrokerMismatchError(broker=task.broker)
+        self.router.register_task(
+            task,
+            broker=self,
+        )
+        self._store_task(task_name, task)
+
+    def _store_task(
+        self,
+        task_name: str,
+        task: AsyncTaskiqDecoratedTask[Any, Any],
+    ) -> None:
+        """
+        Store a decorated task in this broker.
+
+        Router-managed binding uses this method after router state has accepted
+        the task, so shared task registration does not re-enter router
+        registration while it is already in progress.
         """
         if task.broker != self:
             raise TaskBrokerMismatchError(broker=task.broker)

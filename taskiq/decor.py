@@ -13,6 +13,7 @@ from typing import (
     overload,
 )
 
+from taskiq._task_function import is_task_binding_function
 from taskiq.kicker import AsyncKicker
 from taskiq.scheduler.created_schedule import CreatedSchedule
 from taskiq.task import AsyncTaskiqTask
@@ -43,6 +44,10 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
     current broker.
     """
 
+    __name__: str
+    __qualname__: str
+    __wrapped__: Callable[_FuncParams, _ReturnType]
+
     def __init__(
         self,
         broker: "AsyncBroker",
@@ -56,6 +61,9 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         self.original_func = original_func
         self.labels = labels
         self.return_type = return_type
+
+        if is_task_binding_function(original_func):
+            return
 
         # This is a hack to make ProcessPoolExecutor work
         # with decorated functions.

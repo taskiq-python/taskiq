@@ -176,6 +176,7 @@ class SmartRetryMiddleware(TaskiqMiddleware):
                     broker=self.broker,
                     labels=message.labels,
                 )
+                .with_broker(self.broker)
                 .with_task_id(message.task_id)
                 .with_labels(_retries=retries)
             )

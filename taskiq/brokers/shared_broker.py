@@ -75,6 +75,18 @@ class AsyncSharedBroker(AsyncBroker):
     ) -> None:
         self.global_task_registry[task_name] = task
 
+    def store_registered_task(
+        self,
+        task: AsyncTaskiqDecoratedTask[Any, Any],
+    ) -> None:
+        """Store a router-bound shared task in the global task registry."""
+        existing_task = self.global_task_registry.get(task.task_name)
+        if existing_task is not None and existing_task is not task:
+            raise ValueError(
+                f"Task name {task.task_name!r} is already stored by this broker.",
+            )
+        self._register_task(task.task_name, task)
+
 
 async_shared_broker = AsyncSharedBroker()
 shared_task = async_shared_broker.task

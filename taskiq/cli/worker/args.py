@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from taskiq.abc.broker import AsyncBroker
 from taskiq.acks import AcknowledgeType
 from taskiq.cli.common_args import LogLevel
 
@@ -25,7 +28,7 @@ def receiver_arg_type(string: str) -> tuple[str, str]:
 class WorkerArgs:
     """Taskiq worker CLI arguments."""
 
-    broker: str
+    broker: str | AsyncBroker | Sequence[AsyncBroker]
     modules: list[str]
     app_dir: str | None = None
     tasks_pattern: Sequence[str] = ("**/tasks.py",)
@@ -61,7 +64,7 @@ class WorkerArgs:
         cls,
         args: Sequence[str] | None = None,
         defaults: dict[str, Any] | None = None,
-    ) -> "WorkerArgs":
+    ) -> WorkerArgs:
         """
         Construct TaskiqArgs instanc from CLI arguments.
 
@@ -73,7 +76,8 @@ class WorkerArgs:
         parser.add_argument(
             "broker",
             help=(
-                "Where to search for broker or broker factory function. "
+                "Where to search for a broker, broker listener sequence, "
+                "or factory function. "
                 "This string must be specified in "
                 "'module.module:variable' format."
             ),
@@ -179,7 +183,7 @@ class WorkerArgs:
             "--shutdown-timeout",
             type=float,
             default=5,
-            help="Maximum amount of time for graceful broker's shutdown is seconds.",
+            help="Maximum time in seconds for each broker's graceful shutdown.",
         )
         parser.add_argument(
             "--reload",
@@ -256,7 +260,7 @@ class WorkerArgs:
             "--wait-tasks-timeout",
             type=float,
             default=None,
-            help="Maximum time to wait for all current tasks to finish before exiting.",
+            help="Maximum graceful wait before cancelling active task callbacks.",
         )
         parser.add_argument(
             "--hardkill-count",

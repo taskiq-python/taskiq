@@ -65,11 +65,15 @@ class SimpleRetryMiddleware(TaskiqMiddleware):
         if not retry_on_error:
             return
 
-        kicker: AsyncKicker[Any, Any] = AsyncKicker(
-            task_name=message.task_name,
-            broker=self.broker,
-            labels=message.labels,
-        ).with_task_id(message.task_id)
+        kicker: AsyncKicker[Any, Any] = (
+            AsyncKicker(
+                task_name=message.task_name,
+                broker=self.broker,
+                labels=message.labels,
+            )
+            .with_broker(self.broker)
+            .with_task_id(message.task_id)
+        )
 
         # Getting number of previous retries.
         retries = int(message.labels.get("_retries", 0)) + 1
