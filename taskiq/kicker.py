@@ -265,6 +265,8 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
             target_route = route
             target_flow = flow
         if target_route is not None:
+            if flow is not None:
+                raise ValueError("Pass either route or flow override.")
             if broker is not None and broker is not target_route.broker:
                 raise ValueError("Pass either route or broker override.")
             target_broker = target_route.broker
@@ -394,6 +396,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
             labels=message.labels,
             args=message.args,
             kwargs=message.kwargs,
+            task_id=self.custom_task_id,
             interval=interval,
         )
         await source.add_schedule(scheduled)

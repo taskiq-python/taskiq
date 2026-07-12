@@ -33,6 +33,35 @@ def test_route_task_does_not_register_subscription_by_default() -> None:
     assert broker.get_subscribed_flows() == ()
 
 
+def test_deprecated_route_subscription_failure_does_not_change_route() -> None:
+    router = TaskiqRouter()
+    broker = RecordingBroker(router=router, broker_name="broker")
+    original_route = router.route_task(
+        "demo.task",
+        broker=broker,
+        flow=Flow("original"),
+    )
+    existing_subscription = router.subscribe(
+        broker,
+        Flow("events").with_options(durable=True),
+        "demo.task",
+    )
+
+    with (
+        pytest.warns(TaskiqDeprecationWarning),
+        pytest.raises(ValueError, match="different broker options"),
+    ):
+        router.route_task(
+            "demo.task",
+            broker=broker,
+            flow=Flow("events").with_options(durable=False),
+            subscribe=True,
+        )
+
+    assert router.routes["demo.task"] == original_route
+    assert router.subscriptions == (existing_subscription,)
+
+
 def test_subscription_snapshot_and_explicit_unsubscribe() -> None:
     router = TaskiqRouter()
     broker = RecordingBroker(router=router, broker_name="broker")

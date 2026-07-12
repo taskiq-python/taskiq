@@ -4,6 +4,7 @@ from enum import Enum, auto
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
+from taskiq._broker_resources import validate_unshared_broker_resources
 from taskiq.exceptions import ScheduledTaskCancelledError
 from taskiq.kicker import AsyncKicker
 from taskiq.router import TaskiqRouter
@@ -57,9 +58,11 @@ class TaskiqScheduler:
         if self._lifecycle is _SchedulerLifecycle.STOPPING:
             raise RuntimeError("TaskiqScheduler is shutting down.")
 
+        managed_brokers = self._managed_brokers()
+        validate_unshared_broker_resources(managed_brokers)
         self._lifecycle = _SchedulerLifecycle.STARTING
         try:
-            for broker in self._managed_brokers():
+            for broker in managed_brokers:
                 broker.is_scheduler_process = True
                 self._started_brokers.append(broker)
                 await broker.startup()

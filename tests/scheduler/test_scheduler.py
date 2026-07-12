@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from taskiq import Flow, TaskiqRouter
+from taskiq import Flow, TaskiqMiddleware, TaskiqRouter
 from taskiq.abc.schedule_source import ScheduleSource
 from taskiq.brokers.inmemory_broker import InMemoryBroker
 from taskiq.compat import model_dump
@@ -98,6 +98,36 @@ async def test_scheduler_owns_all_router_broker_lifecycles() -> None:
         "shutdown:second",
         "shutdown:first",
     ]
+
+
+async def test_scheduler_rejects_shared_broker_lifecycle_resource() -> None:
+    events: list[str] = []
+    router = TaskiqRouter()
+    first = LifecycleBroker(events, router=router, broker_name="first")
+    second = LifecycleBroker(events, router=router, broker_name="second")
+    second.with_result_backend(first.result_backend)
+    scheduler = TaskiqScheduler(broker=first, sources=[])
+
+    with pytest.raises(ValueError, match="result backend instance"):
+        await scheduler.startup()
+
+    assert events == []
+
+
+async def test_scheduler_rejects_shared_middleware_instance() -> None:
+    events: list[str] = []
+    router = TaskiqRouter()
+    first = LifecycleBroker(events, router=router, broker_name="first")
+    second = LifecycleBroker(events, router=router, broker_name="second")
+    middleware = TaskiqMiddleware()
+    first.with_middlewares(middleware)
+    second.with_middlewares(middleware)
+    scheduler = TaskiqScheduler(broker=first, sources=[])
+
+    with pytest.raises(ValueError, match="middleware instance"):
+        await scheduler.startup()
+
+    assert events == []
 
 
 async def test_scheduler_cleans_up_partial_broker_startup() -> None:

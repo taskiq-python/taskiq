@@ -184,6 +184,44 @@ async def test_runtime_preserves_listener_failure_after_sibling_cleanup(
     ]
 
 
+async def test_runtime_keeps_listener_failure_over_fatal_shutdown_error(
+    runtime_executor: ThreadPoolExecutor,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    events: list[str] = []
+    router = TaskiqRouter()
+    listener_error = RuntimeTestError("listener failed")
+    fatal_shutdown_error = FatalRuntimeTestError("fatal shutdown")
+    first = RuntimeBroker(
+        router=router,
+        broker_name="first",
+        events=events,
+        listen_error=listener_error,
+    )
+    second = RuntimeBroker(
+        router=router,
+        broker_name="second",
+        events=events,
+        shutdown_error=fatal_shutdown_error,
+    )
+    runtime = build_runtime((first, second), runtime_executor)
+    caplog.set_level(logging.ERROR, logger="taskiq.worker.runtime")
+    runtime_task = asyncio.create_task(runtime.run(asyncio.Event()))
+    await asyncio.gather(first.listen_started.wait(), second.listen_started.wait())
+
+    first.release_listener.set()
+
+    with pytest.raises(RuntimeTestError) as exc_info:
+        await runtime_task
+
+    assert exc_info.value is listener_error
+    assert [event for event in events if event.endswith(".shutdown")] == [
+        "second.shutdown",
+        "first.shutdown",
+    ]
+    assert "Additional error while shutting down worker brokers" in caplog.text
+
+
 async def test_runtime_keeps_first_listener_error_over_sibling_stop_error(
     runtime_executor: ThreadPoolExecutor,
 ) -> None:
@@ -798,14 +836,20 @@ async def test_runtime_does_not_swallow_fatal_broker_shutdown_error(
     runtime_executor: ThreadPoolExecutor,
 ) -> None:
     events: list[str] = []
+    router = TaskiqRouter()
+    first = RuntimeBroker(
+        router=router,
+        broker_name="first",
+        events=events,
+    )
     shutdown_error = FatalRuntimeTestError("fatal shutdown")
-    broker = RuntimeBroker(
-        router=TaskiqRouter(),
-        broker_name="listener",
+    second = RuntimeBroker(
+        router=router,
+        broker_name="second",
         events=events,
         shutdown_error=shutdown_error,
     )
-    runtime = build_runtime((broker,), runtime_executor)
+    runtime = build_runtime((first, second), runtime_executor)
     finish_event = asyncio.Event()
     finish_event.set()
 
@@ -813,6 +857,10 @@ async def test_runtime_does_not_swallow_fatal_broker_shutdown_error(
         await runtime.run(finish_event)
 
     assert exc_info.value is shutdown_error
+    assert [event for event in events if event.endswith(".shutdown")] == [
+        "second.shutdown",
+        "first.shutdown",
+    ]
 
 
 async def test_runtime_bounds_cancellation_resistant_listener_cleanup(

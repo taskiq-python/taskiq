@@ -107,6 +107,22 @@ def build_stateful_task(
     return generated
 
 
+def build_annotated_task(
+    task_name: str,
+    annotation: object,
+) -> TaskDefinition[..., object]:
+    """Build declarations whose validation contract varies independently."""
+
+    def generated(value: object) -> object:
+        return value
+
+    generated.__annotations__ = {
+        "return": annotation,
+        "value": annotation,
+    }
+    return task_builder(task_name)(generated)
+
+
 factory_process_pool_add_one = build_process_pool_task(
     "shared.factory_add_one",
     1,
@@ -246,6 +262,12 @@ def test_equivalent_immutable_factory_state_reuses_binding() -> None:
             id="different-positional-default-type",
         ),
         pytest.param(
+            "shared.signed-zero-state",
+            (frozenset({1}), -0.0, 1),
+            (frozenset({1}), 0.0, 1),
+            id="different-signed-zero-default",
+        ),
+        pytest.param(
             "shared.keyword-state",
             (frozenset({1}), 1, 1),
             (frozenset({1}), 1, 2),
@@ -256,6 +278,12 @@ def test_equivalent_immutable_factory_state_reuses_binding() -> None:
             (frozenset({1}), 1, 1),
             (frozenset({2}), 1, 1),
             id="different-frozen-closure",
+        ),
+        pytest.param(
+            "shared.frozenset-type-state",
+            (frozenset({1}), 1, 1),
+            (frozenset({1.0}), 1, 1),
+            id="equal-frozen-values-with-different-types",
         ),
     ],
 )
@@ -271,6 +299,16 @@ def test_different_factory_execution_state_rejects_binding_reuse(
         match="Factory-generated TaskDefinitions must use unique task names",
     ):
         build_stateful_task(task_name, *second_state)
+
+
+def test_different_factory_annotations_reject_binding_reuse() -> None:
+    build_annotated_task("shared.annotation-state", int)
+
+    with pytest.raises(
+        ValueError,
+        match="Factory-generated TaskDefinitions must use unique task names",
+    ):
+        build_annotated_task("shared.annotation-state", str)
 
 
 def test_task_definition_preserves_metadata_across_broker_bindings() -> None:

@@ -22,17 +22,41 @@ def _values_match(left: object, right: object) -> bool:
         return True
     if type(left) is not type(right):
         return False
-    if isinstance(left, (str, bytes, int, float, bool, type(None))):
+    return _same_type_values_match(left, right)
+
+
+def _same_type_values_match(left: object, right: object) -> bool:
+    """Compare supported immutable values after exact type validation."""
+    if type(left) in {str, bytes, int, bool, type(None)}:
         return bool(left == right)
-    if isinstance(left, tuple):
-        right_tuple = cast(tuple[object, ...], right)
-        return len(left) == len(right_tuple) and all(
+    if isinstance(left, float) and isinstance(right, float):
+        return left.hex() == right.hex()
+    if isinstance(left, tuple) and isinstance(right, tuple):
+        return len(left) == len(right) and all(
             _values_match(left_item, right_item)
-            for left_item, right_item in zip(left, right_tuple, strict=True)
+            for left_item, right_item in zip(left, right, strict=True)
         )
-    if isinstance(left, frozenset):
-        return left == cast(frozenset[object], right)
+    if isinstance(left, frozenset) and isinstance(right, frozenset):
+        return _frozensets_match(left, right)
     return False
+
+
+def _frozensets_match(
+    left: frozenset[object],
+    right: frozenset[object],
+) -> bool:
+    """Compare unordered immutable values without relying on loose equality."""
+    unmatched_values = list(right)
+    if len(left) != len(unmatched_values):
+        return False
+    for left_item in left:
+        for index, right_item in enumerate(unmatched_values):
+            if _values_match(left_item, right_item):
+                unmatched_values.pop(index)
+                break
+        else:
+            return False
+    return True
 
 
 def _mappings_match(
@@ -67,6 +91,8 @@ def _execution_state_matches(left: object, right: object) -> bool:
     if not _values_match(left.__defaults__, right.__defaults__):
         return False
     if not _mappings_match(left.__kwdefaults__, right.__kwdefaults__):
+        return False
+    if not _mappings_match(left.__annotations__, right.__annotations__):
         return False
     return _values_match(_closure_values(left), _closure_values(right))
 

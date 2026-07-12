@@ -529,6 +529,11 @@ class AsyncBroker(ABC):
         registration ordering and the broker owns task storage. Brokers with a
         custom registration store should override this method.
         """
+        existing_task = self.local_task_registry.get(task.task_name)
+        if existing_task is not None and existing_task is not task:
+            raise ValueError(
+                f"Task name {task.task_name!r} is already stored by this broker.",
+            )
         self._store_task(task.task_name, task)
 
     def _decorate_task(

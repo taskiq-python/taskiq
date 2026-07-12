@@ -342,6 +342,26 @@ async def test_wait_all_propagates_task_failure() -> None:
     assert not broker._running_tasks
 
 
+async def test_wait_all_retains_failure_from_already_completed_task() -> None:
+    task_error = LifecycleError("completed in-memory task failed")
+    broker = InMemoryBroker()
+    broker.with_middlewares(FailingExecutionMiddleware(task_error))
+
+    @broker.task
+    async def failing_task() -> None:
+        return None
+
+    await failing_task.kiq()
+    while broker._running_tasks:
+        await asyncio.sleep(0)
+
+    with pytest.raises(LifecycleError) as exc_info:
+        await broker.wait_all()
+
+    assert exc_info.value is task_error
+    await broker.wait_all()
+
+
 async def test_shutdown_cleans_resources_after_task_failure() -> None:
     events: list[str] = []
     task_error = LifecycleError("in-memory task failed")

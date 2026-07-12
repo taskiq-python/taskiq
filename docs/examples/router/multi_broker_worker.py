@@ -3,7 +3,7 @@
 import asyncio
 from collections.abc import AsyncGenerator
 
-from taskiq import AsyncBroker, BrokerMessage, Flow, TaskiqRouter
+from taskiq import AsyncBroker, BrokerMessage, Flow, FlowProtocol, TaskiqRouter
 
 
 class DemoBroker(AsyncBroker):
@@ -15,6 +15,14 @@ class DemoBroker(AsyncBroker):
 
     async def kick(self, message: BrokerMessage) -> None:
         await self.messages.put(message.message)
+
+    async def kick_to_flow(
+        self,
+        message: BrokerMessage,
+        flow: FlowProtocol | None = None,
+    ) -> None:
+        """Accept every demo flow into this broker's single local queue."""
+        await self.kick(message)
 
     async def listen(self) -> AsyncGenerator[bytes, None]:
         while True:

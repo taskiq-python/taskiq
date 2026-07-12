@@ -11,6 +11,7 @@ from logging import getLogger
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, cast
 
+from taskiq._broker_resources import validate_unshared_broker_resources
 from taskiq.abc.broker import AsyncBroker
 from taskiq.acks import AcknowledgeType
 
@@ -45,7 +46,7 @@ def _consume_late_shutdown_result(
 async def _shutdown_broker(
     broker: AsyncBroker,
     timeout: float,
-) -> asyncio.CancelledError | None:
+) -> BaseException | None:
     """Shut down one broker without preventing later resource cleanup."""
     logger.info("Shutting down broker %s.", broker.broker_name)
     shutdown_task = asyncio.create_task(
@@ -94,6 +95,14 @@ async def _shutdown_broker(
             exc_info=True,
         )
         return None
+    except BaseException as exc:
+        logger.warning(
+            "Broker %s failed fatally during shutdown: %s",
+            broker.broker_name,
+            type(exc).__name__,
+            exc_info=(type(exc), exc, exc.__traceback__),
+        )
+        return exc
 
     if result is not None:
         logger.info(
@@ -320,9 +329,18 @@ class WorkerRuntime:
             primary_error = exc
         finally:
             finish_event.set()
-            cleanup_cancellation = await self._shutdown_brokers(started_brokers)
+            cleanup_error = await self._shutdown_brokers(started_brokers)
             if primary_error is None:
-                primary_error = cleanup_cancellation
+                primary_error = cleanup_error
+            elif cleanup_error is not None:
+                logger.error(
+                    "Additional error while shutting down worker brokers.",
+                    exc_info=(
+                        type(cleanup_error),
+                        cleanup_error,
+                        cleanup_error.__traceback__,
+                    ),
+                )
 
         if primary_error is not None:
             raise primary_error
@@ -511,46 +529,23 @@ class WorkerRuntime:
     async def _shutdown_brokers(
         self,
         started_brokers: list[AsyncBroker],
-    ) -> asyncio.CancelledError | None:
-        cleanup_cancellation: asyncio.CancelledError | None = None
+    ) -> BaseException | None:
+        cleanup_error: BaseException | None = None
         for broker in reversed(started_brokers):
-            broker_cancellation = await _shutdown_broker(
+            broker_error = await _shutdown_broker(
                 broker,
                 self.options.shutdown_timeout,
             )
-            if cleanup_cancellation is None:
-                cleanup_cancellation = broker_cancellation
-        return cleanup_cancellation
+            if cleanup_error is None:
+                cleanup_error = broker_error
+        return cleanup_error
 
     def _validate_runtime_configuration(self) -> None:
-        self._validate_unshared_resources()
+        validate_unshared_broker_resources(
+            self.managed_brokers,
+            error_type=WorkerRuntimeConfigurationError,
+        )
         self._validate_task_lookup()
-
-    def _validate_unshared_resources(self) -> None:
-        middleware_owners: dict[int, str] = {}
-        backend_owners: dict[int, str] = {}
-
-        for broker in self.managed_brokers:
-            for middleware in broker.middlewares:
-                previous_owner = middleware_owners.setdefault(
-                    id(middleware),
-                    broker.broker_name,
-                )
-                if previous_owner != broker.broker_name:
-                    raise WorkerRuntimeConfigurationError(
-                        "One middleware instance cannot be lifecycle-owned by "
-                        f"brokers {previous_owner!r} and {broker.broker_name!r}.",
-                    )
-
-            previous_owner = backend_owners.setdefault(
-                id(broker.result_backend),
-                broker.broker_name,
-            )
-            if previous_owner != broker.broker_name:
-                raise WorkerRuntimeConfigurationError(
-                    "One result backend instance cannot be lifecycle-owned by "
-                    f"brokers {previous_owner!r} and {broker.broker_name!r}.",
-                )
 
     def _validate_task_lookup(self) -> None:
         task_owners: dict[str, tuple[object, str]] = {}

@@ -3,7 +3,7 @@ from typing import Literal
 
 import pytest
 
-from taskiq import TaskiqRoute
+from taskiq import Flow, TaskiqRoute
 from taskiq.abc.formatter import TaskiqFormatter
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.exceptions import SendTaskError
@@ -233,6 +233,24 @@ async def test_route_configuration_error_is_not_wrapped() -> None:
             message,
             broker=other,
             route=TaskiqRoute(source),
+        )
+
+
+async def test_kicker_rejects_route_with_separate_flow_override() -> None:
+    broker = RecordingBroker()
+
+    @broker.task(task_name="lifecycle.route-flow")
+    async def demo_task() -> None:
+        return None
+
+    kicker = demo_task.kicker()
+    message = kicker.prepare().message
+
+    with pytest.raises(ValueError, match="either route or flow override"):
+        await kicker.kiq_message(
+            message,
+            route=TaskiqRoute(broker),
+            flow=Flow("override"),
         )
 
 

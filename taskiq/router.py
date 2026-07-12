@@ -197,17 +197,19 @@ class TaskiqRouter:
     ) -> TaskiqRoute:
         """Set default outbound route for a task."""
         task_name = resolve_task_name(task)
-        route = self._routes.set_route(task_name, broker=broker, flow=flow)
-        if subscribe:
-            warnings.warn(
-                "`route_task(..., subscribe=True)` is deprecated. "
-                "Use `router.subscribe(...)` to add inbound flow subscriptions.",
-                TaskiqDeprecationWarning,
-                stacklevel=2,
-            )
-        if subscribe and route.flow is not None:
+        if not subscribe:
+            return self._routes.set_route(task_name, broker=broker, flow=flow)
+
+        route = self._routes.build_route(broker=broker, flow=flow)
+        warnings.warn(
+            "`route_task(..., subscribe=True)` is deprecated. "
+            "Use `router.subscribe(...)` to add inbound flow subscriptions.",
+            TaskiqDeprecationWarning,
+            stacklevel=2,
+        )
+        if route.flow is not None:
             self.subscribe(route.broker, route.flow, task_name)
-        return route
+        return self._routes.set_route(task_name, broker=broker, flow=flow)
 
     def resolve_route(
         self,
@@ -308,6 +310,10 @@ class TaskiqRouter:
         route_broker = broker
         if route_broker is None:
             route_broker = getattr(task, "broker", None)
+
+        self._tasks.ensure_available(task)
+        if route_broker is not None or flow is not None:
+            self._routes.build_route(broker=route_broker, flow=flow)
 
         self._tasks.register(task)
         if route_broker is not None or flow is not None:

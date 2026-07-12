@@ -46,9 +46,9 @@ async def shutdown_broker(broker: AsyncBroker, timeout: float) -> None:
         TaskiqDeprecationWarning,
         stacklevel=2,
     )
-    cancellation = await _shutdown_broker(broker, timeout)
-    if cancellation is not None:
-        raise cancellation
+    shutdown_error = await _shutdown_broker(broker, timeout)
+    if shutdown_error is not None:
+        raise shutdown_error
 
 
 def get_receiver_type(args: WorkerArgs) -> type[Receiver]:

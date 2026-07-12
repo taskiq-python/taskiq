@@ -23,6 +23,17 @@ class FailingStorageBroker(RecordingBroker):
         raise StorageError("storage failed")
 
 
+class LocalOnlyStorageBroker(RecordingBroker):
+    """Model a legacy adapter that stores decorated tasks outside Router."""
+
+    def _register_task(
+        self,
+        task_name: str,
+        task: AsyncTaskiqDecoratedTask[Any, Any],
+    ) -> None:
+        self._store_task(task_name, task)
+
+
 async def test_task_builder_can_be_registered_later() -> None:
     broker = RecordingBroker()
 
@@ -158,6 +169,49 @@ async def test_task_definition_uses_shared_broker_registration_contract() -> Non
         assert target.sent[0][0].task_name == task_name
     finally:
         broker.global_task_registry.pop(task_name, None)
+
+
+def test_task_definition_does_not_replace_legacy_shared_task() -> None:
+    task_name = "shared.global.conflict"
+    broker = AsyncSharedBroker()
+    broker.global_task_registry.pop(task_name, None)
+
+    @broker.task(task_name=task_name)
+    async def legacy_task() -> None:
+        return None
+
+    @task_builder(task_name)
+    async def task_definition() -> None:
+        return None
+
+    try:
+        with pytest.raises(ValueError, match="already stored by this broker"):
+            broker.register_task(task_definition)
+
+        assert broker.global_task_registry[task_name] is legacy_task
+        assert broker.router.find_task(task_name) is None
+        assert not broker.router.has_route(task_name)
+    finally:
+        broker.global_task_registry.pop(task_name, None)
+
+
+def test_task_definition_does_not_replace_legacy_local_task() -> None:
+    broker = LocalOnlyStorageBroker()
+
+    @broker.task(task_name="shared.local.conflict")
+    async def legacy_task() -> None:
+        return None
+
+    @task_builder("shared.local.conflict")
+    async def task_definition() -> None:
+        return None
+
+    with pytest.raises(ValueError, match="already stored by this broker"):
+        broker.register_task(task_definition)
+
+    assert broker.local_task_registry[legacy_task.task_name] is legacy_task
+    assert broker.router.find_task(legacy_task.task_name) is None
+    assert not broker.router.has_route(legacy_task.task_name)
 
 
 def test_storage_failure_does_not_publish_partial_router_state() -> None:

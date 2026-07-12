@@ -155,6 +155,7 @@ class InMemoryBroker(AsyncBroker):
         )
         self.await_inplace = await_inplace
         self._running_tasks: set[asyncio.Task[Any]] = set()
+        self._running_task_error: BaseException | None = None
 
     async def kick(self, message: BrokerMessage) -> None:
         """
@@ -177,7 +178,7 @@ class InMemoryBroker(AsyncBroker):
 
         task = asyncio.create_task(receiver_cb)
         self._running_tasks.add(task)
-        task.add_done_callback(self._running_tasks.discard)
+        task.add_done_callback(self._on_running_task_done)
 
     async def kick_to_flow(
         self,
@@ -205,18 +206,25 @@ class InMemoryBroker(AsyncBroker):
         Useful when used in testing and you need to await all sent tasks
         before asserting results.
         """
-        task_errors: list[BaseException] = []
         while self._running_tasks:
-            results = await asyncio.gather(
+            await asyncio.gather(
                 *tuple(self._running_tasks),
                 return_exceptions=True,
             )
-            task_errors.extend(
-                result for result in results if isinstance(result, BaseException)
-            )
 
-        if task_errors:
-            raise task_errors[0]
+        if self._running_task_error is not None:
+            task_error = self._running_task_error
+            self._running_task_error = None
+            raise task_error
+
+    def _on_running_task_done(self, task: asyncio.Task[Any]) -> None:
+        """Release a completed task and retain failures until lifecycle drain."""
+        self._running_tasks.discard(task)
+        try:
+            task.result()
+        except BaseException as exc:
+            if self._running_task_error is None:
+                self._running_task_error = exc
 
     def _get_startup_events(self) -> tuple[TaskiqEvents, ...]:
         """Run both sides because this broker executes tasks in the client process."""

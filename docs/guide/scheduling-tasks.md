@@ -159,6 +159,11 @@ If you want to pass additional labels, you can call these methods on the `Kicker
     )
 ```
 
+An explicit `.with_task_id(...)` is stored for cron, interval and time
+schedules and is reused when the scheduler dispatches the task. Without an
+explicit task id, Taskiq keeps the id deferred and generates it at dispatch
+time as before.
+
 ::: warning Routing warning
 
 `with_broker`, `with_route` and `with_flow` are immediate invocation settings.

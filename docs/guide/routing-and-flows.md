@@ -83,12 +83,21 @@ same Router do not receive listeners; the runtime starts them in client mode so
 tasks can publish routed child invocations through them. Passing one broker
 keeps the legacy lifecycle and does not start Router peers.
 
+`InMemoryBroker` remains a deliberate special case: it executes sends in the
+client process, so its legacy lifecycle always includes both client and worker
+event phases even when it is an outbound-only Router peer.
+
 All listener brokers must be distinct, use the same Router and have unique
 broker names. One child `Receiver` owns each transport's formatter, middleware,
 result backend, acknowledgement and iterator. The executor,
 `--max-async-tasks`, `--max-prefetch` and `--max-tasks-per-child` budgets remain
 process-wide. Startup is sequential, listener shutdown overlaps, and broker
 cleanup runs in reverse startup order.
+
+Every managed broker must own distinct middleware and result-backend Python
+instances. Separate instances may point to the same external service, but
+sharing one lifecycle object across brokers is rejected before startup so
+Taskiq cannot initialize or close it twice.
 
 Without `--wait-tasks-timeout`, listener shutdown, including running callbacks,
 has no deadline, preserving single-broker CLI behavior. When the option is set,
@@ -317,6 +326,9 @@ was attempted. Configure the router before scheduler startup; brokers attached
 later are not part of that lifecycle snapshot. A scheduler whose broker has no
 other router members keeps the legacy single-broker lifecycle.
 
+The same distinct-resource rule described for multi-broker workers applies to
+these scheduler-managed brokers.
+
 `with_broker(...)`, `with_route(...)` and `with_flow(...)` on a kicker are not
 persisted schedule route metadata. They can affect `CreatedSchedule.kiq()`,
 which is an immediate queued invocation helper, but they do not change the
@@ -398,10 +410,12 @@ total = await calculate_total.call(19, 3)
 
 `TaskDefinition` preserves the wrapped callable's name, qualified name,
 module, documentation and inspectable signature. Binding the same definition
-to one or several brokers does not rename or otherwise mutate the package-level
-function. Bound task objects expose the same callable metadata, while Taskiq
-uses a stable internal module-level callable for worker execution and process
-pool serialization.
+independently in separate applications or Routers does not rename or otherwise
+mutate the package-level function. Within one shared Router, register the
+definition once; every listener broker can resolve that Router task by name.
+Bound task objects expose the same callable metadata, while Taskiq uses a
+stable internal module-level callable for worker execution and process pool
+serialization.
 
 Factory-generated declarations from the same Python source location must use
 stable, unique task names. Taskiq includes `task_name` in the deterministic
@@ -476,6 +490,9 @@ Migration guidance for application code:
 - Do not use labels as a transport routing schema. Labels remain task metadata.
 - Register a `TaskDefinition` without `task_name` or label overrides; plain
   callable registration still supports those overrides.
+- Keep task names unique within one Router. Re-registering a different task
+  object under an existing Router task name raises `ValueError` instead of
+  silently replacing execution policy.
 - To listen on several brokers in one worker process, export a module-level
   broker tuple and pass that single import path to `taskiq worker`. Do not pass
   several broker paths as positional arguments and do not use Router membership
@@ -515,6 +532,9 @@ Scheduler and requeue compatibility:
 
 - `ScheduledTask` does not store routes, broker names, flow objects or
   broker-specific flow options in this iteration.
+- An explicit kicker task id is stored consistently for cron, interval and
+  time schedules; when absent, the scheduler generates an invocation id at
+  dispatch time.
 - Scheduled dispatch resolves the route late in the scheduler process through
   the scheduler broker's router.
 - Scheduler startup starts all brokers already attached to that router and

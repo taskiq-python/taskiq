@@ -173,3 +173,21 @@ def test_router_infers_broker_from_prebound_task() -> None:
 
     assert registered is bound_task
     assert router.resolve_route(registered).broker is broker
+
+
+def test_bound_task_registration_validates_route_before_registry_mutation() -> None:
+    router = TaskiqRouter()
+    broker = RecordingBroker(router=router, broker_name="local")
+    foreign_broker = RecordingBroker(broker_name="foreign")
+
+    @task_builder("shared.invalid-route")
+    def shared_task() -> None:
+        return None
+
+    bound_task = broker.bind_task_definition(shared_task, register=False)
+
+    with pytest.raises(ValueError, match="not registered in this router"):
+        router.register_task(bound_task, broker=foreign_broker)
+
+    assert router.find_task(bound_task.task_name) is None
+    assert not router.has_route(bound_task.task_name)

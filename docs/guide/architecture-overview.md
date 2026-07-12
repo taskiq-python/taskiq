@@ -57,10 +57,11 @@ When you call the `task.kiq` on a task, it generates a Kicker instance and is a 
 ```python
 import asyncio
 
-from taskiq.brokers.inmemory_broker import InMemoryBroker
+from taskiq import InMemoryBroker, TaskiqRouter
 
-broker = InMemoryBroker()
-second_broker = InMemoryBroker()
+router = TaskiqRouter()
+broker = InMemoryBroker(router=router, broker_name="default")
+second_broker = InMemoryBroker(router=router, broker_name="second")
 
 
 @broker.task
@@ -74,7 +75,12 @@ async def main():
     # This task was initially assigned to broker,
     # but this time it is going to be sent using
     # the second broker with additional label `delay=1`.
-    task = await my_async_task.kicker().with_broker(second_broker).with_labels(delay=1).kiq()
+    task = await (
+        my_async_task.kicker()
+        .with_broker(second_broker)
+        .with_labels(delay=1)
+        .kiq()
+    )
     print(await task.get_result())
 
 
