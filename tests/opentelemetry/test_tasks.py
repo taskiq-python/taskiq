@@ -36,10 +36,16 @@ class TestTaskiqInstrumentation(TestBase):
 
         asyncio.run(test())
 
-        spans = self.sorted_spans(self.memory_exporter.get_finished_spans())
+        spans = self.memory_exporter.get_finished_spans()
         self.assertEqual(len(spans), 2)
 
-        consumer, producer = spans
+        spans_by_kind = {span.kind: span for span in spans}
+        self.assertEqual(
+            set(spans_by_kind),
+            {SpanKind.CONSUMER, SpanKind.PRODUCER},
+        )
+        consumer = spans_by_kind[SpanKind.CONSUMER]
+        producer = spans_by_kind[SpanKind.PRODUCER]
 
         self.assertEqual(
             consumer.name,
@@ -85,10 +91,16 @@ class TestTaskiqInstrumentation(TestBase):
 
         asyncio.run(test())
 
-        spans = self.sorted_spans(self.memory_exporter.get_finished_spans())
+        spans = self.memory_exporter.get_finished_spans()
         self.assertEqual(len(spans), 2)
 
-        consumer, producer = spans
+        spans_by_kind = {span.kind: span for span in spans}
+        self.assertEqual(
+            set(spans_by_kind),
+            {SpanKind.CONSUMER, SpanKind.PRODUCER},
+        )
+        consumer = spans_by_kind[SpanKind.CONSUMER]
+        producer = spans_by_kind[SpanKind.PRODUCER]
 
         self.assertEqual(
             consumer.name,
