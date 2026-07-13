@@ -39,13 +39,12 @@ async def admin_api_server() -> AsyncGenerator[TestServer, None]:
 async def broker_with_admin_middleware(
     admin_api_server: TestServer,
 ) -> AsyncGenerator[InMemoryBroker, None]:
-    broker = InMemoryBroker(await_inplace=True).with_middlewares(
-        TaskiqAdminMiddleware(
-            str(admin_api_server.make_url("/")),  # URL тестового сервера
-            "supersecret",
-            taskiq_broker_name="InMemory",
-        ),
+    middleware = TaskiqAdminMiddleware(
+        str(admin_api_server.make_url("/")),  # URL тестового сервера
+        "supersecret",
+        taskiq_broker_name="InMemory",
     )
+    broker = InMemoryBroker(await_inplace=True).with_middlewares(middleware)
 
     broker.register_task(task_with_dataclass, task_name="task_with_dataclass")
     broker.register_task(task_with_typed_dict, task_name="task_with_typed_dict")
@@ -55,6 +54,8 @@ async def broker_with_admin_middleware(
     await broker.startup()
     yield broker
     await broker.shutdown()
+    assert middleware._client is not None
+    assert middleware._client.closed
 
 
 async def task_with_dataclass(dto: DataclassDTO) -> None:
