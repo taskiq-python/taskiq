@@ -3,7 +3,7 @@ import contextvars
 import random
 import time
 import unittest.mock
-from collections.abc import Generator
+from collections.abc import AsyncGenerator, Generator
 from concurrent.futures import ThreadPoolExecutor
 from functools import wraps
 from typing import Any, ClassVar
@@ -937,3 +937,68 @@ async def test_no_semaphore_without_max_async_tasks() -> None:
     """Test that semaphore is None when max_async_tasks is not set."""
     receiver = get_receiver(max_async_tasks=None)
     assert receiver.sem is None
+
+
+async def test_prefetcher_does_not_pop_message_past_max_tasks() -> None:
+    """Test not pulling a message without the intention of running it."""
+    broker = AsyncQueueBroker()
+
+    @broker.task
+    async def noop() -> None:
+        return None
+
+    for _ in range(6):
+        await noop.kiq()
+
+    assert broker.queue.qsize() == 6
+
+    receiver = Receiver(
+        broker,
+        executor=ThreadPoolExecutor(max_workers=1),
+        max_async_tasks=1,
+        max_tasks_to_execute=5,
+    )
+
+    await receiver.listen(asyncio.Event())
+
+    assert broker.queue.qsize() == 1
+
+
+async def test_prefetcher_recovers_from_transient_listen_error() -> None:
+    """A transient error mid-prefetch must not kill the prefetcher."""
+
+    class FlakyBroker(AsyncQueueBroker):
+        def __init__(self) -> None:
+            super().__init__()
+            self.fail_once = True
+
+        async def listen(self) -> AsyncGenerator[AckableMessage, None]:
+            while True:
+                data = await self.queue.get()
+                if self.fail_once:
+                    self.fail_once = False
+                    self.queue.task_done()
+                    raise RuntimeError("transient broker hiccup")
+                yield AckableMessage(data=data, ack=self.queue.task_done)
+
+    broker = FlakyBroker()
+    ran = 0
+
+    @broker.task
+    async def collector() -> None:
+        nonlocal ran
+        ran += 1
+
+    await collector.kiq()  # consumed by the transient error
+    await collector.kiq()  # prefetcher recovering
+
+    receiver = Receiver(
+        broker,
+        executor=ThreadPoolExecutor(max_workers=1),
+        max_async_tasks=1,
+        max_tasks_to_execute=1,
+    )
+
+    await asyncio.wait_for(receiver.listen(asyncio.Event()), timeout=5)
+
+    assert ran == 1
