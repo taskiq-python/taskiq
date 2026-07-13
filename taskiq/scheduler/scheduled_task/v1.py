@@ -2,9 +2,12 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any
 
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field, root_validator, validator
 
-from taskiq.scheduler.scheduled_task.validators import validate_interval_value
+from taskiq.scheduler.scheduled_task.validators import (
+    parse_cron_offset,
+    validate_interval_value,
+)
 
 
 class ScheduledTask(BaseModel):
@@ -20,6 +23,11 @@ class ScheduledTask(BaseModel):
     cron_offset: str | timedelta | None = None
     time: datetime | None = None
     interval: int | timedelta | None = None
+
+    @validator("cron_offset", pre=True)
+    @classmethod
+    def _parse_cron_offset(cls, value: Any) -> Any:
+        return parse_cron_offset(value)
 
     @root_validator(pre=False)  # type: ignore
     @classmethod
