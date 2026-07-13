@@ -23,7 +23,7 @@ from taskiq.abc.serializer import TaskiqSerializer
 from taskiq.acks import AckableMessage
 from taskiq.decor import AsyncTaskiqDecoratedTask
 from taskiq.events import TaskiqEvents
-from taskiq.exceptions import TaskBrokerMismatchError
+from taskiq.exceptions import SendTaskError, TaskBrokerMismatchError
 from taskiq.formatters.proxy_formatter import ProxyFormatter
 from taskiq.message import BrokerMessage
 from taskiq.result_backends.dummy import DummyResultBackend
@@ -186,18 +186,21 @@ class AsyncBroker(ABC):
 
     async def startup(self) -> None:
         """Do something when starting broker."""
-        event = TaskiqEvents.CLIENT_STARTUP
-        if self.is_worker_process:
-            event = TaskiqEvents.WORKER_STARTUP
-
-        for handler in self.event_handlers[event]:
-            await maybe_awaitable(handler(self.state))
+        for event in self._get_startup_events():
+            for handler in self.event_handlers[event]:
+                await maybe_awaitable(handler(self.state))
 
         for middleware in self.middlewares:
             if middleware.__class__.startup != TaskiqMiddleware.startup:
                 await maybe_awaitable(middleware.startup())
 
         await self.result_backend.startup()
+
+    def _get_startup_events(self) -> tuple[TaskiqEvents, ...]:
+        """Return event phases owned by this broker startup."""
+        if self.is_worker_process:
+            return (TaskiqEvents.WORKER_STARTUP,)
+        return (TaskiqEvents.CLIENT_STARTUP,)
 
     async def shutdown(self) -> None:
         """
@@ -206,19 +209,67 @@ class AsyncBroker(ABC):
         This method is called,
         when broker is closing.
         """
-        event = TaskiqEvents.CLIENT_SHUTDOWN
-        if self.is_worker_process:
-            event = TaskiqEvents.WORKER_SHUTDOWN
+        shutdown_error: BaseException | None = None
 
-        # Call all shutdown events.
-        for handler in self.event_handlers[event]:
-            await maybe_awaitable(handler(self.state))
+        for event in self._get_shutdown_events():
+            for handler in self.event_handlers[event]:
+                try:
+                    await maybe_awaitable(handler(self.state))
+                except BaseException as exc:
+                    shutdown_error = self._remember_shutdown_error(
+                        shutdown_error,
+                        exc,
+                    )
 
         for middleware in self.middlewares:
             if middleware.__class__.shutdown != TaskiqMiddleware.shutdown:
-                await maybe_awaitable(middleware.shutdown())
+                try:
+                    await maybe_awaitable(middleware.shutdown())
+                except BaseException as exc:
+                    shutdown_error = self._remember_shutdown_error(
+                        shutdown_error,
+                        exc,
+                    )
 
-        await self.result_backend.shutdown()
+        try:
+            await self.result_backend.shutdown()
+        except BaseException as exc:
+            shutdown_error = self._remember_shutdown_error(shutdown_error, exc)
+
+        if shutdown_error is not None:
+            raise shutdown_error
+
+    def _get_shutdown_events(self) -> tuple[TaskiqEvents, ...]:
+        """Return event phases owned by this broker shutdown."""
+        if self.is_worker_process:
+            return (TaskiqEvents.WORKER_SHUTDOWN,)
+        return (TaskiqEvents.CLIENT_SHUTDOWN,)
+
+    @staticmethod
+    def _remember_shutdown_error(
+        first_error: BaseException | None,
+        current_error: BaseException,
+    ) -> BaseException:
+        """Keep the first shutdown failure while cleanup continues."""
+        if first_error is None:
+            return current_error
+        logger.error(
+            "Additional error while shutting down broker resources.",
+            exc_info=current_error,
+        )
+        return first_error
+
+    async def _kick_with_post_send(
+        self,
+        message: BrokerMessage,
+        post_send: Callable[[], Awaitable[None]],
+    ) -> None:
+        """Run the package-internal send boundary used by AsyncKicker."""
+        try:
+            await self.kick(message)
+        except Exception as exc:
+            raise SendTaskError from exc
+        await post_send()
 
     @abstractmethod
     async def kick(

@@ -4,9 +4,11 @@ from copy import copy
 import pytest
 
 from taskiq.abc.broker import AsyncBroker
+from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.decor import AsyncTaskiqDecoratedTask
 from taskiq.events import TaskiqEvents
-from taskiq.message import BrokerMessage
+from taskiq.exceptions import SendTaskError
+from taskiq.message import BrokerMessage, TaskiqMessage
 from taskiq.state import TaskiqState
 
 
@@ -28,6 +30,46 @@ class _TestBroker(AsyncBroker):
 
         :param callback: callback that is never called.
         """
+
+
+class _RecordingSendBroker(_TestBroker):
+    """Record transport dispatch and raise an optional send failure."""
+
+    def __init__(
+        self,
+        events: list[str],
+        kick_error: Exception | None = None,
+    ) -> None:
+        super().__init__()
+        self.events = events
+        self.kick_error = kick_error
+
+    async def kick(self, message: BrokerMessage) -> None:
+        self.events.append("kick")
+        if self.kick_error is not None:
+            raise self.kick_error
+
+
+class _RecordingSendMiddleware(TaskiqMiddleware):
+    """Record client send hooks and raise an optional post-send failure."""
+
+    def __init__(
+        self,
+        events: list[str],
+        post_send_error: Exception | None = None,
+    ) -> None:
+        super().__init__()
+        self.events = events
+        self.post_send_error = post_send_error
+
+    def pre_send(self, message: TaskiqMessage) -> TaskiqMessage:
+        self.events.append("pre_send")
+        return message
+
+    def post_send(self, message: TaskiqMessage) -> None:
+        self.events.append("post_send")
+        if self.post_send_error is not None:
+            raise self.post_send_error
 
 
 def test_decorator_success() -> None:
@@ -80,6 +122,56 @@ def test_kicker_labels_modification() -> None:
     assert "another_label" in test_kicker.labels
 
     assert test_task.labels == old_labels
+
+
+async def test_kicker_preserves_external_broker_send_order() -> None:
+    events: list[str] = []
+    broker = _RecordingSendBroker(events)
+    broker.with_middlewares(_RecordingSendMiddleware(events))
+
+    @broker.task
+    async def task() -> None:
+        return None
+
+    await task.kiq()
+
+    assert events == ["pre_send", "kick", "post_send"]
+
+
+async def test_kicker_wraps_external_broker_transport_error() -> None:
+    events: list[str] = []
+    kick_error = RuntimeError("transport failed")
+    broker = _RecordingSendBroker(events, kick_error=kick_error)
+    broker.with_middlewares(_RecordingSendMiddleware(events))
+
+    @broker.task
+    async def task() -> None:
+        return None
+
+    with pytest.raises(SendTaskError) as exc_info:
+        await task.kiq()
+
+    assert exc_info.value.__cause__ is kick_error
+    assert events == ["pre_send", "kick"]
+
+
+async def test_kicker_preserves_post_send_error_type() -> None:
+    events: list[str] = []
+    post_send_error = RuntimeError("post-send failed")
+    broker = _RecordingSendBroker(events)
+    broker.with_middlewares(
+        _RecordingSendMiddleware(events, post_send_error=post_send_error),
+    )
+
+    @broker.task
+    async def task() -> None:
+        return None
+
+    with pytest.raises(RuntimeError) as exc_info:
+        await task.kiq()
+
+    assert exc_info.value is post_send_error
+    assert events == ["pre_send", "kick", "post_send"]
 
 
 @pytest.mark.anyio

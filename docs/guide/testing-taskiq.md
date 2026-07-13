@@ -165,6 +165,10 @@ broker = InMemoryBroker(await_inplace=True)
 
 With this setup all `await function.kiq()` calls will behave similarly to `await function()`, but
 with dependency injection and all taskiq-related functionality.
+The normal middleware boundary is preserved in both execution modes: all
+`post_send` hooks finish before `pre_execute` and the task body begin.
+With `await_inplace=True`, the `kiq()` call also returns only after inline
+execution completes.
 
 2. Alternatively, you can manually await all tasks after invoking the
    target function by using the `wait_all` method.
@@ -181,6 +185,18 @@ async def test_add_one():
     # At that time we can guarantee that all sent tasks
     # have been completed and do all the assertions.
 ```
+
+`wait_all()` also surfaces the first pending background callback failure even
+if that callback completed before `wait_all()` was called. The failure is
+consumed after it is raised, so a later `wait_all()` only observes newer work.
+Cancelling a `wait_all()` call cancels only that waiter; accepted executions
+remain tracked and can be drained by a later call.
+Calling `shutdown()` performs the same drain before closing middleware, result
+backend, and executor resources. If shutdown is cancelled while draining, it
+finishes the drain and resource cleanup before propagating the cancellation.
+Both drain methods must be called by the external test or application lifecycle
+owner. Calling `wait_all()` or `shutdown()` from a task or `post_send` hook
+managed by the same broker raises `RuntimeError` instead of waiting on itself.
 
 ## Dependency injection
 
