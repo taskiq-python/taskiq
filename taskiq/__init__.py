@@ -36,6 +36,7 @@ from taskiq.scheduler.scheduled_task import ScheduledTask
 from taskiq.scheduler.scheduler import TaskiqScheduler
 from taskiq.state import TaskiqState
 from taskiq.task import AsyncTaskiqTask
+from taskiq.task_gen import TaskiqTaskGenerator, task_gen
 
 __version__ = version("taskiq")
 
@@ -69,8 +70,10 @@ __all__ = [
     "TaskiqResultTimeoutError",
     "TaskiqScheduler",
     "TaskiqState",
+    "TaskiqTaskGenerator",
     "ZeroMQBroker",
     "__version__",
     "async_shared_broker",
     "gather",
+    "task_gen",
 ]
