@@ -6,6 +6,7 @@ import random
 import sys
 from collections.abc import Callable
 from concurrent.futures import Executor, ProcessPoolExecutor
+from contextlib import suppress
 from logging import getLogger
 from time import time
 from typing import Any, get_type_hints
@@ -78,6 +79,7 @@ class Receiver:
         self.known_tasks: set[str] = set()
         self.max_tasks_to_execute = max_tasks_to_execute
         self.wait_tasks_timeout = wait_tasks_timeout
+        self._active_tasks: set[asyncio.Task[Any]] = set()
         for task in self.broker.get_all_tasks().values():
             self._prepare_task(task.task_name, task.original_func)
         self.sem: asyncio.Semaphore | None = None
@@ -461,63 +463,111 @@ class Receiver:
 
         :param queue: queue with prefetched data.
         """
-        tasks: set[asyncio.Task[Any]] = set()
-
-        def task_cb(task: "asyncio.Task[Any]") -> None:
-            """
-            Callback for tasks.
-
-            This function used to remove task
-            from the list of active tasks and release
-            the semaphore, so other tasks can use it.
-
-            :param task: finished task
-            """
-            tasks.discard(task)
-            if self.sem is not None:
-                self.sem.release()
-
-        while True:
-            try:
+        capacity_acquired = False
+        graceful_shutdown = False
+        try:
+            while True:
                 # Waits for semaphore to be released.
                 if self.sem is not None:
                     await self.sem.acquire()
+                    capacity_acquired = True
 
                 self.sem_prefetch.release()
                 message = await queue.get()
                 if message is QUEUE_DONE:
-                    # asyncio.wait will throw an error if there is nothing to wait for
-                    if tasks:
-                        logger.info(
-                            f"Waiting for {len(tasks)} running tasks to complete...",
-                        )
-                        await asyncio.wait(tasks, timeout=self.wait_tasks_timeout)
-                        logger.info("No more tasks to wait for. Shutting down.")
+                    graceful_shutdown = True
                     break
 
-                # Custom hooks for OTel and any future instrumentations
-                for middleware in reversed(self.broker.middlewares):
-                    if hasattr(middleware, "on_prefetch_queue_remove"):
-                        await maybe_awaitable(
-                            middleware.on_prefetch_queue_remove(),  # type: ignore
-                        )
+                await self._notify_prefetch_queue_remove()
+                self._start_callback(message)
+                capacity_acquired = False
+        except asyncio.CancelledError:
+            pass
+        finally:
+            if capacity_acquired and self.sem is not None:
+                self.sem.release()
+            await self._drain_active_tasks(
+                cancel_immediately=not graceful_shutdown,
+            )
+            logger.info("The runner is stopped.")
 
-                task = asyncio.create_task(
-                    self.callback(message=message, raise_err=False),
+    async def _run_owned_callback(self, message: bytes | AckableMessage) -> None:
+        """Run one callback outside repeated listener-scope cancellation."""
+        with anyio.CancelScope(shield=True):
+            await self.callback(message=message, raise_err=False)
+
+    async def _notify_prefetch_queue_remove(self) -> None:
+        """Run instrumentation before transferring callback ownership."""
+        for middleware in reversed(self.broker.middlewares):
+            if hasattr(middleware, "on_prefetch_queue_remove"):
+                await maybe_awaitable(
+                    middleware.on_prefetch_queue_remove(),  # type: ignore
                 )
-                tasks.add(task)
 
-                # We want the task to remove itself from the set when it's done.
-                #
-                # Because if we won't save it anywhere,
-                # python's GC can silently cancel task
-                # and this behaviour considered to be a Hisenbug.
-                # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
-                task.add_done_callback(task_cb)
+    def _start_callback(self, message: bytes | AckableMessage) -> None:
+        """Transfer the current execution slot to an owned callback task."""
+        task = asyncio.create_task(self._run_owned_callback(message))
+        self._active_tasks.add(task)
+        task.add_done_callback(self._on_callback_done)
 
+    def _on_callback_done(self, task: "asyncio.Task[Any]") -> None:
+        """Release callback capacity and retrieve unexpected failures."""
+        self._active_tasks.discard(task)
+        if self.sem is not None:
+            self.sem.release()
+        if task.cancelled():
+            return
+        task_exception = task.exception()
+        if task_exception is not None:
+            logger.error(
+                "Receiver callback failed outside task execution handling.",
+                exc_info=(
+                    type(task_exception),
+                    task_exception,
+                    task_exception.__traceback__,
+                ),
+            )
+
+    async def _drain_active_tasks(
+        self,
+        *,
+        cancel_immediately: bool,
+    ) -> None:
+        """Wait for callbacks and cancel work beyond the graceful boundary."""
+        tasks = set(self._active_tasks)
+        if not tasks:
+            return
+
+        logger.info("Waiting for %d running tasks to complete...", len(tasks))
+        if cancel_immediately:
+            pending = {task for task in tasks if not task.done()}
+        else:
+            try:
+                _, pending = await asyncio.wait(
+                    tasks,
+                    timeout=self.wait_tasks_timeout,
+                )
             except asyncio.CancelledError:
-                break
-        logger.info("The runner is stopped.")
+                pending = {task for task in tasks if not task.done()}
+
+        if pending:
+            logger.warning("Cancelling %d running callback tasks.", len(pending))
+            with anyio.CancelScope(shield=True):
+                await self._cancel_callback_tasks(pending)
+        logger.info("No more tasks to wait for. Shutting down.")
+
+    @staticmethod
+    async def _cancel_callback_tasks(
+        tasks: set[asyncio.Task[Any]],
+    ) -> None:
+        """Cancel callbacks once and await cleanup despite outer cancellation."""
+        for task in tasks:
+            task.cancel()
+        waiter = asyncio.gather(*tasks, return_exceptions=True)
+        while not waiter.done():
+            with suppress(asyncio.CancelledError):
+                await asyncio.shield(waiter)
+        waiter.result()
 
     def _prepare_task(self, name: str, handler: Callable[..., Any]) -> None:
         """
