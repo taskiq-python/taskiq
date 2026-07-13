@@ -159,6 +159,10 @@ If you want to pass additional labels, you can call these methods on the `Kicker
     )
 ```
 
+An explicit `.with_task_id(...)` is stored for cron, interval and time
+schedules and is reused for every dispatch of a recurring schedule. Without an
+explicit task id, Taskiq generates a new invocation id for each dispatch.
+
 ::: warning Cool warning!
 
 The `with_broker` method won't do anything in this case, since we have a broker assigned to each scheduler.

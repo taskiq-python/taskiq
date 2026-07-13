@@ -9,7 +9,7 @@ from taskiq.abc.formatter import TaskiqFormatter
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.abc.result_backend import AsyncResultBackend
 from taskiq.abc.schedule_source import ScheduleSource
-from taskiq.acks import AckableMessage
+from taskiq.acks import AckableMessage, AcknowledgeType
 from taskiq.brokers.inmemory_broker import InMemoryBroker
 from taskiq.brokers.shared_broker import async_shared_broker
 from taskiq.brokers.zmq_broker import ZeroMQBroker
@@ -41,6 +41,7 @@ __version__ = version("taskiq")
 
 __all__ = [
     "AckableMessage",
+    "AcknowledgeType",
     "AsyncBroker",
     "AsyncResultBackend",
     "AsyncTaskiqDecoratedTask",

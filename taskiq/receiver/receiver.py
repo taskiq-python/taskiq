@@ -15,7 +15,7 @@ from taskiq_dependencies import DependencyGraph
 
 from taskiq.abc.broker import AckableMessage, AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
-from taskiq.acks import AcknowledgeType
+from taskiq.acks import AckController, AcknowledgeType, parse_acknowledge_type
 from taskiq.context import Context
 from taskiq.exceptions import NoResultError
 from taskiq.message import TaskiqMessage
@@ -116,6 +116,9 @@ class Receiver:
         :param raise_err: raise an error if cannot save result in
             result_backend.
         """
+        ack_controller = AckController(
+            message.ack if isinstance(message, AckableMessage) else None,
+        )
         message_data = message.data if isinstance(message, AckableMessage) else message
         try:
             taskiq_msg = self.broker.formatter.loads(message=message_data)
@@ -148,28 +151,24 @@ class Receiver:
                     ),
                 )
 
+        ack_time = self._get_ack_time(taskiq_msg)
         logger.info(
             "Executing task %s with ID: %s",
             taskiq_msg.task_name,
             taskiq_msg.task_id,
         )
 
-        if self.ack_time == AcknowledgeType.WHEN_RECEIVED and isinstance(
-            message,
-            AckableMessage,
-        ):
-            await maybe_awaitable(message.ack())
+        if ack_time == AcknowledgeType.WHEN_RECEIVED and ack_controller.is_ackable:
+            await ack_controller.ack()
 
         result = await self.run_task(
             target=task.original_func,
             message=taskiq_msg,
+            ack_controller=ack_controller,
         )
 
-        if self.ack_time == AcknowledgeType.WHEN_EXECUTED and isinstance(
-            message,
-            AckableMessage,
-        ):
-            await maybe_awaitable(message.ack())
+        if ack_time == AcknowledgeType.WHEN_EXECUTED and ack_controller.is_ackable:
+            await ack_controller.ack()
 
         for middleware in reversed(self.broker.middlewares):
             if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
@@ -192,16 +191,30 @@ class Receiver:
             if raise_err:
                 raise exc
 
-        if self.ack_time == AcknowledgeType.WHEN_SAVED and isinstance(
-            message,
-            AckableMessage,
-        ):
-            await maybe_awaitable(message.ack())
+        if ack_time == AcknowledgeType.WHEN_SAVED and ack_controller.is_ackable:
+            await ack_controller.ack()
+
+    def _get_ack_time(self, message: TaskiqMessage) -> AcknowledgeType:
+        """
+        Get acknowledge time for a task.
+
+        Task-level `ack_type` label overrides worker-level configuration.
+        """
+        ack_type = message.labels.get("ack_type")
+        if ack_type is None:
+            return self.ack_time
+        try:
+            return parse_acknowledge_type(ack_type)
+        except ValueError as exc:
+            raise ValueError(
+                f"Invalid ack_type label {ack_type!r} for task {message.task_name}.",
+            ) from exc
 
     async def run_task(  # noqa: C901, PLR0912, PLR0915
         self,
         target: Callable[..., Any],
         message: TaskiqMessage,
+        ack_controller: AckController | None = None,
     ) -> TaskiqResult[Any]:
         """
         This function actually executes functions.
@@ -242,7 +255,7 @@ class Receiver:
             broker_ctx = self.broker.custom_dependency_context
             broker_ctx.update(
                 {
-                    Context: Context(message, self.broker),
+                    Context: Context(message, self.broker, ack_controller),
                     TaskiqState: self.broker.state,
                 },
             )

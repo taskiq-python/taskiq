@@ -26,7 +26,7 @@ class MyScheduleSource(ScheduleSource):
         print("New schedule added:", schedule)
 
     # This method is completely optional, but if you want to support
-    # schedule cancelation, you must implement it.
+    # schedule cancellation, you must implement it.
     async def delete_schedule(self, schedule_id: str) -> None:
         print("Deleting schedule:", schedule_id)
 

@@ -278,9 +278,9 @@ async def get_transaction(
 ) -> AsyncGenerator[Transaction, None]:
     trans = db_driver.begin_transaction():
     try:
-        # Here we give transaction to our dependant function.
+        # Here we give transaction to our dependent function.
         yield trans
-    # If exception was found in dependant function,
+    # If exception was found in dependent function,
     # we rollback our transaction.
     except Exception:
         await trans.rollback()
@@ -297,9 +297,9 @@ async def get_transaction(
 ) -> AsyncGenerator[Transaction, None]:
     trans = db_driver.begin_transaction():
     try:
-        # Here we give transaction to our dependant function.
+        # Here we give transaction to our dependent function.
         yield trans
-    # If exception was found in dependant function,
+    # If exception was found in dependent function,
     # we rollback our transaction.
     except Exception:
         await trans.rollback()
