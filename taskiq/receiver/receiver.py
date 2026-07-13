@@ -656,19 +656,12 @@ class Receiver:
         :param queue: queue with prefetched data.
         """
         tasks: set[asyncio.Task[Any]] = set()
-
-        while True:
-            try:
+        graceful_shutdown = False
+        try:
+            while True:
                 queued_message = await queue.get()
                 if queued_message is _QueueSignal.DONE:
-                    # asyncio.wait will throw an error if there is nothing to wait for
-                    if tasks:
-                        logger.info(
-                            "Waiting for %d running tasks to complete...",
-                            len(tasks),
-                        )
-                        await asyncio.wait(tasks, timeout=self.wait_tasks_timeout)
-                        logger.info("No more tasks to wait for. Shutting down.")
+                    graceful_shutdown = True
                     break
                 execution_semaphore = self.sem
                 owns_execution_slot = execution_semaphore is not None
@@ -684,12 +677,6 @@ class Receiver:
                 )
                 tasks.add(started_callback.task)
 
-                # We want the task to remove itself from the set when it's done.
-                #
-                # Because if we won't save it anywhere,
-                # python's GC can silently cancel task
-                # and this behaviour considered to be a Hisenbug.
-                # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
                 started_callback.task.add_done_callback(
                     functools.partial(
                         self._on_callback_done,
@@ -697,10 +684,61 @@ class Receiver:
                         owns_delivery_slot=started_callback.owns_delivery_slot,
                     ),
                 )
+        except asyncio.CancelledError:
+            pass
+        finally:
+            await self._drain_active_tasks(
+                tasks,
+                cancel_immediately=not graceful_shutdown,
+            )
+            logger.info("The runner is stopped.")
 
+    async def _run_owned_callback(self, message: bytes | AckableMessage) -> None:
+        """Run one callback outside repeated listener-scope cancellation."""
+        with anyio.CancelScope(shield=True):
+            await self.callback(message=message, raise_err=False)
+
+    async def _drain_active_tasks(
+        self,
+        tasks: set[asyncio.Task[Any]],
+        *,
+        cancel_immediately: bool,
+    ) -> None:
+        """Wait for callbacks and cancel work beyond the graceful boundary."""
+        tasks = set(tasks)
+        if not tasks:
+            return
+
+        logger.info("Waiting for %d running tasks to complete...", len(tasks))
+        if cancel_immediately:
+            pending = {task for task in tasks if not task.done()}
+        else:
+            try:
+                _, pending = await asyncio.wait(
+                    tasks,
+                    timeout=self.wait_tasks_timeout,
+                )
             except asyncio.CancelledError:
-                break
-        logger.info("The runner is stopped.")
+                pending = {task for task in tasks if not task.done()}
+
+        if pending:
+            logger.warning("Cancelling %d running callback tasks.", len(pending))
+            with anyio.CancelScope(shield=True):
+                await self._cancel_callback_tasks(pending)
+        logger.info("No more tasks to wait for. Shutting down.")
+
+    @staticmethod
+    async def _cancel_callback_tasks(
+        tasks: set[asyncio.Task[Any]],
+    ) -> None:
+        """Cancel callbacks once and await cleanup despite outer cancellation."""
+        for task in tasks:
+            task.cancel()
+        waiter = asyncio.gather(*tasks, return_exceptions=True)
+        while not waiter.done():
+            with contextlib.suppress(asyncio.CancelledError):
+                await asyncio.shield(waiter)
+        waiter.result()
 
     def _start_callback(
         self,
@@ -716,7 +754,7 @@ class Receiver:
                 owns_delivery_slot = False
             return _StartedCallback(
                 task=asyncio.create_task(
-                    self.callback(message=message.data, raise_err=False),
+                    self._run_owned_callback(message=message.data),
                 ),
                 owns_delivery_slot=owns_delivery_slot,
             )
@@ -737,12 +775,24 @@ class Receiver:
         active_tasks: set[asyncio.Task[Any]],
         owns_delivery_slot: bool,
     ) -> None:
-        """Release capacity transferred to a completed callback task."""
+        """Release callback capacity and retrieve unexpected failures."""
         active_tasks.discard(task)
         if self.sem is not None:
             self.sem.release()
         if owns_delivery_slot:
             self.sem_prefetch.release()
+        if task.cancelled():
+            return
+        task_exception = task.exception()
+        if task_exception is not None:
+            logger.error(
+                "Receiver callback failed outside task execution handling.",
+                exc_info=(
+                    type(task_exception),
+                    task_exception,
+                    task_exception.__traceback__,
+                ),
+            )
 
     def _record_listen_error(self, error: BaseException) -> None:
         """Preserve the first listener error and report cleanup failures."""
