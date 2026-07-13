@@ -74,12 +74,19 @@ async def critical_task() -> None:
 
 @broker.task(ack_type="manual")
 async def manually_acked_task(context: Context = TaskiqDepends()) -> None:
-    ...
+    while still_working:
+        await do_some_work()
+        if context.is_ack_progressable:
+            await context.ack_progress()
     await context.ack()
 ```
 
 If a task has no `ack_type` label, the worker-level `--ack-type` value is used.
 Manual acknowledgement requires a broker that yields `AckableMessage`.
+Some brokers can also report that a task is still being processed through
+`Context.ack_progress()` to prevent acknowledgement timeouts during long-running tasks.
+Currently, this is supported only by the `PushBasedJetStreamBroker` and
+`PullBasedJetStreamBroker` implementations from `taskiq-nats`.
 
 ### Type casts
 
