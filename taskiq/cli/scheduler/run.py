@@ -174,6 +174,38 @@ async def send(
     await scheduler.on_ready(source, task)
 
 
+async def send_with_timeout(
+    scheduler: TaskiqScheduler,
+    source: ScheduleSource,
+    task: ScheduledTask,
+    timeout: float,
+) -> None:
+    """
+    Send a task, cancelling it if it does not complete within ``timeout`` seconds.
+
+    A timed-out send is logged at WARNING and swallowed — re-raising would propagate
+    out of the scheduler's main loop's ``add_done_callback``, which is not what we
+    want. Suppressing it lets the done_callback clear ``running_schedules`` so the
+    next cron boundary can re-dispatch the task. The slot is freed; the message is
+    dropped (the broker did not acknowledge it within the budget).
+
+    :param scheduler: current scheduler.
+    :param source: source of the task.
+    :param task: task to send.
+    :param timeout: seconds to wait before cancelling the send. Must be > 0.
+    """
+    try:
+        await asyncio.wait_for(send(scheduler, source, task), timeout=timeout)
+    except asyncio.TimeoutError:
+        logger.warning(
+            "Sending task %s with schedule_id %s timed out after %.1fs "
+            "and was cancelled. The next scheduled tick will retry.",
+            task.task_name,
+            task.schedule_id,
+            timeout,
+        )
+
+
 async def _sleep_until_next_second() -> None:
     now = datetime.now(tz=timezone.utc)
     await asyncio.sleep(1 - now.microsecond / 1_000_000)
@@ -292,6 +324,7 @@ class SchedulerLoop:
         update_interval: timedelta | None = None,
         loop_interval: timedelta | None = None,
         skip_first_run: bool = False,
+        send_timeout: float | None = None,
     ) -> None:
         """
         Runs scheduler loop.
@@ -303,11 +336,19 @@ class SchedulerLoop:
         :param loop_interval: interval to check tasks to send.
         :param skip_first_run: Wait for the beginning of the next minute
             to skip the first run.
+        :param send_timeout: optional per-send timeout (seconds). If set, each
+            spawned send task is wrapped in :func:`asyncio.wait_for` with this
+            timeout, preventing a single hung ``broker.kick`` from permanently
+            blocking subsequent ticks of the same ``schedule_id`` via the
+            ``running_schedules`` skip check. Default ``None`` (no timeout —
+            backwards-compatible behavior).
         """
         if update_interval is None:
             update_interval = timedelta(minutes=1)
         if loop_interval is None:
             loop_interval = timedelta(seconds=1)
+        if send_timeout is not None and send_timeout <= 0:
+            raise ValueError("send_timeout must be > 0 when provided")
 
         running_schedules: dict[ScheduleId, asyncio.Task[Any]] = {}
 
@@ -335,8 +376,17 @@ class SchedulerLoop:
                     )
 
                     if is_ready_to_send and task.schedule_id not in running_schedules:
+                        if send_timeout is not None:
+                            send_coro = send_with_timeout(
+                                self.scheduler,
+                                source,
+                                task,
+                                timeout=send_timeout,
+                            )
+                        else:
+                            send_coro = send(self.scheduler, source, task)
                         send_task = self._event_loop.create_task(
-                            send(self.scheduler, source, task),
+                            send_coro,
                             # We need to set the name of the task
                             # to be able to discard its reference
                             # after it is done.
@@ -412,6 +462,7 @@ async def run_scheduler(args: SchedulerArgs) -> None:
             update_interval=update_interval,
             loop_interval=loop_interval,
             skip_first_run=args.skip_first_run,
+            send_timeout=args.send_timeout,
         )
     except asyncio.CancelledError:
         logger.info("Shutting down scheduler.")
