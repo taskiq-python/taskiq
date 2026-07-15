@@ -45,7 +45,8 @@ async def run_receiver_task(
     :param validate_params: whether to validate params or not.
     :param max_async_tasks: maximum number of simultaneous async tasks.
     :param max_async_tasks_jitter: random jitter to add to max_async_tasks.
-    :param max_prefetch: maximum number of tasks to prefetch.
+    :param max_prefetch: maximum number of deliveries allowed to wait beyond
+        the available async execution capacity. Must be non-negative.
     :param propagate_exceptions: whether to propagate exceptions in generators or not.
     :param run_startup: whether to run startup function or not.
     :param ack_time: acknowledge type to use.

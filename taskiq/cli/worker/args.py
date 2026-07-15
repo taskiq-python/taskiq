@@ -224,7 +224,10 @@ class WorkerArgs:
             type=int,
             dest="max_prefetch",
             default=0,
-            help="Maximum prefetched tasks per worker process. ",
+            help=(
+                "Maximum deliveries waiting beyond async execution capacity. "
+                "Must be non-negative. "
+            ),
         )
         parser.add_argument(
             "--no-configure-logging",
