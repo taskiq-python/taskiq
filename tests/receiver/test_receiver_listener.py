@@ -215,6 +215,74 @@ async def test_prefetch_is_additional_to_bounded_execution_capacity() -> None:
     await assert_semaphore_capacity(receiver.sem, 2)
 
 
+async def test_runner_retains_prefetch_ownership_until_callback_handoff(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    broker = ControlledBroker()
+    prefetch_counter = PrefetchCounterMiddleware()
+    three_messages_added = asyncio.Event()
+    callback_started = asyncio.Event()
+    callback_finished = asyncio.Event()
+    release_callback = asyncio.Event()
+    added_messages = 0
+
+    class AddBarrierMiddleware(TaskiqMiddleware):
+        def on_prefetch_queue_add(self) -> None:
+            nonlocal added_messages
+            added_messages += 1
+            if added_messages == 3:
+                three_messages_added.set()
+
+    broker.with_middlewares(prefetch_counter, AddBarrierMiddleware())
+
+    @broker.task(task_name="receiver.prefetch.runner-owned")
+    async def task() -> None:
+        callback_started.set()
+        try:
+            await release_callback.wait()
+        finally:
+            callback_finished.set()
+
+    receiver = Receiver(
+        broker,
+        max_async_tasks=1,
+        max_prefetch=2,
+        run_startup=False,
+    )
+    execution_capacity = ObservedSemaphore(1)
+    receiver.sem = execution_capacity
+    for _ in range(3):
+        await task.kiq()
+
+    listen_task = asyncio.create_task(receiver.listen(asyncio.Event()))
+    try:
+        await asyncio.wait_for(callback_started.wait(), timeout=1)
+        assert await execution_capacity.acquire_attempts.get() == 1
+        assert await execution_capacity.acquire_attempts.get() == 2
+        await asyncio.wait_for(three_messages_added.wait(), timeout=1)
+
+        assert prefetch_counter.queued_messages == 2
+
+        with caplog.at_level(logging.WARNING, logger="taskiq.receiver.receiver"):
+            listen_task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await listen_task
+
+        assert (
+            "Discarding 2 prefetched deliveries during Receiver cleanup" in caplog.text
+        )
+        assert prefetch_counter.queued_messages == 0
+    finally:
+        if not listen_task.done():
+            listen_task.cancel()
+            await asyncio.gather(listen_task, return_exceptions=True)
+        release_callback.set()
+        await asyncio.wait_for(callback_finished.wait(), timeout=1)
+
+    await assert_semaphore_capacity(receiver.sem_prefetch, 3)
+    await assert_semaphore_capacity(execution_capacity, 1)
+
+
 async def test_unlimited_execution_keeps_zero_prefetch_handoff_progress() -> None:
     broker = ControlledBroker()
     two_callbacks_started = asyncio.Event()
@@ -255,7 +323,7 @@ async def test_unlimited_execution_keeps_zero_prefetch_handoff_progress() -> Non
     await asyncio.wait_for(callbacks_finished.wait(), timeout=1)
 
 
-def test_delivery_capacity_uses_jittered_execution_limit() -> None:
+async def test_delivery_capacity_uses_jittered_execution_limit() -> None:
     with unittest.mock.patch(
         "taskiq.receiver.receiver.random.randint",
         return_value=3,
@@ -269,8 +337,8 @@ def test_delivery_capacity_uses_jittered_execution_limit() -> None:
         )
 
     assert receiver.sem is not None
-    assert receiver.sem._value == 8
-    assert receiver.sem_prefetch._value == 10
+    await assert_semaphore_capacity(receiver.sem, 8)
+    await assert_semaphore_capacity(receiver.sem_prefetch, 10)
 
 
 def test_negative_prefetch_is_rejected_before_listener_startup() -> None:
@@ -295,6 +363,23 @@ async def test_finish_wakes_prefetcher_blocked_on_capacity() -> None:
     await asyncio.wait_for(listen_task, timeout=1)
 
     assert observed_semaphore.locked()
+
+
+async def test_finish_returns_concurrently_acquired_capacity_once() -> None:
+    broker = ControlledBroker()
+    receiver = Receiver(broker, max_prefetch=0, run_startup=False)
+    observed_semaphore = ObservedSemaphore(0)
+    receiver.sem_prefetch = observed_semaphore
+    finish_event = asyncio.Event()
+    listen_task = asyncio.create_task(receiver.listen(finish_event))
+
+    await observed_semaphore.acquire_started.wait()
+    observed_semaphore.release()
+    finish_event.set()
+    await asyncio.wait_for(listen_task, timeout=1)
+
+    assert broker.read_started.empty()
+    await assert_semaphore_capacity(observed_semaphore, 1)
 
 
 async def test_pending_read_is_cancelled_and_iterator_closed() -> None:
@@ -569,6 +654,25 @@ async def test_listener_open_failure_propagates() -> None:
         await asyncio.wait_for(receiver.listen(asyncio.Event()), timeout=1)
 
     assert exc_info.value is listener_error
+
+
+async def test_listener_exhaustion_stops_cleanly_and_releases_capacity() -> None:
+    listener_closed = asyncio.Event()
+
+    async def exhausted_listener() -> AsyncGenerator[bytes | AckableMessage, None]:
+        try:
+            if False:  # pragma: no branch
+                yield b""
+        finally:
+            listener_closed.set()
+
+    broker = ListenerBroker(exhausted_listener)
+    receiver = Receiver(broker, max_prefetch=0, run_startup=False)
+
+    await asyncio.wait_for(receiver.listen(asyncio.Event()), timeout=1)
+
+    assert listener_closed.is_set()
+    await assert_semaphore_capacity(receiver.sem_prefetch, 1)
 
 
 async def test_prefetch_add_hook_failure_preserves_delivery_and_capacity() -> None:

@@ -286,6 +286,8 @@ class WorkerArgs:
             args,
             namespace=None if defaults is None else Namespace(**defaults),
         )
+        if namespace.max_prefetch < 0:
+            parser.error("argument --max-prefetch: max_prefetch cannot be negative.")
         # If there are any patterns specified, remove default.
         # This is an argparse limitation.
         if len(namespace.tasks_pattern) > 1:

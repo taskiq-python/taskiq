@@ -52,7 +52,11 @@ async def run_receiver_task(
     :param ack_time: acknowledge type to use.
     :param use_process_pool: whether to use process pool or threadpool.
     :raises asyncio.CancelledError: if the task was cancelled.
+    :raises ValueError: if max_prefetch is negative.
     """
+    if max_prefetch < 0:
+        raise ValueError("max_prefetch cannot be negative.")
+
     finish_event = asyncio.Event()
 
     def on_exit(_: Receiver) -> None:

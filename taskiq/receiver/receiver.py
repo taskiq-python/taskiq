@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from logging import getLogger
 from time import time
-from typing import Any, get_type_hints
+from typing import Any, Literal, get_type_hints
 
 import anyio
 from taskiq_dependencies import DependencyGraph
@@ -645,7 +645,13 @@ class Receiver:
         state.owns_delivery_slot = False
         return late_delivery
 
-    async def _notify_prefetch_hook(self, hook_name: str) -> None:
+    async def _notify_prefetch_hook(
+        self,
+        hook_name: Literal[
+            "on_prefetch_queue_add",
+            "on_prefetch_queue_remove",
+        ],
+    ) -> None:
         """Run all prefetch hooks and preserve the first failure."""
         first_error: BaseException | None = None
         for middleware in reversed(self.broker.middlewares):
@@ -723,7 +729,18 @@ class Receiver:
                         await asyncio.wait(tasks, timeout=self.wait_tasks_timeout)
                         logger.info("No more tasks to wait for. Shutting down.")
                     break
-                started_callback = await self._start_callback(queued_message)
+                execution_semaphore = self.sem
+                owns_execution_slot = execution_semaphore is not None
+                if execution_semaphore is not None:
+                    try:
+                        await execution_semaphore.acquire()
+                    except BaseException:
+                        queue.put_nowait(queued_message)
+                        raise
+                started_callback = await self._start_callback(
+                    queued_message,
+                    owns_execution_slot=owns_execution_slot,
+                )
                 tasks.add(started_callback.task)
 
                 # We want the task to remove itself from the set when it's done.
@@ -747,15 +764,13 @@ class Receiver:
     async def _start_callback(
         self,
         message: _PrefetchedMessage,
+        *,
+        owns_execution_slot: bool,
     ) -> _StartedCallback:
         """Transfer execution and delivery capacity to a callback task."""
         owns_delivery_slot = message.owns_delivery_slot
-        owns_execution_slot = False
         try:
             await self._notify_prefetch_hook("on_prefetch_queue_remove")
-            if self.sem is not None:
-                await self.sem.acquire()
-                owns_execution_slot = True
 
             if self.sem is None and owns_delivery_slot:
                 self.sem_prefetch.release()
@@ -767,6 +782,9 @@ class Receiver:
                 owns_delivery_slot=owns_delivery_slot,
             )
         except BaseException:
+            logger.warning(
+                "Discarding 1 prefetched delivery during Receiver cleanup.",
+            )
             if owns_delivery_slot:
                 self.sem_prefetch.release()
             if owns_execution_slot and self.sem is not None:
