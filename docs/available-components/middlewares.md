@@ -34,6 +34,25 @@ async def test():
 
 `retry_on_error` enables retries for a task. `max_retries` is the maximum number of retry attempts.
 
+### Retrying only specific exceptions
+
+By default, all exceptions trigger a retry. You can limit retries to specific
+exception types either broker-wide via `types_of_exceptions`, or per task via
+the `types_of_exceptions` label in the task decorator. The per-task value
+overrides the broker-wide setting.
+
+```python
+broker = ZeroMQBroker().with_middlewares(
+    # Broker-wide default: retry only on ConnectionError.
+    SimpleRetryMiddleware(types_of_exceptions=(ConnectionError,)),
+)
+
+
+@broker.task(retry_on_error=True, types_of_exceptions=(ValueError, KeyError))
+async def test():
+    raise ValueError("retry only on ValueError or KeyError")
+```
+
 ## Smart retry middleware
 
 The `SmartRetryMiddleware` automatically retries tasks with flexible delay settings and retry strategies when errors occur. This is particularly useful when tasks fail due to temporary issues, such as network errors or temporary unavailability of external services.
@@ -78,6 +97,13 @@ async def my_task():
 * `retry_on_error`: Enables the retry mechanism for the specific task.
 * `max_retries`: Maximum number of retries (overrides middleware default).
 * `delay`: Initial delay before retrying the task, in seconds.
+* `types_of_exceptions`: Exception types that trigger a retry for this task. Overrides the broker-wide `types_of_exceptions` passed to the middleware.
+
+```python
+@broker.task(retry_on_error=True, types_of_exceptions=(ConnectionError,))
+async def my_task():
+    raise ConnectionError("retrying only on ConnectionError")
+```
 
 ### Usage Recommendations
 

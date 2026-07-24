@@ -322,6 +322,12 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
             formatted_kwargs[kwarg_name] = self._prepare_arg(kwarg_val)
 
         for label, label_val in self.labels.items():
+            # `types_of_exceptions` is only ever read back from the
+            # locally registered task's labels (see retry middlewares),
+            # never from the wire. It holds exception classes, which
+            # can't be faithfully serialized, so don't ship it at all.
+            if label == "types_of_exceptions":
+                continue
             labels[label], labels_types[label] = prepare_label(label_val)
 
         task_id = self.custom_task_id
