@@ -26,6 +26,28 @@ class SimpleRetryMiddleware(TaskiqMiddleware):
         self.no_result_on_retry = no_result_on_retry
         self.types_of_exceptions = types_of_exceptions
 
+    def _get_types_of_exceptions(
+        self,
+        message: "TaskiqMessage",
+    ) -> Iterable[type[BaseException]] | None:
+        """
+        Resolve retryable exception types for a task.
+
+        Per-task ``types_of_exceptions`` set via the task decorator take
+        precedence over the broker-wide value. Types are read from the
+        registered task object, since label values are stringified when a
+        message is serialized and cannot carry real exception types.
+
+        :param message: Original task message.
+        :return: Effective exception types or None.
+        """
+        task = self.broker.find_task(message.task_name)
+        if task is not None:
+            task_types = task.labels.get("types_of_exceptions")
+            if task_types is not None:
+                return task_types
+        return self.types_of_exceptions
+
     async def on_error(
         self,
         message: "TaskiqMessage",
@@ -45,9 +67,10 @@ class SimpleRetryMiddleware(TaskiqMiddleware):
         :param result: execution result.
         :param exception: found exception.
         """
-        if self.types_of_exceptions is not None and not isinstance(
+        types_of_exceptions = self._get_types_of_exceptions(message)
+        if types_of_exceptions is not None and not isinstance(
             exception,
-            tuple(self.types_of_exceptions),
+            tuple(types_of_exceptions),
         ):
             return
 
