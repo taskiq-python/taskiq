@@ -130,6 +130,8 @@ class Receiver:
                 exc,
                 exc_info=True,
             )
+            if ack_controller.is_ackable:
+                await ack_controller.ack()
             return
         logger.debug(f"Received message: {taskiq_msg}")
         task = self.broker.find_task(taskiq_msg.task_name)
@@ -138,6 +140,8 @@ class Receiver:
                 'task "%s" is not found. Maybe you forgot to import it?',
                 taskiq_msg.task_name,
             )
+            if ack_controller.is_ackable:
+                await ack_controller.ack()
             return
         logger.debug(
             "Function for task %s is resolved. Executing...",
