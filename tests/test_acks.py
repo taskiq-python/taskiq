@@ -1,6 +1,22 @@
+from typing import Any
+
 import pytest
 
-from taskiq.acks import AcknowledgeType, parse_acknowledge_type
+from taskiq.acks import AckController, AcknowledgeType, parse_acknowledge_type
+
+
+async def test_ack_forwards_broker_specific_options() -> None:
+    """AckController forwards explicit options to a supporting callback."""
+    received_options: dict[str, Any] = {}
+
+    async def ack_callback(**kwargs: Any) -> None:
+        received_options.update(kwargs)
+
+    controller = AckController(ack_callback)
+    await controller.ack(delete_after_ack=True)
+
+    assert controller.is_acked
+    assert received_options == {"delete_after_ack": True}
 
 
 def test_parse_acknowledge_type_from_enum() -> None:

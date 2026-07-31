@@ -560,6 +560,42 @@ async def test_manual_task_ack_from_context() -> None:
     assert events == ["task", "ack", "post_execute", "save", "post_save"]
 
 
+async def test_manual_task_ack_forwards_broker_specific_options() -> None:
+    """Context.ack forwards options to the broker's acknowledgement callback."""
+    events: list[str] = []
+    received_options: dict[str, Any] = {}
+    broker = (
+        InMemoryBroker()
+        .with_result_backend(
+            _EventResultBackend(events),
+        )
+        .with_middlewares(_EventMiddleware(events))
+    )
+
+    @broker.task(ack_type="manual")
+    async def my_task(context: Context = Depends()) -> int:
+        events.append("task")
+        await context.ack(delete_after_ack=True)
+        return 1
+
+    def ack_callback(**kwargs: Any) -> None:
+        received_options.update(kwargs)
+        events.append("ack")
+
+    receiver = get_receiver(broker, ack_type=AcknowledgeType.WHEN_SAVED)
+    broker_message = broker.formatter.dumps(my_task.kicker()._prepare_message())
+
+    await receiver.callback(
+        AckableMessage(
+            data=broker_message.message,
+            ack=ack_callback,
+        ),
+    )
+
+    assert received_options == {"delete_after_ack": True}
+    assert events == ["task", "ack", "post_execute", "save", "post_save"]
+
+
 async def test_manual_task_ack_is_idempotent() -> None:
     """Calling Context.ack twice acknowledges the message once."""
     events: list[str] = []

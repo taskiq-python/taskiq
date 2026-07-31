@@ -36,12 +36,18 @@ async def listen(self) -> AsyncGenerator[AckableMessage, None]:
    for message in self.my_channel:
       yield AckableMessage(
          data=message.bytes,
-         # Ack is a function that takes no parameters.
-         # So you either set here method of a message,
+         # Ack can accept broker-specific keyword options.
+         # So you either set here a method of a message,
          # or you can make a closure.
          ack=message.ack,
       )
 ```
+
+For manual acknowledgement, options passed to `Context.ack(**kwargs)` are
+forwarded unchanged to this callback. Taskiq does not define or interpret these
+options; they are specific to the broker. Automatic acknowledgement calls the
+callback without options. Brokers that do not support options can continue to
+provide a no-argument callback.
 
 ## Conventions
 

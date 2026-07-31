@@ -1,10 +1,12 @@
 import enum
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import Any, TypeAlias
 
 from pydantic import BaseModel
 
 from taskiq.utils import maybe_awaitable
+
+AckCallback: TypeAlias = Callable[..., None | Awaitable[None]]
 
 
 @enum.unique
@@ -54,13 +56,13 @@ class AckableMessage(BaseModel):
     """
 
     data: bytes
-    ack: Callable[[], None | Awaitable[None]]
+    ack: AckCallback
 
 
 class AckController:
     """Controls acknowledgement state for a received message."""
 
-    def __init__(self, ack: Callable[[], None | Awaitable[None]] | None) -> None:
+    def __init__(self, ack: AckCallback | None) -> None:
         self._ack = ack
         self.is_acked = False
 
@@ -69,11 +71,11 @@ class AckController:
         """Whether the current message supports acknowledgement."""
         return self._ack is not None
 
-    async def ack(self) -> None:
-        """Acknowledge the current message once."""
+    async def ack(self, **kwargs: Any) -> None:
+        """Acknowledge the current message once with broker-specific options."""
         if self._ack is None:
             raise RuntimeError("Current message is not ackable.")
         if self.is_acked:
             return
-        await maybe_awaitable(self._ack())
+        await maybe_awaitable(self._ack(**kwargs))
         self.is_acked = True

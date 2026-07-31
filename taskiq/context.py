@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.acks import AckController
@@ -34,15 +34,17 @@ class Context:
         """Whether the current message has already been acknowledged."""
         return self._ack_controller is not None and self._ack_controller.is_acked
 
-    async def ack(self) -> None:
+    async def ack(self, **kwargs: Any) -> None:
         """
         Acknowledge current message.
 
+        :param kwargs: Broker-specific options forwarded to the acknowledgement
+            callback.
         :raises RuntimeError: if current broker message is not ackable.
         """
         if self._ack_controller is None:
             raise RuntimeError("Current message is not ackable.")
-        await self._ack_controller.ack()
+        await self._ack_controller.ack(**kwargs)
 
     async def requeue(self) -> None:
         """
