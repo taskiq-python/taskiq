@@ -637,11 +637,8 @@ class Receiver:
     ) -> None:
         """Release capacity for abandoned queue entries."""
         discarded_messages = 0
-        while True:
-            try:
-                queued_message = queue.get_nowait()
-            except asyncio.QueueEmpty:
-                break
+        while not queue.empty():
+            queued_message = queue.get_nowait()
             if isinstance(queued_message, _PrefetchedMessage):
                 discarded_messages += 1
                 if queued_message.owns_delivery_slot:
