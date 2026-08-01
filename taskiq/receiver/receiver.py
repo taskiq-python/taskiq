@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import contextvars
 import functools
 import inspect
@@ -10,7 +11,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from logging import getLogger
 from time import time
-from typing import Any, Literal, get_type_hints
+from typing import Any, get_type_hints
 
 import anyio
 from taskiq_dependencies import DependencyGraph
@@ -442,7 +443,7 @@ class Receiver:
                 logger.error(
                     "A Receiver listener lifecycle error was recorded before "
                     "the task group failed.",
-                    exc_info=(type(error), error, error.__traceback__),
+                    exc_info=error,
                 )
             raise
 
@@ -463,12 +464,7 @@ class Receiver:
         :param queue: queue for prefetched data.
         :param finish_event: event to indicate that we need to stop prefetching.
         """
-        try:
-            state = _PrefetchState(iterator=self.broker.listen())
-        except BaseException as exc:
-            self._record_listen_error(exc)
-            queue.put_nowait(_QueueSignal.DONE)
-            return
+        state = _PrefetchState(iterator=self.broker.listen())
 
         fetched_tasks = 0
         finish_waiter = asyncio.create_task(finish_event.wait())
@@ -494,13 +490,6 @@ class Receiver:
                     ),
                 )
                 state.owns_delivery_slot = False
-                try:
-                    await self._notify_prefetch_hook("on_prefetch_queue_add")
-                except asyncio.CancelledError:
-                    raise
-                except BaseException as exc:
-                    self._record_listen_error(exc)
-                    break
         finally:
             logger.info("Stopping prefetching messages...")
             with anyio.CancelScope(shield=True):
@@ -509,7 +498,8 @@ class Receiver:
                 finally:
                     queue.put_nowait(_QueueSignal.DONE)
                     finish_waiter.cancel()
-                    await asyncio.gather(finish_waiter, return_exceptions=True)
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await finish_waiter
 
     def _should_stop_prefetch(
         self,
@@ -563,7 +553,7 @@ class Receiver:
         """Acquire one delivery-admission slot unless shutdown wins the race."""
         acquire_task = asyncio.create_task(self.sem_prefetch.acquire())
         try:
-            done, _ = await asyncio.wait(
+            await asyncio.wait(
                 {acquire_task, finish_waiter},
                 return_when=asyncio.FIRST_COMPLETED,
             )
@@ -571,7 +561,7 @@ class Receiver:
             await self._settle_delivery_acquire(acquire_task)
             raise
 
-        if finish_waiter in done or finish_event.is_set():
+        if finish_waiter.done() or finish_event.is_set():
             await self._settle_delivery_acquire(acquire_task)
             return False
 
@@ -605,10 +595,6 @@ class Receiver:
             return
 
         queue.put_nowait(late_delivery)
-        try:
-            await self._notify_prefetch_hook("on_prefetch_queue_add")
-        except BaseException as exc:
-            self._record_listen_error(exc)
 
     async def _close_prefetch_state(
         self,
@@ -645,38 +631,11 @@ class Receiver:
         state.owns_delivery_slot = False
         return late_delivery
 
-    async def _notify_prefetch_hook(
-        self,
-        hook_name: Literal[
-            "on_prefetch_queue_add",
-            "on_prefetch_queue_remove",
-        ],
-    ) -> None:
-        """Run all prefetch hooks and preserve the first failure."""
-        first_error: BaseException | None = None
-        for middleware in reversed(self.broker.middlewares):
-            hook = getattr(middleware, hook_name, None)
-            if hook is not None:
-                try:
-                    await maybe_awaitable(hook())
-                except BaseException as exc:
-                    if first_error is None:
-                        first_error = exc
-                    else:
-                        logger.error(
-                            "Additional error while running prefetch hook %s.",
-                            hook_name,
-                            exc_info=(type(exc), exc, exc.__traceback__),
-                        )
-
-        if first_error is not None:
-            raise first_error
-
     async def _discard_queued_messages(
         self,
         queue: "asyncio.Queue[_PrefetchedMessage | _QueueSignal]",
     ) -> None:
-        """Release capacity and instrumentation for abandoned queue entries."""
+        """Release capacity for abandoned queue entries."""
         discarded_messages = 0
         while True:
             try:
@@ -693,18 +652,6 @@ class Receiver:
                 "Discarding %d prefetched deliveries during Receiver cleanup.",
                 discarded_messages,
             )
-
-        # Restore all capacity before cleanup hooks introduce suspension points.
-        first_error: BaseException | None = None
-        for _ in range(discarded_messages):
-            try:
-                await self._notify_prefetch_hook("on_prefetch_queue_remove")
-            except BaseException as exc:
-                if first_error is None:
-                    first_error = exc
-
-        if first_error is not None:
-            self._record_listen_error(first_error)
 
     async def runner(
         self,
@@ -737,7 +684,7 @@ class Receiver:
                     except BaseException:
                         queue.put_nowait(queued_message)
                         raise
-                started_callback = await self._start_callback(
+                started_callback = self._start_callback(
                     queued_message,
                     owns_execution_slot=owns_execution_slot,
                 )
@@ -761,7 +708,7 @@ class Receiver:
                 break
         logger.info("The runner is stopped.")
 
-    async def _start_callback(
+    def _start_callback(
         self,
         message: _PrefetchedMessage,
         *,
@@ -770,8 +717,6 @@ class Receiver:
         """Transfer execution and delivery capacity to a callback task."""
         owns_delivery_slot = message.owns_delivery_slot
         try:
-            await self._notify_prefetch_hook("on_prefetch_queue_remove")
-
             if self.sem is None and owns_delivery_slot:
                 self.sem_prefetch.release()
                 owns_delivery_slot = False

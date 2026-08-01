@@ -3,28 +3,11 @@ from collections.abc import AsyncGenerator, Callable, Sequence
 from typing import Literal, cast
 
 from taskiq.abc.broker import AckableMessage, AsyncBroker
-from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.message import BrokerMessage, TaskiqMessage
 
 
 class ReceiverLifecycleError(RuntimeError):
-    """Marker error for listener and middleware lifecycle failures."""
-
-
-class PrefetchCounterMiddleware(TaskiqMiddleware):
-    """Track the observable number of messages in the prefetch queue."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.queued_messages = 0
-
-    def on_prefetch_queue_add(self) -> None:
-        """Record one queued delivery."""
-        self.queued_messages += 1
-
-    def on_prefetch_queue_remove(self) -> None:
-        """Record one removed or discarded delivery."""
-        self.queued_messages -= 1
+    """Marker error for listener lifecycle failures."""
 
 
 class ObservedSemaphore(asyncio.Semaphore):

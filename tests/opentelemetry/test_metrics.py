@@ -189,19 +189,6 @@ class TestTaskiqOTelMetrics(TestBase):
             "tests.opentelemetry.taskiq_test_tasks:task_add",
         )
 
-    def test_prefetch_queue_counter(self) -> None:
-        middleware = next(
-            m for m in broker.middlewares if isinstance(m, OpenTelemetryMiddleware)
-        )
-        middleware.on_prefetch_queue_add()
-        middleware.on_prefetch_queue_add()
-        middleware.on_prefetch_queue_add()
-        middleware.on_prefetch_queue_remove()
-
-        points = self._get_data_points("worker_prefetched_tasks")
-        self.assertEqual(len(points), 1)
-        self.assertEqual(points[0].value, 2)
-
     def test_worker_resource_metrics_when_worker_process(self) -> None:
         middleware = next(
             m for m in broker.middlewares if isinstance(m, OpenTelemetryMiddleware)

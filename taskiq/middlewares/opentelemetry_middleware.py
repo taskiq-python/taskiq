@@ -230,12 +230,6 @@ class OpenTelemetryMiddleware(TaskiqMiddleware):
             unit="1",
             description="Number of tasks currently executing in the worker.",
         )
-        # 9- Number of tasks executing
-        self.number_of_broker_prefetched_tasks = self._meter.create_up_down_counter(
-            "worker_prefetched_tasks",
-            unit="1",
-            description="Number of tasks currently prefetched in the worker.",
-        )
 
     def _observe_memory(self, options: Any) -> Generator[Observation, None, None]:
         if self.broker and self.broker.is_worker_process:
@@ -447,11 +441,3 @@ class OpenTelemetryMiddleware(TaskiqMiddleware):
             -1,
             attributes={"task_name": message.task_name},
         )
-
-    def on_prefetch_queue_add(self) -> None:
-        """This hook is called after task is added to the worker prefetch queue."""
-        self.number_of_broker_prefetched_tasks.add(1)
-
-    def on_prefetch_queue_remove(self) -> None:
-        """This hook is called after task is removed from the worker prefetch queue."""
-        self.number_of_broker_prefetched_tasks.add(-1)
