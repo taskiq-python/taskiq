@@ -174,8 +174,9 @@ class Receiver:
             if middleware.__class__.post_execute != TaskiqMiddleware.post_execute:
                 await maybe_awaitable(middleware.post_execute(taskiq_msg, result))
 
+        should_save = self._should_save_result(taskiq_msg, result)
         try:
-            if not isinstance(result.error, NoResultError):
+            if should_save:
                 await self.broker.result_backend.set_result(taskiq_msg.task_id, result)
 
                 for middleware in reversed(self.broker.middlewares):
@@ -209,6 +210,46 @@ class Receiver:
             raise ValueError(
                 f"Invalid ack_type label {ack_type!r} for task {message.task_name}.",
             ) from exc
+
+    def _should_save_result(
+        self,
+        message: TaskiqMessage,
+        result: TaskiqResult[Any],
+    ) -> bool:
+        """
+        Decide whether execution result should be stored.
+
+        Results are skipped when:
+        * task raised ``NoResultError``;
+        * task has ``skip_result`` label set to ``True``.
+        """
+        if isinstance(result.error, NoResultError):
+            return False
+        if self._is_skip_result(message):
+            logger.debug(
+                "Task %s with id %s has skip_result label. Skipping result backend.",
+                message.task_name,
+                message.task_id,
+            )
+            return False
+        return True
+
+    @staticmethod
+    def _is_skip_result(message: TaskiqMessage) -> bool:
+        """
+        Check whether ``skip_result`` label is enabled.
+
+        Only ``True`` and ``False`` are allowed. Missing label means ``False``.
+        """
+        skip_result = message.labels.get("skip_result")
+        if skip_result is None:
+            return False
+        if isinstance(skip_result, bool):
+            return skip_result
+        raise ValueError(
+            f"Invalid skip_result label {skip_result!r} for task "
+            f"{message.task_name}. Expected True or False.",
+        )
 
     async def run_task(  # noqa: C901, PLR0912, PLR0915
         self,
