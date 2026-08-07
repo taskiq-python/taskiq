@@ -242,6 +242,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
             labels=message.labels,
             args=message.args,
             kwargs=message.kwargs,
+            task_id=self.custom_task_id,
             interval=interval,
         )
         await source.add_schedule(scheduled)
