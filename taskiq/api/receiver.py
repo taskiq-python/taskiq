@@ -45,13 +45,18 @@ async def run_receiver_task(
     :param validate_params: whether to validate params or not.
     :param max_async_tasks: maximum number of simultaneous async tasks.
     :param max_async_tasks_jitter: random jitter to add to max_async_tasks.
-    :param max_prefetch: maximum number of tasks to prefetch.
+    :param max_prefetch: maximum number of deliveries allowed to wait beyond
+        the available async execution capacity. Must be non-negative.
     :param propagate_exceptions: whether to propagate exceptions in generators or not.
     :param run_startup: whether to run startup function or not.
     :param ack_time: acknowledge type to use.
     :param use_process_pool: whether to use process pool or threadpool.
     :raises asyncio.CancelledError: if the task was cancelled.
+    :raises ValueError: if max_prefetch is negative.
     """
+    if max_prefetch < 0:
+        raise ValueError("max_prefetch cannot be negative.")
+
     finish_event = asyncio.Event()
 
     def on_exit(_: Receiver) -> None:

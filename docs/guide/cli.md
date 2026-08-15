@@ -162,7 +162,7 @@ The number of signals before a hard kill can be configured with the `--hardkill-
 * `--log-format` is used to set a log format (default `%(asctime)s][%(name)s][%(levelname)-7s][%(processName)s] %(message)s`).
 * `--max-async-tasks` - maximum number of simultaneously running async tasks.
 * `--max-async-tasks-jitter` – Randomly varies the max async task limit between --max-async-tasks and a jittered value, helping prevent simultaneous worker restarts.
-* `--max-prefetch` - number of tasks to be prefetched before execution. (Useful for systems with high message rates, but brokers should support acknowledgements).
+* `--max-prefetch` - maximum number of deliveries allowed to wait for execution beyond the available async execution capacity. With a finite `--max-async-tasks` limit, a worker admits at most its effective async execution limit plus `max_prefetch` running or waiting deliveries. The default `0` disables additional buffering, and the value must be non-negative. This option is useful for systems with high message rates, but brokers should support acknowledgements.
 * `--max-threadpool-threads` - number of threads for sync function execution.
 * `--no-propagate-errors` - if this parameter is enabled, exceptions won't be thrown in generator dependencies.
 * `--receiver` - python path to custom receiver class.
