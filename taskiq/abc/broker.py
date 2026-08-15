@@ -3,8 +3,9 @@ import sys
 import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from collections.abc import AsyncGenerator, Awaitable, Callable
-from functools import wraps
+from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator
+from contextlib import contextmanager
+from functools import partial, wraps
 from logging import getLogger
 from typing import (
     TYPE_CHECKING,
@@ -47,6 +48,7 @@ _FuncParams = ParamSpec("_FuncParams")
 _ReturnType = TypeVar("_ReturnType")
 
 EventHandler: TypeAlias = Callable[[TaskiqState], Awaitable[None] | None]
+ShutdownHook: TypeAlias = Callable[[], Awaitable[None] | None]
 
 logger = getLogger("taskiq")
 
@@ -118,6 +120,7 @@ class AsyncBroker(ABC):
         self.is_worker_process = False
         # True only if broker runs in scheduler process.
         self.is_scheduler_process = False
+        self._shutdown_resource_index = 0
 
     def find_task(self, task_name: str) -> AsyncTaskiqDecoratedTask[Any, Any] | None:
         """
@@ -209,35 +212,37 @@ class AsyncBroker(ABC):
         This method is called,
         when broker is closing.
         """
-        shutdown_error: BaseException | None = None
+        shutdown_errors: list[BaseException] = []
+        await self._shutdown_resources(shutdown_errors)
 
+        if shutdown_errors:
+            raise shutdown_errors[0]
+
+    async def _shutdown_resources(
+        self,
+        shutdown_errors: list[BaseException],
+    ) -> None:
+        """Close every registered resource and record failures in order."""
+        for index, shutdown_hook in enumerate(self._iter_shutdown_hooks()):
+            if index < self._shutdown_resource_index:
+                continue
+            try:
+                await maybe_awaitable(shutdown_hook())
+            except Exception as exc:
+                self._record_shutdown_error(shutdown_errors, exc)
+            self._shutdown_resource_index = index + 1
+
+    def _iter_shutdown_hooks(self) -> Iterator[ShutdownHook]:
+        """Yield lifecycle hooks in their shutdown order."""
         for event in self._get_shutdown_events():
             for handler in self.event_handlers[event]:
-                try:
-                    await maybe_awaitable(handler(self.state))
-                except BaseException as exc:
-                    shutdown_error = self._remember_shutdown_error(
-                        shutdown_error,
-                        exc,
-                    )
+                yield partial(handler, self.state)
 
         for middleware in self.middlewares:
             if middleware.__class__.shutdown != TaskiqMiddleware.shutdown:
-                try:
-                    await maybe_awaitable(middleware.shutdown())
-                except BaseException as exc:
-                    shutdown_error = self._remember_shutdown_error(
-                        shutdown_error,
-                        exc,
-                    )
+                yield middleware.shutdown
 
-        try:
-            await self.result_backend.shutdown()
-        except BaseException as exc:
-            shutdown_error = self._remember_shutdown_error(shutdown_error, exc)
-
-        if shutdown_error is not None:
-            raise shutdown_error
+        yield self.result_backend.shutdown
 
     def _get_shutdown_events(self) -> tuple[TaskiqEvents, ...]:
         """Return event phases owned by this broker shutdown."""
@@ -258,6 +263,23 @@ class AsyncBroker(ABC):
             exc_info=current_error,
         )
         return first_error
+
+    @classmethod
+    def _record_shutdown_error(
+        cls,
+        shutdown_errors: list[BaseException],
+        current_error: BaseException,
+    ) -> None:
+        """Record the first failure when it occurs and log later failures."""
+        first_error = shutdown_errors[0] if shutdown_errors else None
+        remembered_error = cls._remember_shutdown_error(first_error, current_error)
+        if first_error is None:
+            shutdown_errors.append(remembered_error)
+
+    @contextmanager
+    def _send_lifecycle(self) -> Iterator[None]:
+        """Own package-internal client send work through broker handoff."""
+        yield
 
     async def _kick_with_post_send(
         self,

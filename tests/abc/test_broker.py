@@ -1,10 +1,13 @@
+import asyncio
 from collections.abc import AsyncGenerator
+from contextvars import ContextVar, Token
 from copy import copy
 
 import pytest
 
 from taskiq.abc.broker import AsyncBroker
 from taskiq.abc.middleware import TaskiqMiddleware
+from taskiq.cli.worker.run import shutdown_broker
 from taskiq.decor import AsyncTaskiqDecoratedTask
 from taskiq.events import TaskiqEvents
 from taskiq.exceptions import SendTaskError
@@ -70,6 +73,39 @@ class _RecordingSendMiddleware(TaskiqMiddleware):
         self.events.append("post_send")
         if self.post_send_error is not None:
             raise self.post_send_error
+
+
+class _BlockingShutdownMiddleware(TaskiqMiddleware):
+    """Hold base broker shutdown until cancelled or explicitly released."""
+
+    def __init__(
+        self,
+        started: asyncio.Event,
+        release: asyncio.Event,
+    ) -> None:
+        super().__init__()
+        self.started = started
+        self.release = release
+
+    async def shutdown(self) -> None:
+        self.started.set()
+        await self.release.wait()
+
+
+class _ContextLifecycleMiddleware(TaskiqMiddleware):
+    """Pair one ContextVar token across startup and shutdown."""
+
+    def __init__(self, context: ContextVar[str]) -> None:
+        super().__init__()
+        self.context = context
+        self.token: Token[str] | None = None
+
+    async def startup(self) -> None:
+        self.token = self.context.set("started")
+
+    async def shutdown(self) -> None:
+        assert self.token is not None
+        self.context.reset(self.token)
 
 
 def test_decorator_success() -> None:
@@ -172,6 +208,37 @@ async def test_kicker_preserves_post_send_error_type() -> None:
 
     assert exc_info.value is post_send_error
     assert events == ["pre_send", "kick", "post_send"]
+
+
+async def test_base_shutdown_preserves_lifecycle_context() -> None:
+    lifecycle_context = ContextVar("lifecycle_context", default="outside")
+    broker = _TestBroker().with_middlewares(
+        _ContextLifecycleMiddleware(lifecycle_context),
+    )
+
+    async with broker:
+        assert lifecycle_context.get() == "started"
+
+    assert lifecycle_context.get() == "outside"
+
+
+async def test_worker_timeout_cancels_base_broker_shutdown() -> None:
+    shutdown_started = asyncio.Event()
+    release_shutdown = asyncio.Event()
+    broker = _TestBroker().with_middlewares(
+        _BlockingShutdownMiddleware(shutdown_started, release_shutdown),
+    )
+    loop = asyncio.get_running_loop()
+    release_handle = loop.call_later(0.5, release_shutdown.set)
+    started_at = loop.time()
+
+    try:
+        await shutdown_broker(broker, timeout=0.01)
+    finally:
+        release_handle.cancel()
+
+    assert shutdown_started.is_set()
+    assert loop.time() - started_at < 0.2
 
 
 @pytest.mark.anyio

@@ -157,21 +157,22 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         logger.debug(
             f"Kicking {self.task_name} with args={args} and kwargs={kwargs}.",
         )
-        message = self._prepare_message(*args, **kwargs)
-        for middleware in self.broker.middlewares:
-            if middleware.__class__.pre_send != TaskiqMiddleware.pre_send:
-                message = await maybe_awaitable(middleware.pre_send(message))
+        with self.broker._send_lifecycle():  # noqa: SLF001
+            message = self._prepare_message(*args, **kwargs)
+            for middleware in self.broker.middlewares:
+                if middleware.__class__.pre_send != TaskiqMiddleware.pre_send:
+                    message = await maybe_awaitable(middleware.pre_send(message))
 
-        try:
-            broker_message = self.broker.formatter.dumps(message)
-        except Exception as exc:
-            raise SendTaskError from exc
+            try:
+                broker_message = self.broker.formatter.dumps(message)
+            except Exception as exc:
+                raise SendTaskError from exc
 
-        # AsyncKicker and AsyncBroker share this package-internal send boundary.
-        await self.broker._kick_with_post_send(  # noqa: SLF001
-            broker_message,
-            partial(self._run_post_send, message),
-        )
+            # AsyncKicker and AsyncBroker share this package-internal send boundary.
+            await self.broker._kick_with_post_send(  # noqa: SLF001
+                broker_message,
+                partial(self._run_post_send, message),
+            )
 
         return AsyncTaskiqTask(
             task_id=message.task_id,

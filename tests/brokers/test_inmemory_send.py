@@ -1,4 +1,5 @@
 import asyncio
+from contextvars import ContextVar
 from typing import Any
 
 import pytest
@@ -7,14 +8,22 @@ from taskiq import InMemoryBroker, TaskiqMessage
 from taskiq.exceptions import SendTaskError, UnknownTaskError
 from taskiq.kicker import AsyncKicker
 from tests.brokers.inmemory_contract_support import (
+    BlockingAfterAcceptKickInMemoryBroker,
     BlockingPostSendMiddleware,
+    ChildReentrantDrainMiddleware,
     CoordinatedPostSendMiddleware,
+    DeferredChildDrainMiddleware,
     DrainSignallingInMemoryBroker,
+    FailingAfterAcceptKickInMemoryBroker,
     FailingExecutionMiddleware,
     FailingPostSendMiddleware,
     LifecycleError,
     PostSendError,
+    RecordingKickInMemoryBroker,
     ReentrantDrainMiddleware,
+    RejectingKickInMemoryBroker,
+    ReplacingKickInMemoryBroker,
+    TransformingKickInMemoryBroker,
 )
 
 
@@ -43,6 +52,140 @@ async def test_direct_kick_preserves_inline_execution() -> None:
 
 
 @pytest.mark.parametrize("await_inplace", [False, True])
+async def test_kicker_uses_inmemory_public_kick_extension(
+    await_inplace: bool,
+) -> None:
+    task_executed = False
+    broker = RecordingKickInMemoryBroker(await_inplace=await_inplace)
+
+    @broker.task
+    async def task() -> None:
+        nonlocal task_executed
+        task_executed = True
+
+    await task.kiq()
+    await broker.wait_all()
+
+    assert broker.kick_calls == 1
+    assert task_executed
+    await broker.shutdown()
+
+
+@pytest.mark.parametrize("await_inplace", [False, True])
+async def test_cancelled_public_kick_preserves_accepted_execution(
+    await_inplace: bool,
+) -> None:
+    events: list[str] = []
+    post_send_started = asyncio.Event()
+    release_post_send = asyncio.Event()
+    task_executed = asyncio.Event()
+    broker = BlockingAfterAcceptKickInMemoryBroker(
+        await_inplace=await_inplace,
+    ).with_middlewares(
+        BlockingPostSendMiddleware(
+            events,
+            post_send_started,
+            release_post_send,
+        ),
+    )
+
+    @broker.task
+    async def task() -> None:
+        task_executed.set()
+
+    send_task = asyncio.create_task(task.kiq())
+    await asyncio.wait_for(broker.accepted.wait(), timeout=1)
+    send_task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await send_task
+
+    await asyncio.wait_for(post_send_started.wait(), timeout=1)
+    assert not task_executed.is_set()
+    release_post_send.set()
+    await asyncio.wait_for(broker.wait_all(), timeout=1)
+
+    assert task_executed.is_set()
+    assert events == [
+        "pre_send",
+        "post_send.started",
+        "post_send.finished",
+        "pre_execute",
+        "post_execute",
+    ]
+    await broker.shutdown()
+
+
+@pytest.mark.parametrize("await_inplace", [False, True])
+async def test_failed_public_kick_preserves_accepted_execution(
+    await_inplace: bool,
+) -> None:
+    events: list[str] = []
+    post_send_started = asyncio.Event()
+    release_post_send = asyncio.Event()
+    kick_error = LifecycleError("public kick failed after acceptance")
+    task_executed = asyncio.Event()
+    broker = FailingAfterAcceptKickInMemoryBroker(
+        kick_error,
+        await_inplace=await_inplace,
+    ).with_middlewares(
+        BlockingPostSendMiddleware(
+            events,
+            post_send_started,
+            release_post_send,
+        ),
+    )
+
+    @broker.task
+    async def task() -> None:
+        task_executed.set()
+
+    with pytest.raises(SendTaskError) as exc_info:
+        await task.kiq()
+
+    await asyncio.wait_for(post_send_started.wait(), timeout=1)
+    assert not task_executed.is_set()
+    release_post_send.set()
+    await asyncio.wait_for(broker.wait_all(), timeout=1)
+
+    assert exc_info.value.__cause__ is kick_error
+    assert task_executed.is_set()
+    assert events == [
+        "pre_send",
+        "post_send.started",
+        "post_send.finished",
+        "pre_execute",
+        "post_execute",
+    ]
+    await broker.shutdown()
+
+
+@pytest.mark.parametrize("await_inplace", [False, True])
+async def test_public_kick_dispatches_the_message_accepted_by_base(
+    await_inplace: bool,
+) -> None:
+    executed_tasks: list[str] = []
+    broker = TransformingKickInMemoryBroker(
+        "replacement",
+        await_inplace=await_inplace,
+    )
+
+    @broker.task(task_name="original")
+    async def original() -> None:
+        executed_tasks.append("original")
+
+    @broker.task(task_name="replacement")
+    async def replacement() -> None:
+        executed_tasks.append("replacement")
+
+    await original.kiq()
+    await broker.wait_all()
+
+    assert executed_tasks == ["replacement"]
+    await broker.shutdown()
+
+
+@pytest.mark.parametrize("await_inplace", [False, True])
 async def test_async_post_send_finishes_before_execution(
     await_inplace: bool,
 ) -> None:
@@ -50,7 +193,7 @@ async def test_async_post_send_finishes_before_execution(
     post_send_started = asyncio.Event()
     release_post_send = asyncio.Event()
     task_started = asyncio.Event()
-    broker = InMemoryBroker(await_inplace=await_inplace)
+    broker = RecordingKickInMemoryBroker(await_inplace=await_inplace)
     broker.with_middlewares(
         BlockingPostSendMiddleware(
             events,
@@ -67,6 +210,7 @@ async def test_async_post_send_finishes_before_execution(
     kiq_task = asyncio.create_task(task.kiq())
     await asyncio.wait_for(post_send_started.wait(), timeout=1)
 
+    assert broker.kick_calls == 1
     assert not task_started.is_set()
     assert events == ["pre_send", "post_send.started"]
 
@@ -83,6 +227,81 @@ async def test_async_post_send_finishes_before_execution(
         "task",
         "post_execute",
     ]
+
+
+@pytest.mark.parametrize("await_inplace", [False, True])
+async def test_rejected_public_kick_skips_post_send(
+    await_inplace: bool,
+) -> None:
+    events: list[str] = []
+    post_send_started = asyncio.Event()
+    release_post_send = asyncio.Event()
+    release_post_send.set()
+    kick_error = LifecycleError("public kick rejected the send")
+    task_executed = False
+    broker = RejectingKickInMemoryBroker(
+        kick_error,
+        await_inplace=await_inplace,
+    ).with_middlewares(
+        BlockingPostSendMiddleware(
+            events,
+            post_send_started,
+            release_post_send,
+        ),
+    )
+
+    @broker.task
+    async def task() -> None:
+        nonlocal task_executed
+        task_executed = True
+
+    with pytest.raises(SendTaskError) as exc_info:
+        await task.kiq()
+
+    assert exc_info.value.__cause__ is kick_error
+    assert broker.kick_calls == 1
+    assert events == ["pre_send"]
+    assert not post_send_started.is_set()
+    assert not task_executed
+    await broker.shutdown()
+
+
+@pytest.mark.parametrize("await_inplace", [False, True])
+async def test_replaced_public_kick_skips_local_execution(
+    await_inplace: bool,
+) -> None:
+    events: list[str] = []
+    post_send_started = asyncio.Event()
+    release_post_send = asyncio.Event()
+    release_post_send.set()
+    task_executed = False
+    broker = ReplacingKickInMemoryBroker(
+        await_inplace=await_inplace,
+    ).with_middlewares(
+        BlockingPostSendMiddleware(
+            events,
+            post_send_started,
+            release_post_send,
+        ),
+    )
+
+    @broker.task
+    async def task() -> None:
+        nonlocal task_executed
+        task_executed = True
+
+    await task.kiq()
+
+    assert broker.kick_calls == 1
+    assert events == [
+        "pre_send",
+        "post_send.started",
+        "post_send.finished",
+    ]
+    assert post_send_started.is_set()
+    assert not task_executed
+    assert not broker._running_tasks
+    await broker.shutdown()
 
 
 async def test_concurrent_inline_sends_keep_per_invocation_ownership() -> None:
@@ -136,6 +355,28 @@ async def test_concurrent_inline_sends_keep_per_invocation_ownership() -> None:
     await broker.shutdown()
 
 
+async def test_inline_send_preserves_caller_task_context() -> None:
+    context_value: ContextVar[str] = ContextVar(
+        "inmemory_inline_context",
+        default="caller",
+    )
+    caller_task = asyncio.current_task()
+    execution_task: asyncio.Task[Any] | None = None
+    broker = InMemoryBroker(await_inplace=True)
+
+    @broker.task
+    async def task() -> None:
+        nonlocal execution_task
+        execution_task = asyncio.current_task()
+        context_value.set("execution")
+
+    await task.kiq()
+
+    assert execution_task is caller_task
+    assert context_value.get() == "execution"
+    await broker.shutdown()
+
+
 async def test_post_send_failure_does_not_retract_accepted_inline_task() -> None:
     post_send_error = PostSendError("post-send failed")
     task_executed = False
@@ -152,6 +393,40 @@ async def test_post_send_failure_does_not_retract_accepted_inline_task() -> None
 
     assert exc_info.value is post_send_error
     assert task_executed
+    await broker.shutdown()
+
+
+async def test_sender_cancellation_after_post_send_failure_keeps_execution() -> None:
+    post_send_error = PostSendError("post-send failed")
+    task_started = asyncio.Event()
+    finish_task = asyncio.Event()
+    task_cancelled = False
+    task_finished = False
+    broker = InMemoryBroker(await_inplace=True)
+    broker.with_middlewares(FailingPostSendMiddleware(post_send_error))
+
+    @broker.task
+    async def task() -> None:
+        nonlocal task_cancelled, task_finished
+        task_started.set()
+        try:
+            await finish_task.wait()
+        except asyncio.CancelledError:
+            task_cancelled = True
+            raise
+        task_finished = True
+
+    sender = asyncio.create_task(task.kiq())
+    await asyncio.wait_for(task_started.wait(), timeout=1)
+    sender.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await sender
+
+    assert not task_cancelled
+    finish_task.set()
+    await asyncio.wait_for(broker.wait_all(), timeout=1)
+    assert task_finished
     await broker.shutdown()
 
 
@@ -211,6 +486,28 @@ async def test_post_send_failure_preserves_execution_error_ownership(
             await broker.wait_all()
         assert execution_exc_info.value is execution_error
 
+    await broker.shutdown()
+
+
+async def test_post_send_failure_remains_primary_when_execution_is_cancelled() -> None:
+    post_send_error = PostSendError("post-send failed")
+    execution_cancel = asyncio.CancelledError("execution cancelled")
+    broker = InMemoryBroker(await_inplace=True)
+    broker.with_middlewares(
+        FailingPostSendMiddleware(post_send_error),
+        FailingExecutionMiddleware(execution_cancel),
+    )
+
+    @broker.task
+    async def task() -> None:
+        return None
+
+    with pytest.raises(PostSendError) as exc_info:
+        await task.kiq()
+
+    assert exc_info.value is post_send_error
+    assert isinstance(exc_info.value.__cause__, asyncio.CancelledError)
+    await broker.wait_all()
     await broker.shutdown()
 
 
@@ -397,4 +694,51 @@ async def test_post_send_cannot_reenter_broker_drain(
     assert str(exc_info.value).startswith(f"InMemoryBroker.{operation}()")
     assert task_executed
     assert broker.executor.submit(int).result() == 0
+    await broker.shutdown()
+
+
+@pytest.mark.parametrize("operation", ["wait_all", "shutdown"])
+@pytest.mark.parametrize("await_inplace", [False, True])
+async def test_post_send_child_cannot_reenter_broker_drain(
+    operation: str,
+    await_inplace: bool,
+) -> None:
+    task_executed = False
+    broker = InMemoryBroker(await_inplace=await_inplace)
+    broker.with_middlewares(ChildReentrantDrainMiddleware(operation))
+
+    @broker.task
+    async def task() -> None:
+        nonlocal task_executed
+        task_executed = True
+
+    with pytest.raises(RuntimeError) as exc_info:
+        await asyncio.wait_for(task.kiq(), timeout=1)
+
+    await asyncio.wait_for(broker.wait_all(), timeout=1)
+    assert str(exc_info.value).startswith(f"InMemoryBroker.{operation}()")
+    assert task_executed
+    assert broker.executor.submit(int).result() == 0
+    await broker.shutdown()
+
+
+@pytest.mark.parametrize("await_inplace", [False, True])
+async def test_post_send_child_can_drain_after_send_lifecycle(
+    await_inplace: bool,
+) -> None:
+    release = asyncio.Event()
+    broker = InMemoryBroker(await_inplace=await_inplace)
+    middleware = DeferredChildDrainMiddleware(release)
+    broker.with_middlewares(middleware)
+
+    @broker.task
+    async def task() -> None:
+        return None
+
+    await asyncio.wait_for(task.kiq(), timeout=1)
+    await asyncio.wait_for(broker.wait_all(), timeout=1)
+    release.set()
+
+    assert middleware.drain_task is not None
+    assert await asyncio.wait_for(middleware.drain_task, timeout=1) is None
     await broker.shutdown()
