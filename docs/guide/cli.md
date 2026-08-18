@@ -167,6 +167,7 @@ The number of signals before a hard kill can be configured with the `--hardkill-
 * `--no-propagate-errors` - if this parameter is enabled, exceptions won't be thrown in generator dependencies.
 * `--receiver` - python path to custom receiver class.
 * `--receiver_arg` - custom args for receiver.
+* `--loop-factory` - python path to an event loop factory in `module:variable` format. When set, this overrides automatic uvloop selection.
 * `--ack-type` - Type of acknowledgement. This parameter is used to set when to acknowledge the task. Possible values are `when_received`, `when_executed`, `when_saved`, `manual`. Default is `when_saved`.
 * `--max-tasks-per-child` - maximum number of tasks to be executed by a single worker process before restart.
 * `--max-fails` - Maximum number of child process exits.
@@ -200,5 +201,6 @@ Path to scheduler is the only required argument.
 - `--fs-discover` or `-fsd`. This option enables search of task files in current directory recursively, using the given pattern.
 - `--no-configure-logging` - use this parameter if your application configures custom logging.
 - `--log-level` is used to set a log level (default `INFO`).
+- `--loop-factory` - python path to an event loop factory in `module:variable` format.
 - `--skip-first-run` - skip first run of scheduler. This option skips running tasks immediately after scheduler start.
 - `--update-interval` - interval in seconds to check for new tasks. By default scheduler will check for new scheduled tasks every first second of the minute.

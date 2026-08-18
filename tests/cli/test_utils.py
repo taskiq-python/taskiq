@@ -1,8 +1,27 @@
+import asyncio
 from contextlib import suppress
 from pathlib import Path
 from unittest.mock import patch
 
-from taskiq.cli.utils import import_tasks
+import pytest
+
+from taskiq.cli.utils import create_event_loop, import_tasks, resolve_loop_factory
+
+
+def test_resolve_loop_factory_from_import_string() -> None:
+    assert resolve_loop_factory("asyncio:new_event_loop") is asyncio.new_event_loop
+
+
+def test_resolve_loop_factory_rejects_non_callable() -> None:
+    with pytest.raises(ValueError, match="must be callable"):
+        resolve_loop_factory("asyncio:ALL_COMPLETED")
+
+
+def test_create_event_loop_rejects_invalid_result() -> None:
+    factory = resolve_loop_factory("builtins:object")
+
+    with pytest.raises(ValueError, match="must return an event loop"):
+        create_event_loop(factory)
 
 
 def test_import_tasks_list_pattern() -> None:
