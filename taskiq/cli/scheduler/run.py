@@ -74,7 +74,10 @@ async def get_all_schedules(
     schedules: list[list[ScheduledTask]] = await asyncio.gather(
         *[get_schedules(source) for source in scheduler.sources],
     )
-    return list(zip(scheduler.sources, schedules, strict=True))
+    result = list(zip(scheduler.sources, schedules, strict=True))
+    for source, task_list in result:
+        await scheduler.on_schedules_updated(source, task_list)
+    return result
 
 
 class CronValueError(Exception):
