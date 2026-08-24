@@ -1,8 +1,8 @@
 from taskiq import (
     InMemoryBroker,
     ScheduledTask,
-    ScheduleSource,
     SchedulerPlugin,
+    ScheduleSource,
     TaskiqScheduler,
 )
 from taskiq.schedule_sources import LabelScheduleSource
