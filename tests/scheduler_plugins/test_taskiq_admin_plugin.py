@@ -1,6 +1,7 @@
 import asyncio
 import json
 from collections.abc import AsyncGenerator
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pytest
@@ -33,6 +34,11 @@ class EditableScheduleSource(ScheduleSource):
     async def delete_schedule(self, schedule_id: str) -> None:
         """Delete a schedule by id."""
         self.schedules.pop(schedule_id, None)
+
+    async def post_send(self, task: "ScheduledTask") -> None:
+        """Delete one-off schedules after they fire."""
+        if task.time is not None:
+            self.schedules.pop(task.schedule_id, None)
 
 
 class ReadOnlyScheduleSource(ScheduleSource):
@@ -244,6 +250,31 @@ async def test_trigger_command_kicks_with_task_id(
     assert message["args"] == [1]
     assert message["kwargs"] == {"key": "value"}
     assert state["acks"][0]["results"][0]["status"] == "applied"
+
+
+async def test_snapshot_pushed_after_oneoff_fires(
+    admin_server: tuple[TestServer, AdminState],
+) -> None:
+    server, state = admin_server
+    broker = AsyncQueueBroker()
+    schedule = ScheduledTask(
+        task_name="ping:pong",
+        labels={},
+        args=[],
+        kwargs={},
+        time=datetime.now(timezone.utc) - timedelta(seconds=1),
+    )
+    source = EditableScheduleSource([schedule])
+    plugin, scheduler = make_scheduler(server, broker, [source])
+    plugin._resolve_names()
+
+    await scheduler.on_ready(source, schedule)
+
+    # The one-off deleted itself on send, and the plugin's post_send
+    # hook pushed a snapshot that no longer contains it.
+    assert schedule.schedule_id not in source.schedules
+    assert state["snapshots"]
+    assert state["snapshots"][-1]["schedules"] == []
 
 
 async def test_delete_command_fails_on_read_only_source(

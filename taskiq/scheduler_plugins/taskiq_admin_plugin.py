@@ -200,6 +200,33 @@ class TaskiqAdminSchedulerPlugin(SchedulerPlugin):
         """
         await self._push_snapshot(source, schedules)
 
+    async def post_send(
+        self,
+        source: ScheduleSource,
+        task: ScheduledTask,
+    ) -> None:
+        """
+        Push a fresh snapshot after a one-off schedule fires.
+
+        One-off (time) schedules delete themselves from their source
+        after firing, so an immediate snapshot keeps the admin from
+        showing them as overdue until the next refresh.
+
+        :param source: source that triggered this task.
+        :param task: task that has been sent.
+        """
+        if task.time is None:
+            return
+        try:
+            schedules = await source.get_schedules()
+        except Exception:
+            _logger.exception(
+                "Cannot get schedules from source %s.",
+                self.source_name(source),
+            )
+            return
+        await self._push_snapshot(source, schedules)
+
     async def _push_snapshot(
         self,
         source: ScheduleSource,
