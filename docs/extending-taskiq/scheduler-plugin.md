@@ -36,3 +36,9 @@ Also, plugins always have a reference to the current scheduler in the
 `self.scheduler` field. You can use it to access the broker or all
 schedule sources, for example to kick a task or delete a schedule
 during the execution of some plugin hook.
+
+Taskiq ships one built-in plugin:
+`taskiq.scheduler_plugins.TaskiqAdminSchedulerPlugin` — the scheduler
+counterpart of `TaskiqAdminMiddleware`. It syncs all schedules and
+registered tasks with the [taskiq-admin](https://github.com/taskiq-python/taskiq-admin)
+panel and applies delete / reschedule / trigger commands created in its UI.
