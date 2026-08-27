@@ -8,9 +8,20 @@ In this section we'll list officially supported brokers.
 
 ## InMemoryBroker
 
-This is a special broker for local development. It uses the same functions to execute tasks,
-but all tasks are executed locally in the current thread.
+This is a special broker for local development. It uses the same functions to
+execute tasks in the current process. Async task functions run on the event
+loop, while sync task functions use the broker's thread pool.
 By default it uses `InMemoryResultBackend` but this can be overridden.
+
+`startup()` and `shutdown()` run both the client and worker event phases because
+the broker performs both roles in one process. They also own middleware and
+result backend lifecycle. Shutdown stops accepting new local executions, waits
+for already accepted work (including active send middleware), then closes those
+resources and the synchronous task executor. A send started after shutdown is
+rejected before its `pre_send` hooks run.
+Once cleanup completes, later `shutdown()` calls do not close those resources
+again. If cancellation interrupts a lifecycle hook, it propagates immediately
+and a later call resumes cleanup from that hook.
 
 ## ZeroMQBroker
 

@@ -1,6 +1,7 @@
 from collections.abc import Coroutine
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timedelta
+from functools import partial
 from logging import getLogger
 from types import CoroutineType
 from typing import (
@@ -141,10 +142,10 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         **kwargs: _FuncParams.kwargs,
     ) -> Any:
         """
-        This method sends function call over the network.
+        Prepare and dispatch a task invocation through the current broker.
 
-        It gets current broker and calls it's kick method,
-        returning what it returns.
+        Send middleware runs around broker dispatch before the task handle is
+        returned.
 
         :param args: function's arguments.
         :param kwargs: function's key word arguments.
@@ -156,24 +157,34 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         logger.debug(
             f"Kicking {self.task_name} with args={args} and kwargs={kwargs}.",
         )
-        message = self._prepare_message(*args, **kwargs)
-        for middleware in self.broker.middlewares:
-            if middleware.__class__.pre_send != TaskiqMiddleware.pre_send:
-                message = await maybe_awaitable(middleware.pre_send(message))
-        try:
-            await self.broker.kick(self.broker.formatter.dumps(message))
-        except Exception as exc:
-            raise SendTaskError from exc
+        with self.broker._send_lifecycle():  # noqa: SLF001
+            message = self._prepare_message(*args, **kwargs)
+            for middleware in self.broker.middlewares:
+                if middleware.__class__.pre_send != TaskiqMiddleware.pre_send:
+                    message = await maybe_awaitable(middleware.pre_send(message))
 
-        for middleware in reversed(self.broker.middlewares):
-            if middleware.__class__.post_send != TaskiqMiddleware.post_send:
-                await maybe_awaitable(middleware.post_send(message))
+            try:
+                broker_message = self.broker.formatter.dumps(message)
+            except Exception as exc:
+                raise SendTaskError from exc
+
+            # AsyncKicker and AsyncBroker share this package-internal send boundary.
+            await self.broker._kick_with_post_send(  # noqa: SLF001
+                broker_message,
+                partial(self._run_post_send, message),
+            )
 
         return AsyncTaskiqTask(
             task_id=message.task_id,
             result_backend=self.broker.result_backend,
             return_type=self.return_type,  # type: ignore # (pyright issue)
         )
+
+    async def _run_post_send(self, message: TaskiqMessage) -> None:
+        """Run post-send middleware in reverse registration order."""
+        for middleware in reversed(self.broker.middlewares):
+            if middleware.__class__.post_send != TaskiqMiddleware.post_send:
+                await maybe_awaitable(middleware.post_send(message))
 
     async def schedule_by_cron(
         self,

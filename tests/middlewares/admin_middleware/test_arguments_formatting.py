@@ -22,7 +22,6 @@ class PydanticDTOFactory(ModelFactory[PydanticDTO]):
     __model__ = PydanticDTO
 
 
-# @pytest.mark.skip
 class TestArgumentsFormattingInAdminMiddleware:
     @pytest.mark.parametrize(
         "dto_factory, task_name",
