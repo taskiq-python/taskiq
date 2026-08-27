@@ -92,16 +92,26 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
         """
 
         async def _send() -> None:
-            client = self._get_client()
-
-            async with client.post(
-                urljoin(self.url, endpoint),
-                headers={"access-token": self.api_token},
-                json=payload,
-            ) as resp:
-                resp.raise_for_status()
-                if not resp.ok:
-                    _logger.error(f"POST {endpoint} - {resp.status}")
+            try:
+                client = self._get_client()
+                async with client.post(
+                    urljoin(self.url, endpoint),
+                    headers={"access-token": self.api_token},
+                    json=payload,
+                ) as resp:
+                    if not resp.ok:
+                        _logger.warning(
+                            "POST %s failed: %s %s",
+                            endpoint,
+                            resp.status,
+                            await resp.text(),
+                        )
+            except Exception as exc:
+                _logger.warning(
+                    "Failed to report to taskiq-admin %s: %r",
+                    endpoint,
+                    exc,
+                )
 
         task = asyncio.create_task(_send())
         self._pending.add(task)
