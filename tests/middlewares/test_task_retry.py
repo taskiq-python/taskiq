@@ -200,6 +200,122 @@ async def test_retry_of_custom_exc_types_of_simple_middleware() -> None:
     assert runs == 1
 
 
+@pytest.mark.parametrize(
+    "middleware_class",
+    [SimpleRetryMiddleware, SmartRetryMiddleware],
+)
+async def test_per_task_exc_types_not_matching(middleware_class: type) -> None:
+    # per-task types_of_exceptions does not include the raised exception
+    broker = InMemoryBroker().with_middlewares(
+        middleware_class(no_result_on_retry=True, default_retry_label=True),
+    )
+    runs = 0
+
+    @broker.task(max_retries=10, types_of_exceptions=(KeyError,))
+    def run_task() -> None:
+        nonlocal runs
+
+        runs += 1
+
+        raise ValueError(runs)
+
+    task = await run_task.kiq()
+    resp = await task.wait_result(timeout=1)
+    with pytest.raises(ValueError):
+        resp.raise_for_error()
+
+    assert runs == 1
+
+
+@pytest.mark.parametrize(
+    "middleware_class",
+    [SimpleRetryMiddleware, SmartRetryMiddleware],
+)
+async def test_per_task_exc_types_matching(middleware_class: type) -> None:
+    # per-task types_of_exceptions includes the raised exception
+    broker = InMemoryBroker().with_middlewares(
+        middleware_class(no_result_on_retry=True, default_retry_label=True),
+    )
+    runs = 0
+
+    @broker.task(max_retries=10, types_of_exceptions=(ValueError,))
+    def run_task() -> None:
+        nonlocal runs
+
+        runs += 1
+
+        raise ValueError(runs)
+
+    task = await run_task.kiq()
+    resp = await task.wait_result(timeout=1)
+    with pytest.raises(ValueError):
+        resp.raise_for_error()
+
+    assert runs == 10
+
+
+@pytest.mark.parametrize(
+    "middleware_class",
+    [SimpleRetryMiddleware, SmartRetryMiddleware],
+)
+async def test_per_task_exc_types_override_global(middleware_class: type) -> None:
+    # per-task types_of_exceptions takes precedence over broker-wide value
+    broker = InMemoryBroker().with_middlewares(
+        middleware_class(
+            no_result_on_retry=True,
+            default_retry_label=True,
+            types_of_exceptions=(KeyError,),
+        ),
+    )
+    runs = 0
+
+    @broker.task(max_retries=10, types_of_exceptions=(ValueError,))
+    def run_task() -> None:
+        nonlocal runs
+
+        runs += 1
+
+        raise ValueError(runs)
+
+    task = await run_task.kiq()
+    resp = await task.wait_result(timeout=1)
+    with pytest.raises(ValueError):
+        resp.raise_for_error()
+
+    assert runs == 10
+
+
+@pytest.mark.parametrize(
+    "middleware_class",
+    [SimpleRetryMiddleware, SmartRetryMiddleware],
+)
+async def test_global_exc_types_without_per_task(middleware_class: type) -> None:
+    # broker-wide types_of_exceptions still applies when no per-task value set
+    broker = InMemoryBroker().with_middlewares(
+        middleware_class(
+            no_result_on_retry=True,
+            default_retry_label=True,
+            types_of_exceptions=(KeyError,),
+        ),
+    )
+    runs = 0
+
+    @broker.task(max_retries=10)
+    def run_task() -> None:
+        nonlocal runs
+
+        runs += 1
+
+        raise ValueError(runs)
+
+    task = await run_task.kiq()
+    resp = await task.wait_result(timeout=1)
+    with pytest.raises(ValueError):
+        resp.raise_for_error()
+
+    assert runs == 1
+
+
 async def test_retry_of_custom_exc_types_of_smart_middleware() -> None:
     # test that the passed error will be handled
     broker = InMemoryBroker().with_middlewares(
