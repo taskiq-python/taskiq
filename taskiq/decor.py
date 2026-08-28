@@ -45,10 +45,10 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
 
     def __init__(
         self,
-        broker: "AsyncBroker",
         task_name: str,
         original_func: Callable[_FuncParams, _ReturnType],
         labels: dict[str, Any],
+        broker: "AsyncBroker | None" = None,
         return_type: type[_ReturnType] | None = None,
     ) -> None:
         self.broker = broker
@@ -229,6 +229,10 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
             labels=copy(self.labels),
             return_type=self.return_type,
         )
+
+    def set_broker(self, broker: "AsyncBroker") -> None:
+        """Set broker for the task."""
+        self.broker = broker
 
     def __repr__(self) -> str:
         return f"AsyncTaskiqDecoratedTask({self.task_name})"

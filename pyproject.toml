@@ -172,7 +172,8 @@ lint.ignore = [
   "D100",  # Missing docstring in public module
   "ANN401",  # typing.Any are disallowed in `**kwargs
   "PLR0913",  # Too many arguments for function call
-  "D106"  # Missing docstring in public nested class
+  "D106",  # Missing docstring in public nested class
+  "UP037"  # Remove quotes from a type def
 ]
 lint.mccabe = { max-complexity = 10 }
 
