@@ -58,7 +58,7 @@ class ScheduleSource(ABC):
     def pre_send(  # noqa: B027
         self,
         task: "ScheduledTask",
-    ) -> Union[None, "CoroutineType[Any, Any, None]", Coroutine[Any, Any, None]]:
+    ) -> Union["CoroutineType[Any, Any, None]", Coroutine[Any, Any, None], None]:
         """
         Actions to execute before task will be sent to broker.
 
@@ -71,7 +71,7 @@ class ScheduleSource(ABC):
     def post_send(  # noqa: B027
         self,
         task: "ScheduledTask",
-    ) -> Union[None, "CoroutineType[Any, Any, None]", Coroutine[Any, Any, None]]:
+    ) -> Union["CoroutineType[Any, Any, None]", Coroutine[Any, Any, None], None]:
         """
         Actions to execute after task was sent to broker.
 

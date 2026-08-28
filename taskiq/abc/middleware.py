@@ -24,7 +24,7 @@ class TaskiqMiddleware:  # pragma: no cover
 
     def startup(
         self,
-    ) -> Union[None, Coroutine[Any, Any, None], "CoroutineType[Any, Any, None]"]:
+    ) -> Union[Coroutine[Any, Any, None], "CoroutineType[Any, Any, None]", None]:
         """
         Startup method to perform various action during startup.
 
@@ -36,7 +36,7 @@ class TaskiqMiddleware:  # pragma: no cover
 
     def shutdown(
         self,
-    ) -> Union[None, Coroutine[Any, Any, None], "CoroutineType[Any, Any, None]"]:
+    ) -> Union[Coroutine[Any, Any, None], "CoroutineType[Any, Any, None]", None]:
         """
         Shutdown method to perform various action during shutdown.
 
@@ -68,7 +68,7 @@ class TaskiqMiddleware:  # pragma: no cover
     def post_send(
         self,
         message: "TaskiqMessage",
-    ) -> Union[None, Coroutine[Any, Any, None], "CoroutineType[Any, Any, None]"]:
+    ) -> Union[Coroutine[Any, Any, None], "CoroutineType[Any, Any, None]", None]:
         """
         This hook is executed right after the task is sent.
 
@@ -101,7 +101,7 @@ class TaskiqMiddleware:  # pragma: no cover
         self,
         message: "TaskiqMessage",
         result: "TaskiqResult[Any]",
-    ) -> Union[None, Coroutine[Any, Any, None], "CoroutineType[Any, Any, None]"]:
+    ) -> Union[Coroutine[Any, Any, None], "CoroutineType[Any, Any, None]", None]:
         """
         This hook executes after task is complete.
 
@@ -116,7 +116,7 @@ class TaskiqMiddleware:  # pragma: no cover
         self,
         message: "TaskiqMessage",
         result: "TaskiqResult[Any]",
-    ) -> Union[None, Coroutine[Any, Any, None], "CoroutineType[Any, Any, None]"]:
+    ) -> Union[Coroutine[Any, Any, None], "CoroutineType[Any, Any, None]", None]:
         """
         Post save hook.
 
@@ -132,7 +132,7 @@ class TaskiqMiddleware:  # pragma: no cover
         message: "TaskiqMessage",
         result: "TaskiqResult[Any]",
         exception: BaseException,
-    ) -> Union[None, Coroutine[Any, Any, None], "CoroutineType[Any, Any, None]"]:
+    ) -> Union[Coroutine[Any, Any, None], "CoroutineType[Any, Any, None]", None]:
         """
         This function is called when exception is found.
 

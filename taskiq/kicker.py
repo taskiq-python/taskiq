@@ -154,7 +154,10 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         :returns: taskiq task.
         """
         logger.debug(
-            f"Kicking {self.task_name} with args={args} and kwargs={kwargs}.",
+            "Kicking %s with args=%s and kwargs=%s.",
+            self.task_name,
+            args,
+            kwargs,
         )
         message = self._prepare_message(*args, **kwargs)
         for middleware in self.broker.middlewares:

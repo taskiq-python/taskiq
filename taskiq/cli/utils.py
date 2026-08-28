@@ -25,7 +25,7 @@ def add_cwd_in_path() -> Generator[None, None, None]:
     if str(cwd) in sys.path:
         yield
     else:
-        logger.debug(f"Inserting {cwd} in sys.path")
+        logger.debug("Inserting %s in sys.path", cwd)
         sys.path.insert(0, str(cwd))
         try:
             yield
@@ -33,7 +33,7 @@ def add_cwd_in_path() -> Generator[None, None, None]:
             try:
                 sys.path.remove(str(cwd))
             except ValueError:
-                logger.warning(f"Cannot remove '{cwd}' from sys.path")
+                logger.warning("Cannot remove '%s' from sys.path", cwd)
 
 
 def import_object(object_spec: str, app_dir: str | None = None) -> Any:
@@ -63,11 +63,11 @@ def import_from_modules(modules: list[str]) -> None:
     """
     for module in modules:
         try:
-            logger.info(f"Importing tasks from module {module}")
+            logger.info("Importing tasks from module %s", module)
             with add_cwd_in_path():
                 import_module(module)
         except ImportError as err:
-            logger.warning(f"Cannot import {module}. Cause:")
+            logger.warning("Cannot import %s. Cause:", module)
             logger.exception(err)
 
 

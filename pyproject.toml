@@ -82,7 +82,7 @@ dev = [
   "pytest-cov>=7.0.0",
   "pytest-xdist[psutil]>=3.8.0",
   # lint
-  "ruff>=0.14.5",
+  "ruff>=0.16.5",
   # tests with all python versions
   "tox>=4.32.0",
   "tox-uv>=1.29.0",
@@ -161,7 +161,8 @@ lint.select = [
   "PL",  # PyLint checks
   "RUF",  # Specific to Ruff checks
   "FA102",  # Future annotations
-  "UP"  # Pyupgrade
+  "UP",  # Pyupgrade
+  "G",  # flake8-logging-format
 ]
 lint.ignore = [
   "D105",  # Missing docstring in magic method
@@ -172,6 +173,7 @@ lint.ignore = [
   "D100",  # Missing docstring in public module
   "ANN401",  # typing.Any are disallowed in `**kwargs
   "PLR0913",  # Too many arguments for function call
+  "PLR0917",  # Too many positional arguments
   "D106"  # Missing docstring in public nested class
 ]
 lint.mccabe = { max-complexity = 10 }
