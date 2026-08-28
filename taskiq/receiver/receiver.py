@@ -170,7 +170,7 @@ class Receiver:
                 exc_info=True,
             )
             return
-        logger.debug(f"Received message: {taskiq_msg}")
+        logger.debug("Received message: %s", taskiq_msg)
         task = self.broker.find_task(taskiq_msg.task_name)
         if task is None:
             logger.warning(
@@ -222,11 +222,7 @@ class Receiver:
                         await maybe_awaitable(middleware.post_save(taskiq_msg, result))
 
         except Exception as exc:
-            logger.exception(
-                "Can't set result in result backend. Cause: %s",
-                exc,
-                exc_info=True,
-            )
+            logger.exception("Can't set result in result backend.")
             if raise_err:
                 raise exc
 
@@ -373,11 +369,7 @@ class Receiver:
             )
         except BaseException as exc:
             found_exception = exc
-            logger.error(
-                "Exception found while executing function: %s",
-                exc,
-                exc_info=True,
-            )
+            logger.exception("Exception found while executing function.")
         # Stop the timer.
         execution_time = time() - start_time
         if dep_ctx:
@@ -668,7 +660,8 @@ class Receiver:
                     # asyncio.wait will throw an error if there is nothing to wait for
                     if tasks:
                         logger.info(
-                            f"Waiting for {len(tasks)} running tasks to complete...",
+                            "Waiting for %d running tasks to complete...",
+                            len(tasks),
                         )
                         await asyncio.wait(tasks, timeout=self.wait_tasks_timeout)
                         logger.info("No more tasks to wait for. Shutting down.")

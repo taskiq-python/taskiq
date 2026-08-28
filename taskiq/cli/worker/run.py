@@ -103,7 +103,7 @@ def start_listen(args: WorkerArgs) -> None:
         :param _frame: current execution frame.
         :raises KeyboardInterrupt: if termination hasn't begun.
         """
-        logger.debug(f"Got signal {signum}.")
+        logger.debug("Got signal %s.", signum)
         nonlocal shutdown_event
         nonlocal hardkill_counter
         # Soft kill is a signal to start shutdown.

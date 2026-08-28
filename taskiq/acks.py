@@ -54,13 +54,13 @@ class AckableMessage(BaseModel):
     """
 
     data: bytes
-    ack: Callable[[], None | Awaitable[None]]
+    ack: Callable[[], Awaitable[None] | None]
 
 
 class AckController:
     """Controls acknowledgement state for a received message."""
 
-    def __init__(self, ack: Callable[[], None | Awaitable[None]] | None) -> None:
+    def __init__(self, ack: Callable[[], Awaitable[None] | None] | None) -> None:
         self._ack = ack
         self.is_acked = False
 
