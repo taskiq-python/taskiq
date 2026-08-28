@@ -1,6 +1,37 @@
 import pytest
 
-from taskiq.acks import AcknowledgeType, parse_acknowledge_type
+from taskiq.acks import AckController, AcknowledgeType, parse_acknowledge_type
+
+
+async def test_ack_progress_can_be_reported_repeatedly() -> None:
+    events: list[str] = []
+
+    def ack_callback() -> None:
+        events.append("ack")
+
+    async def ack_progress_callback() -> None:
+        events.append("progress")
+
+    controller = AckController(ack_callback, ack_progress_callback)
+
+    assert controller.is_ackable
+    assert controller.is_ack_progressable
+    await controller.ack_progress()
+    await controller.ack_progress()
+    assert not controller.is_acked
+    await controller.ack()
+    await controller.ack_progress()
+
+    assert controller.is_acked
+    assert events == ["progress", "progress", "ack"]
+
+
+async def test_ack_progress_raises_when_unsupported() -> None:
+    controller = AckController(lambda: None)
+
+    assert not controller.is_ack_progressable
+    with pytest.raises(RuntimeError, match="does not support ack progress"):
+        await controller.ack_progress()
 
 
 def test_parse_acknowledge_type_from_enum() -> None:

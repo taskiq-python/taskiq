@@ -40,8 +40,15 @@ async def listen(self) -> AsyncGenerator[AckableMessage, None]:
          # So you either set here method of a message,
          # or you can make a closure.
          ack=message.ack,
+         # Optionally expose a callback that reports the message
+         # is still being processed without finally acknowledging it.
+         ack_progress=message.ack_progress,
       )
 ```
+
+Tasks can call the optional progress callback through `Context.ack_progress()`.
+The callback may be invoked multiple times and should extend or reset the broker's
+acknowledgement deadline without marking the message as finally acknowledged.
 
 ## Conventions
 

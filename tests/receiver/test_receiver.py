@@ -539,6 +539,7 @@ async def test_manual_task_ack_from_context() -> None:
     async def my_task(context: Context = Depends()) -> int:
         events.append("task")
         assert context.is_ackable
+        assert not context.is_ack_progressable
         assert not context.is_acked
         await context.ack()
         assert context.is_acked
@@ -558,6 +559,55 @@ async def test_manual_task_ack_from_context() -> None:
     )
 
     assert events == ["task", "ack", "post_execute", "save", "post_save"]
+
+
+async def test_task_reports_ack_progress_from_context() -> None:
+    """A task can repeatedly report acknowledgement progress through context."""
+    events: list[str] = []
+    broker = (
+        InMemoryBroker()
+        .with_result_backend(
+            _EventResultBackend(events),
+        )
+        .with_middlewares(_EventMiddleware(events))
+    )
+
+    @broker.task(ack_type="manual")
+    async def my_task(context: Context = Depends()) -> int:
+        events.append("task")
+        assert context.is_ack_progressable
+        await context.ack_progress()
+        await context.ack_progress()
+        await context.ack()
+        await context.ack_progress()
+        return 1
+
+    def ack_callback() -> None:
+        events.append("ack")
+
+    def ack_progress_callback() -> None:
+        events.append("progress")
+
+    receiver = get_receiver(broker)
+    broker_message = broker.formatter.dumps(my_task.kicker()._prepare_message())
+
+    await receiver.callback(
+        AckableMessage(
+            data=broker_message.message,
+            ack=ack_callback,
+            ack_progress=ack_progress_callback,
+        ),
+    )
+
+    assert events == [
+        "task",
+        "progress",
+        "progress",
+        "ack",
+        "post_execute",
+        "save",
+        "post_save",
+    ]
 
 
 async def test_manual_task_ack_is_idempotent() -> None:
