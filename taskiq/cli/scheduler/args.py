@@ -20,6 +20,7 @@ class SchedulerArgs:
     skip_first_run: bool = False
     update_interval: int | None = None
     loop_interval: int | None = None
+    loop_factory: str | None = None
 
     @classmethod
     def from_cli(cls, args: Sequence[str] | None = None) -> "SchedulerArgs":
@@ -109,6 +110,15 @@ class SchedulerArgs:
             help=(
                 "Interval in seconds to check tasks to send. "
                 "If not specified, scheduler will run once a second."
+            ),
+        )
+        parser.add_argument(
+            "--loop-factory",
+            default=None,
+            help=(
+                "Where to search for an event loop factory. "
+                "This string must be specified in "
+                "'module.module:variable' format."
             ),
         )
 
