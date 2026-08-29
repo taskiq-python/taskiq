@@ -772,6 +772,142 @@ async def test_no_result_error() -> None:
     assert not broker._running_tasks
 
 
+async def test_skip_result_label_on_decorator() -> None:
+    """Task skip_result label skips result backend and post_save."""
+    events: list[str] = []
+    broker = (
+        InMemoryBroker()
+        .with_result_backend(
+            _EventResultBackend(events),
+        )
+        .with_middlewares(_EventMiddleware(events))
+    )
+
+    @broker.task(skip_result=True)
+    async def my_task() -> int:
+        events.append("task")
+        return 1
+
+    receiver = get_receiver(broker)
+    broker_message = broker.formatter.dumps(my_task.kicker()._prepare_message())
+
+    await receiver.callback(broker_message.message)
+
+    assert events == ["task", "post_execute"]
+    assert not await broker.result_backend.is_result_ready(
+        broker_message.task_id,
+    )
+
+
+async def test_skip_result_label_via_kicker() -> None:
+    """skip_result can be set per call with kicker labels."""
+    events: list[str] = []
+    broker = (
+        InMemoryBroker()
+        .with_result_backend(
+            _EventResultBackend(events),
+        )
+        .with_middlewares(_EventMiddleware(events))
+    )
+
+    @broker.task
+    async def my_task() -> int:
+        events.append("task")
+        return 1
+
+    receiver = get_receiver(broker)
+    broker_message = broker.formatter.dumps(
+        my_task.kicker().with_labels(skip_result=True)._prepare_message(),
+    )
+
+    await receiver.callback(broker_message.message)
+
+    assert events == ["task", "post_execute"]
+    assert not await broker.result_backend.is_result_ready(
+        broker_message.task_id,
+    )
+
+
+async def test_skip_result_false_still_saves_result() -> None:
+    """Explicit skip_result=False keeps default result storage behavior."""
+    events: list[str] = []
+    broker = (
+        InMemoryBroker()
+        .with_result_backend(
+            _EventResultBackend(events),
+        )
+        .with_middlewares(_EventMiddleware(events))
+    )
+
+    @broker.task(skip_result=False)
+    async def my_task() -> int:
+        events.append("task")
+        return 1
+
+    receiver = get_receiver(broker)
+    broker_message = broker.formatter.dumps(my_task.kicker()._prepare_message())
+
+    await receiver.callback(broker_message.message)
+
+    assert events == ["task", "post_execute", "save", "post_save"]
+    assert await broker.result_backend.is_result_ready(broker_message.task_id)
+
+
+async def test_skip_result_invalid_value_raises() -> None:
+    """Non-bool skip_result values are rejected."""
+    broker = InMemoryBroker()
+
+    @broker.task
+    async def my_task() -> int:
+        return 1
+
+    receiver = get_receiver(broker)
+    broker_message = broker.formatter.dumps(
+        TaskiqMessage(
+            task_id="skip-result-invalid",
+            task_name=my_task.task_name,
+            labels={"skip_result": "true"},
+            args=[],
+            kwargs={},
+        ),
+    )
+
+    with pytest.raises(ValueError, match="Invalid skip_result label"):
+        await receiver.callback(broker_message.message)
+
+
+async def test_skip_result_still_acks_when_saved() -> None:
+    """WHEN_SAVED ack still happens if result storage is skipped."""
+    events: list[str] = []
+    broker = (
+        InMemoryBroker()
+        .with_result_backend(
+            _EventResultBackend(events),
+        )
+        .with_middlewares(_EventMiddleware(events))
+    )
+
+    @broker.task(skip_result=True)
+    async def my_task() -> int:
+        events.append("task")
+        return 1
+
+    def ack_callback() -> None:
+        events.append("ack")
+
+    receiver = get_receiver(broker, ack_type=AcknowledgeType.WHEN_SAVED)
+    broker_message = broker.formatter.dumps(my_task.kicker()._prepare_message())
+
+    await receiver.callback(
+        AckableMessage(
+            data=broker_message.message,
+            ack=ack_callback,
+        ),
+    )
+
+    assert events == ["task", "post_execute", "ack"]
+
+
 async def test_result() -> None:
     broker = InMemoryBroker()
 
