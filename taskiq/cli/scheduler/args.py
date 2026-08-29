@@ -20,6 +20,7 @@ class SchedulerArgs:
     skip_first_run: bool = False
     update_interval: int | None = None
     loop_interval: int | None = None
+    send_timeout: float | None = None
 
     @classmethod
     def from_cli(cls, args: Sequence[str] | None = None) -> "SchedulerArgs":
@@ -109,6 +110,19 @@ class SchedulerArgs:
             help=(
                 "Interval in seconds to check tasks to send. "
                 "If not specified, scheduler will run once a second."
+            ),
+        )
+        parser.add_argument(
+            "--send-timeout",
+            type=float,
+            default=None,
+            help=(
+                "Optional per-send timeout (seconds). If set, each spawned send "
+                "task is wrapped in asyncio.wait_for with this timeout, "
+                "preventing a single hung broker.kick from permanently blocking "
+                "subsequent ticks for the same schedule_id. On timeout the send "
+                "is cancelled, a warning is logged, and the next scheduled tick "
+                "will retry. Default: no timeout (backwards-compatible)."
             ),
         )
 
