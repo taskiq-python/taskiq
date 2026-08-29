@@ -4,7 +4,10 @@ import uuid
 import pytest
 
 from taskiq import InMemoryBroker
+from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.events import TaskiqEvents
+from taskiq.message import TaskiqMessage
+from taskiq.result import TaskiqResult
 from taskiq.state import TaskiqState
 
 
@@ -114,3 +117,46 @@ async def test_wait_all() -> None:
     assert slept
     assert await task.is_ready()
     assert not broker._running_tasks
+
+
+async def test_inplace_middleware_order() -> None:
+    """post_send must fire before task execution with await_inplace=True."""
+    events: list[str] = []
+
+    class OrderMiddleware(TaskiqMiddleware):
+        async def pre_send(self, message: TaskiqMessage) -> TaskiqMessage:
+            events.append("pre_send")
+            return message
+
+        async def post_send(self, message: TaskiqMessage) -> None:
+            events.append("post_send")
+
+        async def pre_execute(self, message: TaskiqMessage) -> TaskiqMessage:
+            events.append("pre_execute")
+            return message
+
+        async def post_execute(
+            self,
+            message: TaskiqMessage,
+            result: "TaskiqResult[object]",
+        ) -> None:
+            events.append("post_execute")
+
+    broker = InMemoryBroker(await_inplace=True).with_middlewares(OrderMiddleware())
+
+    @broker.task
+    async def test_task() -> None:
+        events.append("task")
+
+    task = await test_task.kiq()
+
+    # The task must be fully executed by the time kiq returns.
+    assert await task.is_ready()
+    assert not broker._inplace_tasks
+    assert events == [
+        "pre_send",
+        "post_send",
+        "pre_execute",
+        "task",
+        "post_execute",
+    ]

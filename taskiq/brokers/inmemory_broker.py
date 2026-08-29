@@ -146,6 +146,7 @@ class InMemoryBroker(AsyncBroker):
         )
         self.await_inplace = await_inplace
         self._running_tasks: set[asyncio.Task[Any]] = set()
+        self._inplace_tasks: set[asyncio.Task[Any]] = set()
 
     async def kick(self, message: BrokerMessage) -> None:
         """
@@ -162,13 +163,36 @@ class InMemoryBroker(AsyncBroker):
             raise UnknownTaskError(task_name=message.task_name)
 
         receiver_cb = self.receiver.callback(message=message.message)
+        task = asyncio.create_task(receiver_cb)
+
         if self.await_inplace:
-            await receiver_cb
+            # Schedule the receiver as a task instead of awaiting it here so
+            # that control returns to the sender and the ``post_send``
+            # middleware hook fires *before* the task starts executing. The
+            # task is then awaited in `_finish_kick`, right after `post_send`,
+            # keeping the in-place execution while fixing the hook ordering.
+            self._inplace_tasks.add(task)
+            task.add_done_callback(self._inplace_tasks.discard)
             return
 
-        task = asyncio.create_task(receiver_cb)
         self._running_tasks.add(task)
         task.add_done_callback(self._running_tasks.discard)
+
+    async def _finish_kick(self) -> None:
+        """
+        Await in-place task execution scheduled by `kick`.
+
+        This runs after the `post_send` middleware hook, so with
+        ``await_inplace=True`` the hook ordering becomes
+        ``pre_send -> post_send -> pre_execute -> task -> post_execute``
+        while tasks are still fully executed before `kiq` returns.
+        """
+        if not self._inplace_tasks:
+            return
+        to_await = list(self._inplace_tasks)
+        self._inplace_tasks.clear()
+        for task in to_await:
+            await task
 
     def listen(self) -> AsyncGenerator[bytes, None]:
         """
