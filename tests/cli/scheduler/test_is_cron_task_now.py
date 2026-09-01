@@ -75,3 +75,21 @@ def test_is_cron_task_now(
 def test_is_cron_task_now_invalid_cron() -> None:
     with pytest.raises(CronValueError):
         is_cron_task_now("invalid cron", datetime.now())
+
+
+def test_is_cron_task_now_invalid_offset_string() -> None:
+    with pytest.raises(CronValueError):
+        is_cron_task_now(
+            cron_value="* * * * *",
+            now=datetime.now(timezone.utc),
+            offset="UTC+3",
+        )
+
+
+def test_is_cron_task_now_unknown_timezone_name() -> None:
+    with pytest.raises(CronValueError):
+        is_cron_task_now(
+            cron_value="* * * * *",
+            now=datetime.now(timezone.utc),
+            offset="Europa/Madrid",
+        )
