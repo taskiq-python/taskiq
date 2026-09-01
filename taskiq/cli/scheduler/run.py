@@ -99,7 +99,10 @@ def is_cron_task_now(
     # If timezone was specified as string we convert it timezone
     # offset and then apply.
     elif offset and isinstance(offset, str):
-        now = now.astimezone(ZoneInfo(offset))
+        try:
+            now = now.astimezone(ZoneInfo(offset))
+        except Exception as e:
+            raise CronValueError(e) from e
 
     try:
         return pycron.is_now(cron_value, now)
