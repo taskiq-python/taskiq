@@ -312,40 +312,6 @@ class OpenTelemetryMiddleware(TaskiqMiddleware):
         )
         return message
 
-    def post_save(  # pylint: disable=R6301
-        self,
-        message: TaskiqMessage,
-        result: TaskiqResult[T],
-    ) -> None:
-        """
-        This function closes span from `pre_execute`.
-
-        :param message: received message.
-        :param result: result of the execution.
-        """
-        logger.debug("post_execute task_id=%s", message.task_id)
-
-        # retrieve and finish the Span
-        ctx = retrieve_context(message)
-
-        if ctx is None:
-            logger.warning("no existing span found for task_id=%s", message.task_id)
-            return
-
-        span, activation, token = ctx
-
-        if span.is_recording():
-            span.set_attribute(_TASK_TAG_KEY, _TASK_EXECUTE)
-            set_attributes_from_context(span, message.labels)
-            span.set_attribute(_TASK_NAME_KEY, message.task_name)
-
-        activation.__exit__(None, None, None)
-        detach_context(message)
-        # if the process sending the task is not instrumented
-        # there's no incoming context and no token to detach
-        if token is not None:
-            context_api.detach(token)  # type: ignore[arg-type]
-
     def on_error(
         self,
         message: TaskiqMessage,
@@ -399,6 +365,8 @@ class OpenTelemetryMiddleware(TaskiqMiddleware):
         :param message: received message.
         :param result: result of the execution.
         """
+        logger.debug("post_execute task_id=%s", message.task_id)
+
         if result.is_err:
             retry_on_error = message.labels.get("retry_on_error")
             if isinstance(retry_on_error, str):
@@ -441,3 +409,24 @@ class OpenTelemetryMiddleware(TaskiqMiddleware):
             -1,
             attributes={"task_name": message.task_name},
         )
+
+        # retrieve and finish the Span
+        ctx = retrieve_context(message)
+
+        if ctx is None:
+            logger.warning("no existing span found for task_id=%s", message.task_id)
+            return
+
+        span, activation, token = ctx
+
+        if span.is_recording():
+            span.set_attribute(_TASK_TAG_KEY, _TASK_EXECUTE)
+            set_attributes_from_context(span, message.labels)
+            span.set_attribute(_TASK_NAME_KEY, message.task_name)
+
+        activation.__exit__(None, None, None)
+        detach_context(message)
+        # if the process sending the task is not instrumented
+        # there's no incoming context and no token to detach
+        if token is not None:
+            context_api.detach(token)  # type: ignore[arg-type]
