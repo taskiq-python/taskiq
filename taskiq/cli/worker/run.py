@@ -110,7 +110,7 @@ def start_listen(args: WorkerArgs) -> None:
         shutdown_event.set()
         # Hard kill is a signal that we should stop
         # everything immediately.
-        if hardkill_counter > args.hardkill_count:
+        if hardkill_counter >= args.hardkill_count:
             logger.warning("Hard kill. Exiting.")
             raise KeyboardInterrupt
         hardkill_counter += 1
