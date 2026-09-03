@@ -334,6 +334,56 @@ async def test_callback_success_ackable() -> None:
     assert acked
 
 
+async def test_callback_acks_unknown_task() -> None:
+    """Test that a message for an unknown task is acked, not left pending."""
+    broker = InMemoryBroker()
+    acked = False
+
+    def ack_callback() -> None:
+        nonlocal acked
+        acked = True
+
+    receiver = get_receiver(broker)
+
+    broker_message = broker.formatter.dumps(
+        TaskiqMessage(
+            task_id="task_id",
+            task_name="unknown_task_name",
+            labels={},
+            args=[],
+            kwargs={},
+        ),
+    )
+
+    await receiver.callback(
+        AckableMessage(
+            data=broker_message.message,
+            ack=ack_callback,
+        ),
+    )
+    assert acked
+
+
+async def test_callback_acks_unparsable_message() -> None:
+    """Test that an unparsable message is acked, not left pending."""
+    broker = InMemoryBroker()
+    acked = False
+
+    def ack_callback() -> None:
+        nonlocal acked
+        acked = True
+
+    receiver = get_receiver(broker)
+
+    await receiver.callback(
+        AckableMessage(
+            data=b"not a valid taskiq message",
+            ack=ack_callback,
+        ),
+    )
+    assert acked
+
+
 async def test_callback_success_ackable_async() -> None:
     """Test that acks work with async functions."""
     broker = InMemoryBroker()
