@@ -352,6 +352,29 @@ class SchedulerLoop:
             await asyncio.sleep(delay.total_seconds())
 
 
+async def _startup_scheduler(scheduler: TaskiqScheduler) -> None:
+    """Start sources and scheduler, rolling back sources if startup fails."""
+    started_sources: list[ScheduleSource] = []
+    try:
+        for source in scheduler.sources:
+            await source.startup()
+            started_sources.append(source)
+
+        logger.info("Starting scheduler.")
+        await scheduler.startup()
+    except (Exception, asyncio.CancelledError):
+        # Only completed startups have a matching shutdown contract.
+        for source in reversed(started_sources):
+            try:
+                await source.shutdown()
+            except (Exception, asyncio.CancelledError):
+                logger.exception(
+                    "Cannot shut down source after startup failure: %s",
+                    source,
+                )
+        raise
+
+
 async def run_scheduler(args: SchedulerArgs) -> None:
     """
     Run scheduler.
@@ -386,9 +409,6 @@ async def run_scheduler(args: SchedulerArgs) -> None:
 
     scheduler.broker.is_scheduler_process = True
     import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
-    for source in scheduler.sources:
-        await source.startup()
-
     update_interval = timedelta(seconds=60)
     if args.update_interval is not None:
         update_interval = timedelta(seconds=args.update_interval)
@@ -397,8 +417,7 @@ async def run_scheduler(args: SchedulerArgs) -> None:
     if args.loop_interval is not None:
         loop_interval = timedelta(seconds=args.loop_interval)
 
-    logger.info("Starting scheduler.")
-    await scheduler.startup()
+    await _startup_scheduler(scheduler)
     logger.info("Startup completed.")
 
     scheduler_loop = SchedulerLoop(scheduler)
