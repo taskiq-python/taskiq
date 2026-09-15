@@ -40,6 +40,14 @@ Project link: [taskiq-nats](https://github.com/taskiq-python/taskiq-nats).
 pip install taskiq-nats
 ```
 
+### S3 result backend
+
+Project link: [taskiq-sqs](https://github.com/taskiq-python/taskiq-sqs). Provides `S3ResultBackend`.
+
+```bash
+pip install taskiq-sqs
+```
+
 ## Third-party result backends
 
 These result backends are not part of the core Taskiq library. They are maintained by other open‑source contributors. You can install them as a separate packages.

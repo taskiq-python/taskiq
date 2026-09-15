@@ -112,6 +112,22 @@ Project link: [taskiq-nats](https://github.com/taskiq-python/taskiq-nats).
 pip install taskiq-nats
 ```
 
+### SQS broker
+
+Project link: [taskiq-sqs](https://github.com/taskiq-python/taskiq-sqs).
+
+```bash
+pip install taskiq-sqs
+```
+
+### Kafka broker
+
+Project link: [taskiq-aio-kafka](https://github.com/taskiq-python/taskiq-aio-kafka).
+
+```bash
+pip install taskiq-aio-kafka
+```
+
 ## Third-party brokers
 
 These brokers are not part of the core Taskiq library. They are maintained by other open‑source contributors. You can install them as a separate packages.
@@ -140,4 +156,12 @@ Project link: [taskiq-ydb](https://github.com/danfimov/taskiq-ydb).
 
 ```bash
 pip install taskiq-ydb
+```
+
+### Azure Service Bus broker
+
+Project link: [taskiq-service-bus](https://github.com/hamiltonkibbe/taskiq-service-bus).
+
+```bash
+pip install taskiq-service-bus
 ```
