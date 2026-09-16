@@ -1,21 +1,17 @@
-# See https://pre-commit.com for more information
-# See https://pre-commit.com/hooks.html for more hooks
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
       - id: check-ast
+
+  - repo: builtin
+    hooks:
       - id: trailing-whitespace
       - id: check-toml
       - id: end-of-file-fixer
 
-  - repo: https://github.com/asottile/add-trailing-comma
-    rev: v4.0.0
-    hooks:
-      - id: add-trailing-comma
-
   - repo: https://github.com/crate-ci/typos
-    rev: v1.38.1
+    rev: v1.50.2
     hooks:
       - id: typos
 
@@ -29,6 +25,12 @@ repos:
             '--exclude-lines', 'amqp://guest:guest@localhost:5672',
         ]
 
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.7
+    hooks:
+      - id: ruff-check
+        args: [ "--fix", "taskiq", "tests", "docs/examples" ]
+
   - repo: local
     hooks:
       - id: black
@@ -36,19 +38,6 @@ repos:
         entry: uv run black
         language: system
         types: [python]
-
-      - id: ruff
-        name: Run ruff lints
-        entry: uv run ruff
-        language: system
-        pass_filenames: false
-        types: [python]
-        args:
-          - "check"
-          - "--fix"
-          - "taskiq"
-          - "tests"
-          - "docs/examples"
 
       - id: mypy
         name: Validate types with MyPy
