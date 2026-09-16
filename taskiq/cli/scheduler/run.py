@@ -4,7 +4,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 from logging import basicConfig, getLogger
 from typing import Any, TypeAlias
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import pycron
 
@@ -101,7 +101,10 @@ def is_cron_task_now(
     elif offset and isinstance(offset, str):
         try:
             now = now.astimezone(ZoneInfo(offset))
-        except Exception as e:
+        # ZoneInfoNotFoundError for unknown keys, ModuleNotFoundError
+        # for systems without timezone data available (e.g. missing
+        # tzdata on Windows).
+        except (ZoneInfoNotFoundError, ModuleNotFoundError) as e:
             raise CronValueError(e) from e
 
     try:
