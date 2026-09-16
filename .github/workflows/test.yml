@@ -17,9 +17,6 @@ permissions:
 
 jobs:
   lint:
-    strategy:
-      matrix:
-        cmd: ["black", "ruff", "mypy"]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -36,7 +33,7 @@ jobs:
       - name: Install deps
         run: uv sync --all-extras
       - name: Run lint check
-        run: uv run pre-commit run -a ${{ matrix.cmd }}
+        run: uv run prek run -a
   pytest:
     strategy:
       matrix:
