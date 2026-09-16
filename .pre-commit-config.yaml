@@ -29,7 +29,7 @@ repos:
     rev: v0.16.7
     hooks:
       - id: ruff-check
-        args: [ "--fix", "taskiq", "tests", "docs/examples" ]
+        args: [ "taskiq", "tests", "docs/examples" ]
 
   - repo: local
     hooks:
