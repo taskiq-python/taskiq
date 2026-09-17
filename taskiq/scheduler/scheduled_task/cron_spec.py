@@ -1,6 +1,6 @@
-from datetime import timedelta
-
 from pydantic import BaseModel
+
+from taskiq.scheduler.scheduled_task.validators import CronOffset
 
 
 class CronSpec(BaseModel):
@@ -12,7 +12,7 @@ class CronSpec(BaseModel):
     months: str | int | None = "*"
     weekdays: str | int | None = "*"
 
-    offset: str | timedelta | None = None
+    offset: CronOffset | None = None
 
     def to_cron(self) -> str:  # pragma: no cover
         """Converts cron spec to cron string."""
