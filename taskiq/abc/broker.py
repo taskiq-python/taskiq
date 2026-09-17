@@ -214,7 +214,7 @@ class AsyncBroker(ABC):
         for handler in self.event_handlers[event]:
             await maybe_awaitable(handler(self.state))
 
-        for middleware in self.middlewares:
+        for middleware in reversed(self.middlewares):
             if middleware.__class__.shutdown != TaskiqMiddleware.shutdown:
                 await maybe_awaitable(middleware.shutdown())
 
