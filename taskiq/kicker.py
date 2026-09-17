@@ -16,7 +16,6 @@ from typing import (
 from pydantic import BaseModel
 
 from taskiq.abc.middleware import TaskiqMiddleware
-from taskiq.compat import model_dump
 from taskiq.exceptions import SendTaskError
 from taskiq.labels import prepare_label
 from taskiq.message import TaskiqMessage
@@ -294,7 +293,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         :return: Formatted argument.
         """
         if isinstance(arg, BaseModel):
-            arg = model_dump(arg)
+            arg = arg.model_dump(mode="json")
         if is_dataclass(arg):
             if isinstance(arg, type):
                 raise ValueError(

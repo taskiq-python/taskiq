@@ -2,11 +2,9 @@ import logging
 from collections.abc import Generator
 from contextlib import AbstractContextManager
 from datetime import datetime, timezone
-from importlib.metadata import version
 from typing import Any, TypeVar
 
 import psutil
-from packaging.version import Version, parse
 
 try:
     import opentelemetry  # noqa: F401
@@ -33,16 +31,6 @@ T = TypeVar("T")
 
 # Taskiq Context key
 CTX_KEY = "__otel_task_span"
-
-# unlike pydantic v2, v1 includes CTX_KEY by default
-# excluding it here
-PYDANTIC_VER = parse(version("pydantic"))
-IS_PYDANTIC1 = Version("2.0") > PYDANTIC_VER
-if IS_PYDANTIC1:
-    if TaskiqMessage.__exclude_fields__:  # type: ignore[attr-defined]
-        TaskiqMessage.__exclude_fields__.update(CTX_KEY)  # type: ignore
-    else:
-        TaskiqMessage.__exclude_fields__ = {CTX_KEY}  # type: ignore
 
 # Taskiq Context attributes
 TASKIQ_CONTEXT_ATTRIBUTES = [
@@ -115,8 +103,8 @@ def attach_context(
 
     if ctx_dict is None:
         ctx_dict = {}
-        # use object.__setattr__ directly
-        # to skip pydantic v1 setattr
+        # use object.__setattr__ directly since CTX_KEY is not a declared model field,
+        # and pydantic forbids setting undeclared attributes
         object.__setattr__(message, CTX_KEY, ctx_dict)
 
     ctx_dict[(message.task_id, is_publish)] = (span, activation, token)

@@ -4,7 +4,6 @@ from typing import Any, Literal
 import pytest
 
 from taskiq.abc.schedule_source import ScheduleSource
-from taskiq.compat import model_dump
 from taskiq.kicker import AsyncKicker
 from taskiq.message import BrokerMessage
 from taskiq.scheduler.scheduled_task import ScheduledTask
@@ -93,7 +92,7 @@ async def test_scheduler_reuses_stored_interval_task_id() -> None:
         kicker.with_task_id("custom-task-id"),
         source,
     )
-    restored = ScheduledTask(**model_dump(scheduled))
+    restored = ScheduledTask(**scheduled.model_dump(mode="json"))
 
     scheduler = TaskiqScheduler(broker, [source])
     await scheduler.on_ready(source, restored)
@@ -110,7 +109,7 @@ async def test_scheduler_generates_task_id_for_each_interval_dispatch() -> None:
     source = RecordingScheduleSource()
     kicker: AsyncKicker[Any, Any] = AsyncKicker("demo.task", broker, {})
     scheduled = await create_schedule("interval", kicker, source)
-    restored = ScheduledTask(**model_dump(scheduled))
+    restored = ScheduledTask(**scheduled.model_dump(mode="json"))
     generated_task_ids = iter(("generated-task-id-1", "generated-task-id-2"))
     broker.with_id_generator(lambda: next(generated_task_ids))
 
