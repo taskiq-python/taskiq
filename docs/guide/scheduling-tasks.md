@@ -5,7 +5,7 @@ order: 8
 # Scheduling tasks
 
 Sometimes you may want to execute some tasks according to some schedule.
-For example, you maybe want to call a function every day at 2 pm.
+For example, you may want to call a function every day at 2 pm.
 
 That's not a problem if you use taskiq. We have primitives that can help you to solve your problems.
 
@@ -14,7 +14,7 @@ What should we do?
 
 @[code python](../examples/schedule/without_schedule.py)
 
-Of course we can implement loop like this:
+Of course we can implement a loop like this:
 
 ```python
     while True:
@@ -22,7 +22,7 @@ Of course we can implement loop like this:
         await asyncio.sleep(timedelta(minutes=5).total_seconds)
 ```
 
-But if you have many schedules it may be a little painful to implement. So let me introduce you the `TaskiqScheduler`.
+But if you have many schedules it may be a little painful to implement. So let me introduce you to the `TaskiqScheduler`.
 Let's add scheduler to our module.
 
 @[code python](../examples/schedule/intro.py)
@@ -62,7 +62,7 @@ To specify schedules (cron or time-based) in the labels of a task definition, yo
 ## Multiple sources
 
 Sometimes you may want to use multiple sources to assemble a schedule for tasks. The `TaskiqScheduler` can do so.
-But it's obvious how to merge schedules from different sources.
+But it's not obvious how to merge schedules from different sources.
 
 That's why you can pass a custom merge function to resolve all possible conflicts or if you want to have more
 complex logic aside from sources. For example, filter out some task schedules.
@@ -72,7 +72,7 @@ Currently we have only two default functions to merge tasks. You can find them i
 - `preserve_all` - simply adds new schedules to the old ones.
 - `only_unique` - adds schedule only if it was not added by previous sources.
 
-Every time we update schedule it gets task from the source and executes this function to merge them together.
+Every time we update the schedule it gets tasks from the source and executes this function to merge them together.
 
 
 ## Working with timezones
@@ -91,9 +91,9 @@ an offset of the cron task. An offset can be a string like `Europe/Berlin` or an
 
 By default, when you start the scheduler it will get all tasks from the schedule source and check whether they should have been executed in this minute. If tasks should have been executed, they will be executed.
 
-This behaviour might be not convenient for some developers. For example, if you have a task that should be executed on every minute, it will be executed once you start the scheduler, even if it was executed a few seconds ago.
+This behavior might be not convenient for some developers. For example, if you have a task that should be executed on every minute, it will be executed once you start the scheduler, even if it was executed a few seconds ago.
 
-To avoid this behaviour, you can pass the `--skip-first-run` flag to the `taskiq scheduler` command. In this case, the scheduler will wait until the start of the next minute and then start executing tasks.
+To avoid this behavior, you can pass the `--skip-first-run` flag to the `taskiq scheduler` command. In this case, the scheduler will wait until the start of the next minute and then start executing tasks.
 
 ```bash:no-line-numbers
 taskiq scheduler module:scheduler --skip-first-run
@@ -102,7 +102,7 @@ taskiq scheduler module:scheduler --skip-first-run
 
 ## Dynamic scheduling
 
-Sometimes you may want to add new schedules to the scheduler on the fly. For example, you may want to run a specific function in several minutes from now. You can easily do it with ScheduleSources that support dynamic scheduling. Currently we suggest to use the `ListRedisScheduleSource` for that purpose. List of schedulers with dynamic task addition will be extended in the future.
+Sometimes you may want to add new schedules to the scheduler on the fly. For example, you may want to run a specific function in several minutes from now. You can easily do it with ScheduleSources that support dynamic scheduling. Currently we suggest using the `ListRedisScheduleSource` for that purpose. List of schedulers with dynamic task addition will be extended in the future.
 For list of available schedule sources see [Available schedule sources](../available-components/schedule-sources.md).
 
 Here's an example of using redis schedule source:
@@ -169,7 +169,7 @@ The `with_broker` method won't do anything in this case, since we have a broker 
 
 :::
 
-Each of these methods return you an instance of the `CreatedSchedule` class. This object has unique schedule ID and some helper methods. For example, you can use the `unschedule` method to remove the schedule from the source.
+Each of these methods returns you an instance of the `CreatedSchedule` class. This object has unique schedule ID and some helper methods. For example, you can use the `unschedule` method to remove the schedule from the source.
 
 ```python
     schedule = await my_task.schedule_by_time(
@@ -188,7 +188,7 @@ Or it can be done manually, by calling `delete_schedule` on schedule source prov
     await redis_source.delete_schedule(schedule.schedule_id)
 ```
 
-Also, you can get schedule_id from the tasks's labels.
+Also, you can get schedule_id from the task's labels.
 
 ```python
 @broker.task

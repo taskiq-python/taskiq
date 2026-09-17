@@ -4,9 +4,9 @@ order: 3
 
 # Architecture overview
 
-Taskiq has very simple structure.
+Taskiq has a very simple structure.
 On the client side all messages are sent by `kickers` using `brokers`.
-On the worker side all messages received by the `broker` and results are stored in result backends.
+On the worker side all messages are received by the `broker` and results are stored in result backends.
 
 On the sequence diagram it looks like this:
 
@@ -35,7 +35,7 @@ Let's discuss every component.
 
 ## Broker
 
-Brokers are the most critical element of the taskiq. Every broker **must** implement the `AsyncBroker` abstract class from [taskiq.abc.broker](https://github.com/taskiq-python/taskiq/blob/master/taskiq/abc/broker.py) to make things work.
+Brokers are the most critical element of taskiq. Every broker **must** implement the `AsyncBroker` abstract class from [taskiq.abc.broker](https://github.com/taskiq-python/taskiq/blob/master/taskiq/abc/broker.py) to make things work.
 
 `AsyncBroker` class has two main methods to implement:
 
@@ -49,7 +49,7 @@ The `listen` is a method with an infinite loop that reads messages from the exte
 
 ## Kicker
 
-Kicker is an object that used to form a message for broker. This class isn't extendable.
+Kicker is an object that is used to form a message for a broker. This class isn't extendable.
 To form a message kicker uses labels, task name and arguments.
 
 When you call the `task.kiq` on a task, it generates a Kicker instance and is a shortening for the `task.kicker().kiq(...)`. You can use kicker to change broker, add labels, or even change task_id.
@@ -122,7 +122,7 @@ Also you can assign custom task names using decorator.
 This is useful to be sure that task names are unique and resolved correctly.
 Also it may be useful to balance message routing in some brokers.
 
-for example:
+For example:
 
 ```python
 @broker.task(task_name="my_tasks.add_one", label1=1)
@@ -147,7 +147,7 @@ Taskiq has a command line interface to run workers.
 It's simple to get it to work.
 
 You have to provide a path to your broker. As an example, if you want to start listening to new tasks
-with a broker that is stored in a variable `my broker` in the module `my_project.broker` run this in your terminal:
+with a broker that is stored in a variable `mybroker` in the module `my_project.broker` run this in your terminal:
 
 ```
 taskiq worker my_project.broker:mybroker
@@ -179,7 +179,7 @@ Or you can let taskiq find all python modules named tasks in current directory r
 taskiq worker test_project.broker:broker -fsd
 ```
 
-If you have uvloop installed, taskiq will automatically install new policies to event loop.
+If you have uvloop installed, taskiq will automatically install new policies to the event loop.
 You can get more info about the CLI in the [CLI](./cli.md) section.
 
 ::: info Cool info
@@ -190,8 +190,8 @@ By default we start two processes, if you want to change this value, please take
 
 ## Middlewares
 
-Middlewares are used to modify message, or take
-some actions before or after task is complete.
+Middlewares are used to modify a message, or take
+some actions before or after the task is complete.
 
 You can write your own middlewares by subclassing
 the `taskiq.abc.middleware.TaskiqMiddleware`.
@@ -223,7 +223,7 @@ Here are methods you can implement in the order they are executed:
 - `pre_send` - executed on the client side before the message is sent. Here you can modify the message.
 - `post_send` - executed right after the message was sent.
 - `pre_execute` - executed on the worker side after the message was received by a worker and before its execution.
-- `on_error` - executed after the task was executed if the exception was found.
+- `on_error` - executed after the task was executed if an exception was found.
 - `post_execute` - executed after the message was executed.
 - `post_save` - executed after the result was saved in the result backend.
 
@@ -231,7 +231,7 @@ You can use sync or async hooks without changing anything, but adding async to t
 
 ::: warning important note
 
-If exception happens in middlewares it won't be caught. Please ensure that you have try\except for all edge cases of your middleware.
+If an exception happens in middlewares it won't be caught. Please ensure that you have try/except for all edge cases of your middleware.
 
 :::
 
@@ -242,9 +242,9 @@ to remember number of failed attempts.
 ## Context
 
 Context is a useful class with some additional functions.
-You can use context to get broker that runs this task, from inside of the task.
+You can use context to get the broker that runs this task, from inside the task.
 
-Or it has ability to control the flow of execution. Here's example of how to get
+Or it has the ability to control the flow of execution. Here's an example of how to get
 the context.
 
 ::: tabs
@@ -307,4 +307,4 @@ Calling `requeue` or `reject` stops task execution and either drops the message,
 or puts it back to the queue.
 
 Also, with context you'll be able to get current message that was received by the broker
-or even instance of a broker who received a message. This may be useful for lib developers.
+or even an instance of a broker that received a message. This may be useful for lib developers.

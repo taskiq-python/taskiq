@@ -24,7 +24,7 @@ For example:
 
 :::
 
-Also, middlewares always have reference to the current broker in `self.broker` field.
+Also, middlewares always have a reference to the current broker in `self.broker` field.
 If you want to kick a message during the execution of some middleware hooks, you
 may use `self.broker` to do so.
 

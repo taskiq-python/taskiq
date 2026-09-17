@@ -56,7 +56,7 @@ Parameters:
 - `cron` - crontab string when to run the task.
 - `cron_offset` - timezone offset for cron values. Explained [here](../guide/scheduling-tasks.md#working-with-timezones)
 - `interval` - Interval to run periodic tasks. Must be at least 1 second and cannot have fractional seconds.
-- `time` - specific time when send the task.
+- `time` - specific time when to send the task.
 - `args` - args to use, when invoking the task.
 - `kwargs` - key-word arguments to use when invoking the task.
 - `labels` - additional labels to use when invoking the task.
@@ -105,7 +105,7 @@ This schedule source doesn't use `schedule` label on tasks. To add new schedules
 
 ## Third-party schedule sources
 
-These schedule sources are not part of the core Taskiq library. They are maintained by other open‑source contributors. You can install them as a separate packages.
+These schedule sources are not part of the core Taskiq library. They are maintained by other open‑source contributors. You can install them as separate packages.
 
 ### PostgreSQL schedule source
 

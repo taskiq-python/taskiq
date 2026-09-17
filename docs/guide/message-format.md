@@ -4,7 +4,7 @@ order: 11
 
 # Taskiq message format
 
-Taskiq doesn't force you to use any specific message format. We define default message format,
+Taskiq doesn't force you to use any specific message format. We define a default message format,
 but you can use any format you want.
 
 The default message format is:

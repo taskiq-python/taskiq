@@ -12,8 +12,8 @@ Taskiq is a library that helps you send and process python functions in a distri
 For example, you have many heavy to calculate functions you want to execute on another server.
 You can implement interservice communication by yourself, or you can use Taskiq to make the job done easily.
 
-The core library doesn't have much functionality. It provides two built-in brokers, CLI, basic functionality for creating distributed tasks, and abstractions to extend the taskiq. The main idea of taskiq is to make it modular and easy to extend. We have libraries for many
-possible use cases, but if you lack something, you can adopt taskiq to fit your needs.
+The core library doesn't have much functionality. It provides two built-in brokers, CLI, basic functionality for creating distributed tasks, and abstractions to extend taskiq. The main idea of taskiq is to make it modular and easy to extend. We have libraries for many
+possible use cases, but if you lack something, you can adapt taskiq to fit your needs.
 
 ## Why not use existing libraries?
 
@@ -26,9 +26,9 @@ You might have seen projects built on top of asyncio that solve a similar proble
 |         Actively maintained |   ✅    |   ❌   |    ❌     |   ✅   |
 |    Multiple broker backends |   ✅    |   ❌   |    ✅     |   ❌   |
 |    Multiple result backends |   ✅    |   ❌   |    ❌     |   ❌   |
-|  Have a rich documentation  |   ✅    |   ❌   |    ❌     |   ✅   |
+|      Rich documentation     |   ✅    |   ❌   |    ❌     |   ✅   |
 |   Startup & Shutdown events |   ✅    |   ✅   |    ❌     |   ✅   |
-| Have ability to abort tasks |   ❌    |   ✅   |    ❌     |   ✅   |
+|      Ability to abort tasks |   ❌    |   ✅   |    ❌     |   ✅   |
 |          Custom serializers |   ✅    |   ✅   |    ❌     |   ✅   |
 |        Dependency injection |   ✅    |   ❌   |    ❌     |   ❌   |
 |              Task pipelines |   ✅    |   ✅   |    ❌     |   ✅   |

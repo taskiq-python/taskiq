@@ -22,7 +22,7 @@ This broker will always return `None` for any return_value. Please be careful.
 
 ## Official result backends
 
-This result backends is not part of the core Taskiq library. But they are maintained by Taskiq developers. You can install them as a separate package.
+These result backends are not part of the core Taskiq library. But they are maintained by Taskiq developers. You can install them as a separate package.
 
 ### Redis result backend
 
@@ -50,7 +50,7 @@ pip install taskiq-sqs
 
 ## Third-party result backends
 
-These result backends are not part of the core Taskiq library. They are maintained by other open‑source contributors. You can install them as a separate packages.
+These result backends are not part of the core Taskiq library. They are maintained by other open‑source contributors. You can install them as separate packages.
 
 ### PostgreSQL result backend
 
