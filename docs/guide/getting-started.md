@@ -219,6 +219,31 @@ Returned value: 2
 Continue reading to get more information about taskiq internals.
 
 
+## Skipping results
+
+If a task is fire-and-forget and you do not need `wait_result()`,
+set the `skip_result` label so the worker will not store anything in the result backend.
+
+::: tabs
+
+@tab decorator
+
+```python
+@broker.task(skip_result=True)
+async def push_event(payload: dict) -> None:
+    ...
+```
+
+@tab when calling
+
+```python
+await push_event.kicker().with_labels(skip_result=True).kiq(payload={...})
+```
+
+:::
+
+You can also raise `NoResultError` inside a task to skip storage dynamically.
+
 ## Timeouts
 
 If you want to restrict amount of time you want to run task,

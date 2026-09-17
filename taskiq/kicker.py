@@ -55,10 +55,13 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
 
     def with_labels(
         self,
-        **labels: str | float,
+        **labels: str | float | bool | bytes,
     ) -> "AsyncKicker[_FuncParams, _ReturnType]":
         """
         Update function's labels before sending.
+
+        Supported value types match label serialization:
+        ``str``, ``float`` (also accepts ``int``), ``bool`` and ``bytes``.
 
         :param labels: new labels.
         :return: kicker with new labels.

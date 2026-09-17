@@ -118,6 +118,15 @@ async def main():
     ).kiq()
 ```
 
+Built-in labels include things like `timeout`, `ack_type`, and `skip_result`.
+For example, fire-and-forget tasks can avoid writing to the result backend:
+
+```python
+@broker.task(skip_result=True)
+async def send_email(user_id: int) -> None:
+    ...
+```
+
 Also you can assign custom task names using decorator.
 This is useful to be sure that task names are unique and resolved correctly.
 Also it may be useful to balance message routing in some brokers.
