@@ -78,6 +78,7 @@ class AsyncTaskiqTask(Generic[_ReturnType]):
         check_interval: float = 0.2,
         timeout: float = -1.0,
         with_logs: bool = False,
+        max_poll_failures: int = 3,
     ) -> "TaskiqResult[_ReturnType]":
         """
         Waits until result is ready.
@@ -89,15 +90,43 @@ class AsyncTaskiqTask(Generic[_ReturnType]):
         task didn't become ready in provided
         period of time.
 
+        Failing readiness checks are tolerated while they look
+        transient. The counter is reset by every successful check, so
+        the wait is only aborted after max_poll_failures checks have
+        failed in a row.
+
         :param check_interval: How often checks are performed.
         :param timeout: timeout for the result.
         :param with_logs: whether you want to fetch logs from worker.
+        :param max_poll_failures: how many readiness checks may fail
+            in a row before giving up. Pass 0 to give up on the first
+            failed check.
         :raises TaskiqResultTimeoutError: if task didn't
             become ready in provided period of time.
+        :raises ResultIsReadyError: if readiness checks kept failing.
         :return: task's return value.
         """
         start_time = time()
-        while not await self.is_ready():
+        failures = 0
+        while True:
+            try:
+                ready = await self.is_ready()
+            except ResultIsReadyError:
+                failures += 1
+                if failures > max_poll_failures:
+                    raise
+                logger.warning(
+                    "Cannot check readiness of task %s, "
+                    "retrying (%d of %d attempts used).",
+                    self.task_id,
+                    failures,
+                    max_poll_failures,
+                    exc_info=True,
+                )
+            else:
+                if ready:
+                    break
+                failures = 0
             if 0 < timeout < time() - start_time:
                 raise TaskiqResultTimeoutError(timeout=timeout)
             await asyncio.sleep(check_interval)
