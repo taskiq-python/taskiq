@@ -31,7 +31,9 @@ class _HangingScheduler(TaskiqScheduler):
         self.on_ready_calls = 0
 
     async def on_ready(  # type: ignore[override]
-        self, source: ScheduleSource, task: ScheduledTask
+        self,
+        source: ScheduleSource,
+        task: ScheduledTask,
     ) -> None:
         self.on_ready_calls += 1
         await asyncio.sleep(self.hang_seconds)
@@ -98,7 +100,9 @@ async def test_send_with_timeout_does_not_log_on_success(
             self.calls = 0
 
         async def on_ready(  # type: ignore[override]
-            self, source: ScheduleSource, task: ScheduledTask
+            self,
+            source: ScheduleSource,
+            task: ScheduledTask,
         ) -> None:
             self.calls += 1
 
@@ -131,7 +135,9 @@ async def test_send_with_timeout_propagates_non_timeout_exceptions() -> None:
             super().__init__(broker=InMemoryBroker(), sources=[_StubSource()])
 
         async def on_ready(  # type: ignore[override]
-            self, source: ScheduleSource, task: ScheduledTask
+            self,
+            source: ScheduleSource,
+            task: ScheduledTask,
         ) -> None:
             raise RuntimeError("boom")
 
@@ -153,7 +159,9 @@ async def test_send_with_timeout_cancels_inner_send() -> None:
             super().__init__(broker=InMemoryBroker(), sources=[_StubSource()])
 
         async def on_ready(  # type: ignore[override]
-            self, source: ScheduleSource, task: ScheduledTask
+            self,
+            source: ScheduleSource,
+            task: ScheduledTask,
         ) -> None:
             try:
                 await asyncio.sleep(30.0)
@@ -184,7 +192,9 @@ async def test_plain_send_still_works_unchanged() -> None:
             self.calls: list[Any] = []
 
         async def on_ready(  # type: ignore[override]
-            self, source: ScheduleSource, task: ScheduledTask
+            self,
+            source: ScheduleSource,
+            task: ScheduledTask,
         ) -> None:
             self.calls.append((source, task))
 

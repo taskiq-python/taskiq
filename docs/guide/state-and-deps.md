@@ -319,6 +319,48 @@ taskiq worker my_file:broker --no-propagate-errors
 
 In this case, no exception will ever going to be propagated to any dependency.
 
+## Progress tracking
+
+Sometimes a task runs for a long time and you want to report how far it has progressed, so other parts of your system
+(e.g. a web handler polling for status) can display it.
+
+Taskiq provides a `ProgressTracker` dependency for this. It's not a method on `Context`, it's a dependency, just like
+anything else built with `taskiq-dependencies`. It grabs the current `task_id` from the context for you and stores
+progress using your broker's result backend.
+
+::: tabs
+
+@tab Annotated 3.10+
+
+@[code python](../examples/state/progress_tracker_annot.py)
+
+@tab default values
+
+@[code python](../examples/state/progress_tracker.py)
+
+:::
+
+You can read the progress back from anywhere that has access to the `AsyncTaskiqTask` returned by `kiq`:
+
+```python
+task = await my_task.kiq()
+
+progress = await task.get_progress()
+if progress is not None:
+    print(progress.state, progress.meta)
+```
+
+`state` can be one of the `TaskState` enum values (`STARTED`, `SUCCESS`, `FAILURE`, `RETRY`) or any custom string.
+`meta` is generic (`ProgressTracker[MetaType]`) and can be any value your result backend can serialize, such as a plain
+string, a `dict`, or a pydantic model. If you call `set_progress` without `meta`, the previously stored `meta` value is
+preserved, which is handy when you only want to update `state`.
+
+::: warning important note
+
+`set_progress`/`get_progress` are no-ops by default on `AsyncResultBackend`. Make sure the result backend you use
+actually implements progress storage (`InMemoryBroker`'s built-in backend does), before relying on this in production.
+
+:::
 
 ## Generics
 
