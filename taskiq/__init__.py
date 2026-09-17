@@ -9,6 +9,7 @@ from taskiq.abc.formatter import TaskiqFormatter
 from taskiq.abc.middleware import TaskiqMiddleware
 from taskiq.abc.result_backend import AsyncResultBackend
 from taskiq.abc.schedule_source import ScheduleSource
+from taskiq.abc.scheduler_plugin import SchedulerPlugin
 from taskiq.acks import AckableMessage, AcknowledgeType
 from taskiq.brokers.inmemory_broker import InMemoryBroker
 from taskiq.brokers.shared_broker import async_shared_broker
@@ -55,6 +56,7 @@ __all__ = [
     "ResultIsReadyError",
     "ScheduleSource",
     "ScheduledTask",
+    "SchedulerPlugin",
     "SecurityError",
     "SendTaskError",
     "SimpleRetryMiddleware",
