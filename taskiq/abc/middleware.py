@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Union
 
 if TYPE_CHECKING:  # pragma: no cover  # pragma: no cover
     from taskiq.abc.broker import AsyncBroker
-    from taskiq.message import TaskiqMessage
+    from taskiq.message import BrokerMessage, TaskiqMessage
     from taskiq.result import TaskiqResult
 
 
@@ -139,4 +139,26 @@ class TaskiqMiddleware:  # pragma: no cover
         :param message: incoming message.
         :param result: returned value.
         :param exception: found exception.
+        """
+
+    def on_send_error(
+        self,
+        message: "TaskiqMessage",
+        broker_message: "BrokerMessage",
+        exception: Exception,
+    ) -> "Union[Union[bool, None], Coroutine[Any, Any, Union[bool, None]]]":
+        """
+        This function is called when exception is raised while sending a message.
+
+        In most cases, it would be a connection issue from the broker.
+
+        Any exceptions occurred by broker's formatter will not trigger this.
+
+        SystemExit, KeyboardInterrupt as well as other BaseExceptions will not
+        be caught here as it would be essentially meaningless to catch them.
+
+        :param message: the sending TaskiqMessage (not BrokerMessage)
+        :param broker_message: the sending BrokerMessage (not TaskiqMessage)
+        :param exception: exception, not yet wrapped with SendTaskError
+        :return: True if the error should be omitted, False or None otherwise.
         """
