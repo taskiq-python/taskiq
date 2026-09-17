@@ -36,7 +36,7 @@ class PrometheusMiddleware(TaskiqMiddleware):
         if not metrics_path.exists():
             metrics_path.mkdir(parents=True)
 
-        logger.debug(f"Setting up multiproc dir to {metrics_path}")
+        logger.debug("Setting up multiproc dir to %s", metrics_path)
 
         os.environ["PROMETHEUS_MULTIPROC_DIR"] = str(metrics_path)
 

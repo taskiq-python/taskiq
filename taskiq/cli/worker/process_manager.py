@@ -77,7 +77,7 @@ class ReloadOneAction(ProcessActionBase):
         try:
             worker.terminate()
         except ValueError:
-            logger.debug(f"Process {worker.name} is already terminated.")
+            logger.debug("Process %s is already terminated.", worker.name)
         # Waiting worker shutdown.
         worker.join()
         event: EventType = Event()
@@ -88,7 +88,11 @@ class ReloadOneAction(ProcessActionBase):
             daemon=False,
         )
         new_process.start()
-        logger.info(f"Process {new_process.name} restarted with pid {new_process.pid}")
+        logger.info(
+            "Process %s restarted with pid %s",
+            new_process.name,
+            new_process.pid,
+        )
         workers[self.worker_num] = new_process
         _wait_for_worker_startup(new_process, event)
 
@@ -139,7 +143,7 @@ def get_signal_handler(
         if current_process().name.startswith("worker"):
             raise KeyboardInterrupt
 
-        logger.debug(f"Got signal {signum}.")
+        logger.debug("Got signal %s.", signum)
         action_queue.put(action_to_send)
         logger.info("Workers are scheduled for shutdown.")
 
@@ -167,7 +171,7 @@ class ProcessManager:
         if args.reload and observer is not None:
             watch_paths = args.reload_dirs if args.reload_dirs else ["."]
             for path_to_watch in watch_paths:
-                logger.debug(f"Watching directory: {path_to_watch}")
+                logger.debug("Watching directory: %s", path_to_watch)
                 observer.schedule(
                     FileWatcher(
                         callback=schedule_workers_reload,
@@ -267,7 +271,7 @@ class ProcessManager:
             # We bulk_process all pending events.
             while not self.action_queue.empty():
                 action = self.action_queue.get()
-                logging.debug(f"Got event: {action}")
+                logging.debug("Got event: %s", action)
                 if isinstance(action, ReloadAllAction):
                     action.handle(
                         workers_num=len(self.workers),
@@ -295,7 +299,7 @@ class ProcessManager:
 
             for worker_num, worker in enumerate(self.workers):
                 if not worker.is_alive():
-                    logger.info(f"{worker.name} is dead. Scheduling reload.")
+                    logger.info("%s is dead. Scheduling reload.", worker.name)
                     self.action_queue.put(
                         ReloadOneAction(
                             worker_num=worker_num,

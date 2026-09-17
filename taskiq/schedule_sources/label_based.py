@@ -37,8 +37,10 @@ class LabelScheduleSource(ScheduleSource):
             if task.broker != self.broker:
                 # if task broker doesn't match self, something is probably wrong
                 logger.warning(
-                    f"Broker for {task_name} `{task.broker}` doesn't "
-                    f"match scheduler's broker `{self.broker}`",
+                    "Broker for %s `%s` doesn't match scheduler's broker `%s`",
+                    task_name,
+                    task.broker,
+                    self.broker,
                 )
                 continue
             for schedule in task.labels.get("schedule", []):

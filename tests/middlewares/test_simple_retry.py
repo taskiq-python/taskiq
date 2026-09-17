@@ -14,6 +14,7 @@ def broker() -> AsyncMock:
     mocked_broker = AsyncMock()
     mocked_broker.id_generator = lambda: uuid.uuid4().hex
     mocked_broker.formatter = JSONFormatter()
+    mocked_broker.find_task = lambda task_name: None
     return mocked_broker
 
 

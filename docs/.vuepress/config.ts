@@ -33,6 +33,7 @@ export default defineUserConfig({
     sidebar: "structure",
 
     pure: true,
+    focus: false,
 
     markdown: {
       tabs: true,

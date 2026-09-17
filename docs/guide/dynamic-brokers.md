@@ -11,7 +11,7 @@ This article is for people who want to:
 
 Taskiq allows you to set up broker instances throughout your application and register tasks for dynamic execution. However, tasks created this way won't be found by the `taskiq worker` command.
 
-To define tasks and assign them to a broker, use `register_task` method.
+To define tasks and assign them to a broker, use the `register_task` method.
 
 @[code python](../examples/dynamics/dyn_broker.py)
 

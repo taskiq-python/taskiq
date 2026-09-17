@@ -2,6 +2,7 @@ import inspect
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, get_type_hints
 
 import pytest
@@ -262,3 +263,154 @@ def test_kwargs_pyndantic_failure(caplog: pytest.LogCaptureFixture) -> None:
         _helper(func, msg)
         assert "Can't parse argument a" in caplog.text
         assert msg.kwargs == {"a": {"a": "10", "b": "f3"}}
+
+
+def test_unannotated_param_value_left_untouched() -> None:
+    def func(request_id, count: int) -> None:  # type: ignore  # noqa: ANN001
+        pass
+
+    msg = TaskiqMessage(
+        task_id="test",
+        task_name="test",
+        labels={},
+        labels_types={},
+        args=["12345", 3],
+        kwargs={},
+    )
+    _helper(func, msg)
+    assert msg.args == ["12345", 3]
+    assert isinstance(msg.args[0], str)
+
+
+def test_annotated_param_parsed_after_unannotated() -> None:
+    def func(request_id, count: int) -> None:  # type: ignore  # noqa: ANN001
+        pass
+
+    msg = TaskiqMessage(
+        task_id="test",
+        task_name="test",
+        labels={},
+        labels_types={},
+        args=["12345", "5"],
+        kwargs={},
+    )
+    _helper(func, msg)
+    assert msg.args == ["12345", 5]
+
+
+def test_datetime_param_parsed_after_unannotated() -> None:
+    def func(ts, when: datetime) -> None:  # type: ignore  # noqa: ANN001
+        pass
+
+    msg = TaskiqMessage(
+        task_id="test",
+        task_name="test",
+        labels={},
+        labels_types={},
+        args=["2026-08-30T10:00:00", "2026-08-30T10:00:00"],
+        kwargs={},
+    )
+    _helper(func, msg)
+    assert msg.args[0] == "2026-08-30T10:00:00"
+    assert msg.args[1] == datetime(2026, 8, 30, 10, 0)
+
+
+def test_invalid_annotated_value_warns_about_right_arg(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    def func(ctx, count: int) -> None:  # type: ignore  # noqa: ANN001
+        pass
+
+    msg = TaskiqMessage(
+        task_id="test",
+        task_name="test",
+        labels={},
+        labels_types={},
+        args=["hello", "not-an-int"],
+        kwargs={},
+    )
+    with caplog.at_level(logging.WARNING):
+        _helper(func, msg)
+        assert "Can't parse argument 1" in caplog.text
+        assert msg.args == ["hello", "not-an-int"]
+
+
+def test_varargs_all_elements_parsed() -> None:
+    def func(*values: int) -> None:
+        pass
+
+    msg = TaskiqMessage(
+        task_id="test",
+        task_name="test",
+        labels={},
+        labels_types={},
+        args=["1", "2", "3"],
+        kwargs={},
+    )
+    _helper(func, msg)
+    assert msg.args == [1, 2, 3]
+
+
+def test_varargs_with_leading_arg() -> None:
+    def func(a: int, *values: int) -> None:
+        pass
+
+    msg = TaskiqMessage(
+        task_id="test",
+        task_name="test",
+        labels={},
+        labels_types={},
+        args=["1", "2", "3"],
+        kwargs={},
+    )
+    _helper(func, msg)
+    assert msg.args == [1, 2, 3]
+
+
+def test_unannotated_varargs_untouched() -> None:
+    def func(*values) -> None:  # type: ignore  # noqa: ANN002
+        pass
+
+    msg = TaskiqMessage(
+        task_id="test",
+        task_name="test",
+        labels={},
+        labels_types={},
+        args=["1", 2],
+        kwargs={},
+    )
+    _helper(func, msg)
+    assert msg.args == ["1", 2]
+
+
+def test_kwonly_param_parsed() -> None:
+    def func(a: int, *, b: int) -> None:
+        pass
+
+    msg = TaskiqMessage(
+        task_id="test",
+        task_name="test",
+        labels={},
+        labels_types={},
+        args=["1"],
+        kwargs={"b": "2"},
+    )
+    _helper(func, msg)
+    assert msg.args == [1]
+    assert msg.kwargs == {"b": 2}
+
+
+def test_positional_params_parsed_from_kwargs() -> None:
+    def func(a: int, b: int) -> None:
+        pass
+
+    msg = TaskiqMessage(
+        task_id="test",
+        task_name="test",
+        labels={},
+        labels_types={},
+        args=[],
+        kwargs={"a": "1", "b": "2"},
+    )
+    _helper(func, msg)
+    assert msg.kwargs == {"a": 1, "b": 2}

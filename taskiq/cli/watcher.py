@@ -56,9 +56,11 @@ class FileWatcher:  # pragma: no cover
                 return
         except Exception as exc:
             logger.info(
-                f"Cannot check path `{event.src_path!r}` in gitignore. Cause: {exc}",
+                "Cannot check path `%r` in gitignore. Cause: %s",
+                event.src_path,
+                exc,
             )
             return
 
-        logger.debug(f"File changed. Event: {event}")
+        logger.debug("File changed. Event: %s", event)
         self.callback(**self.callback_kwargs)

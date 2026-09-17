@@ -21,6 +21,7 @@ class SchedulerArgs:
     update_interval: int | None = None
     loop_interval: int | None = None
     loop_factory: str | None = None
+    send_timeout: float | None = None
 
     @classmethod
     def from_cli(cls, args: Sequence[str] | None = None) -> "SchedulerArgs":
@@ -119,6 +120,20 @@ class SchedulerArgs:
                 "Where to search for an event loop factory. "
                 "This string must be specified in "
                 "'module.module:variable' format."
+            ),
+        )
+
+        parser.add_argument(
+            "--send-timeout",
+            type=float,
+            default=None,
+            help=(
+                "Optional per-send timeout (seconds). If set, each spawned send "
+                "task is wrapped in asyncio.wait_for with this timeout, "
+                "preventing a single hung broker.kick from permanently blocking "
+                "subsequent ticks for the same schedule_id. On timeout the send "
+                "is cancelled, a warning is logged, and the next scheduled tick "
+                "will retry. Default: no timeout (backwards-compatible)."
             ),
         )
 

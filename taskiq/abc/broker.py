@@ -177,8 +177,8 @@ class AsyncBroker(ABC):
         for middleware in middlewares:
             if not isinstance(middleware, TaskiqMiddleware):
                 logger.warning(
-                    f"Middleware {middleware} is not an instance of TaskiqMiddleware. "
-                    "Skipping...",
+                    "Middleware %s is not an instance of TaskiqMiddleware. Skipping...",
+                    middleware,
                 )
                 continue
             middleware.set_broker(self)
@@ -464,8 +464,8 @@ class AsyncBroker(ABC):
         for middleware in middlewares:
             if not isinstance(middleware, TaskiqMiddleware):
                 logger.warning(
-                    f"Middleware {middleware} is not an instance of TaskiqMiddleware. "
-                    "Skipping...",
+                    "Middleware %s is not an instance of TaskiqMiddleware. Skipping...",
+                    middleware,
                 )
                 continue
             middleware.set_broker(self)

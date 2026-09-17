@@ -17,9 +17,6 @@ permissions:
 
 jobs:
   lint:
-    strategy:
-      matrix:
-        cmd: ["black", "ruff", "mypy"]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -36,12 +33,11 @@ jobs:
       - name: Install deps
         run: uv sync --all-extras
       - name: Run lint check
-        run: uv run pre-commit run -a ${{ matrix.cmd }}
+        run: uv run prek run -a
   pytest:
     strategy:
       matrix:
         py_version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
-        pydantic_ver: ["<2", ">=2.5,<3"]
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: "${{ matrix.os }}"
     steps:
@@ -60,8 +56,6 @@ jobs:
           version: "latest"
       - name: Install deps
         run: uv sync --all-extras
-      - name: Setup pydantic version
-        run: uv pip install "pydantic ${{ matrix.pydantic_ver }}"
       - name: Run pytest check
         run: uv run pytest -vv -n auto --cov="taskiq" .
       - name: Generate report

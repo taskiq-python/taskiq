@@ -11,7 +11,7 @@ Here's a minimal example of a schedule source:
 
 @[code python](../examples/extending/schedule_source.py)
 
-You can implement a schedule source that write schedules in the database and have delayed tasks in runtime.
+You can implement a schedule source that writes schedules in the database and have delayed tasks in runtime.
 
 ::: info Cool tip!
 You can also use `LabelScheduleSource` as a base class for your schedule source

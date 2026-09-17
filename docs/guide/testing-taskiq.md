@@ -13,8 +13,8 @@ Let's dive into examples.
 
 ### Environment setup
 
-For testing you maybe don't want to use actual distributed broker. But still you want to validate your logic.
-Since python is an interpreted language, you can easily replace you broker with another one if the expression is correct.
+For testing you may not want to use an actual distributed broker. But still you want to validate your logic.
+Since python is an interpreted language, you can easily replace your broker with another one if the expression is correct.
 
 We can set an environment variable, that indicates that currently we're running in testing environment.
 
@@ -189,7 +189,7 @@ Taskiq provides a way to set both first-level and local dependencies for depende
 
 ### First-level dependencies
 
-If your dependency does not have a function -> this is what we can call first-level dependency.
+If your dependency does not have a function -> this is what we can call a first-level dependency.
 
 In order to override first-level dependency, you use the same method as to add it.
 
@@ -235,7 +235,7 @@ async def modify_path(some_path: Path = TaskiqDepends()):
 
 :::
 
-To test the task itself, it's not different to the example without dependencies, but we just need to pass all
+To test the task itself, it's not different from the example without dependencies, but we just need to pass all
 expected dependencies manually as function's arguments or key-word arguments.
 
 ```python
@@ -252,7 +252,7 @@ async def test_modify_path():
 ```
 
 But what if we want to test task execution? Well, you don't need to provide dependencies manually, you
-must mutate dependency_context before calling a task. We suggest to do it in fixtures.
+must mutate dependency_context before calling a task. We suggest doing it in fixtures.
 
 ```python
 import pytest
@@ -335,7 +335,7 @@ from taskiq import TaskiqDepends
 from your_project.database import AsyncSession
 from your_project.tkq import broker
 
-async def get_async_session(context: Context = TaskiqDepends()]) -> AsyncGenerator[AsyncSession]:
+async def get_async_session(context: Context = TaskiqDepends()) -> AsyncGenerator[AsyncSession]:
     session = context.state.async_session
 
     try:
@@ -359,7 +359,7 @@ async def do_some_work(session: AsyncSession = TaskiqDepends(get_async_session))
 import pytest
 
 from your_project.database import AsyncSession
-from your_project.tqk import broker
+from your_project.tkq import broker
 
 # We use autouse, so this fixture
 # is called automatically before all tests.

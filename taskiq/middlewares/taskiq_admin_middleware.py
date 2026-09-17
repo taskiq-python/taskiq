@@ -7,7 +7,6 @@ from urllib.parse import urljoin
 import aiohttp
 
 from taskiq.abc.middleware import TaskiqMiddleware
-from taskiq.compat import model_dump
 from taskiq.message import TaskiqMessage
 from taskiq.result import TaskiqResult
 
@@ -92,16 +91,26 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
         """
 
         async def _send() -> None:
-            client = self._get_client()
-
-            async with client.post(
-                urljoin(self.url, endpoint),
-                headers={"access-token": self.api_token},
-                json=payload,
-            ) as resp:
-                resp.raise_for_status()
-                if not resp.ok:
-                    _logger.error(f"POST {endpoint} - {resp.status}")
+            try:
+                client = self._get_client()
+                async with client.post(
+                    urljoin(self.url, endpoint),
+                    headers={"access-token": self.api_token},
+                    json=payload,
+                ) as resp:
+                    if not resp.ok:
+                        _logger.warning(
+                            "POST %s failed: %s %s",
+                            endpoint,
+                            resp.status,
+                            await resp.text(),
+                        )
+            except Exception as exc:
+                _logger.warning(
+                    "Failed to report to taskiq-admin %s: %r",
+                    endpoint,
+                    exc,
+                )
 
         task = asyncio.create_task(_send())
         self._pending.add(task)
@@ -116,7 +125,7 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
 
         :param message: kicked message.
         """
-        dict_message: dict[str, Any] = model_dump(message)
+        dict_message: dict[str, Any] = message.model_dump(mode="json")
         await self._spawn_request(
             f"/api/tasks/{message.task_id}/queued",
             {
@@ -139,7 +148,7 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
         :param message: incoming parsed taskiq message.
         :return: modified message.
         """
-        dict_message: dict[str, Any] = model_dump(message)
+        dict_message: dict[str, Any] = message.model_dump(mode="json")
         await self._spawn_request(
             f"/api/tasks/{message.task_id}/started",
             {
@@ -167,7 +176,7 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
         :param message: incoming message.
         :param result: result of execution for current task.
         """
-        dict_result: dict[str, Any] = model_dump(result)
+        dict_result: dict[str, Any] = result.model_dump(mode="json")
         await self._spawn_request(
             f"/api/tasks/{message.task_id}/executed",
             {
