@@ -20,6 +20,7 @@ class SchedulerArgs:
     skip_first_run: bool = False
     update_interval: int | None = None
     loop_interval: int | None = None
+    loop_factory: str | None = None
     send_timeout: float | None = None
 
     @classmethod
@@ -112,6 +113,16 @@ class SchedulerArgs:
                 "If not specified, scheduler will run once a second."
             ),
         )
+        parser.add_argument(
+            "--loop-factory",
+            default=None,
+            help=(
+                "Where to search for an event loop factory. "
+                "This string must be specified in "
+                "'module.module:variable' format."
+            ),
+        )
+
         parser.add_argument(
             "--send-timeout",
             type=float,
