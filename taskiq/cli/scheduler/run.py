@@ -313,7 +313,7 @@ class SchedulerLoop:
 
         return is_ready_to_send
 
-    async def run(
+    async def run(  # noqa: C901
         self,
         *,
         update_interval: timedelta | None = None,
