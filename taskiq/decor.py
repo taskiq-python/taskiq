@@ -1,3 +1,4 @@
+import inspect
 import sys
 from collections.abc import Callable, Coroutine
 from copy import copy
@@ -75,18 +76,23 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         # it back to the module where it was defined.
         # This way ProcessPoolExecutor will be able to import
         # the function by it's name and verify its correctness.
-        new_name = f"{original_func.__name__}__taskiq_original"
-        self.original_func.__name__ = new_name
-        if hasattr(self.original_func, "__qualname__"):
-            original_qualname = self.original_func.__qualname__.rsplit(".")
-            original_qualname[-1] = new_name
-            new_qualname = ".".join(original_qualname)
-            self.original_func.__qualname__ = new_qualname
-        setattr(
-            sys.modules[original_func.__module__],
-            new_name,
-            original_func,
-        )
+        #
+        # Bound methods are skipped: their `__name__` is not
+        # assignable, and renaming via `__func__` would mutate
+        # the class-level function and break pickle lookup.
+        if inspect.isfunction(original_func):
+            new_name = f"{original_func.__name__}__taskiq_original"
+            self.original_func.__name__ = new_name
+            if hasattr(self.original_func, "__qualname__"):
+                original_qualname = self.original_func.__qualname__.rsplit(".")
+                original_qualname[-1] = new_name
+                new_qualname = ".".join(original_qualname)
+                self.original_func.__qualname__ = new_qualname
+            setattr(
+                sys.modules[original_func.__module__],
+                new_name,
+                original_func,
+            )
 
     # Docs for this method are omitted in order to help
     # your IDE resolve correct docs for it.

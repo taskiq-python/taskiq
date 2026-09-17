@@ -1,8 +1,11 @@
 from collections.abc import AsyncGenerator
+from concurrent.futures import ProcessPoolExecutor
 from copy import copy
+from types import MethodType
 
 import pytest
 
+from taskiq import InMemoryBroker
 from taskiq.abc.broker import AsyncBroker
 from taskiq.decor import AsyncTaskiqDecoratedTask
 from taskiq.events import TaskiqEvents
@@ -28,6 +31,15 @@ class _TestBroker(AsyncBroker):
 
         :param callback: callback that is never called.
         """
+
+
+_process_pool_broker = _TestBroker()
+
+
+@_process_pool_broker.task(task_name="process_pool_sync_add")
+def process_pool_sync_add(value: int) -> int:
+    """Module-level sync task used by ProcessPoolExecutor regression test."""
+    return value + 1
 
 
 def test_decorator_success() -> None:
@@ -80,6 +92,53 @@ def test_kicker_labels_modification() -> None:
     assert "another_label" in test_kicker.labels
 
     assert test_task.labels == old_labels
+
+
+def test_register_task_accepts_bound_method() -> None:
+    """Bound methods must register without mutating method.__name__."""
+    broker = _TestBroker()
+
+    class Counter:
+        def increment(self, value: int) -> int:
+            return value + 1
+
+    instance = Counter()
+    task = broker.register_task(instance.increment)
+
+    assert isinstance(task, AsyncTaskiqDecoratedTask)
+    assert isinstance(task.original_func, MethodType)
+    assert task.original_func.__self__ is instance
+    assert task.task_name == f"{instance.increment.__module__}:increment"
+    assert broker.find_task(task.task_name) is task
+
+
+@pytest.mark.anyio
+async def test_bound_method_task_executes_with_self() -> None:
+    """Registered bound method must keep instance state across execution."""
+    broker = InMemoryBroker(await_inplace=True)
+
+    class Counter:
+        def __init__(self) -> None:
+            self.total = 0
+
+        def add(self, value: int) -> int:
+            self.total += value
+            return self.total
+
+    instance = Counter()
+    task = broker.register_task(instance.add, task_name="bound.add")
+
+    kicked = await task.kiq(5)
+    result = await kicked.wait_result()
+    assert result.return_value == 5
+    assert instance.total == 5
+
+
+def test_process_pool_runs_module_level_decorated_sync_function() -> None:
+    """ProcessPoolExecutor must be able to run renamed original sync functions."""
+    with ProcessPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(process_pool_sync_add.original_func, 41)
+        assert future.result(timeout=5) == 42
 
 
 @pytest.mark.anyio
