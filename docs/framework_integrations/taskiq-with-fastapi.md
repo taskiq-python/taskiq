@@ -8,7 +8,7 @@ FastAPI is a highly popular async web framework in Python. It has gained its pop
 1. It's easy to use;
 2. Cool dependency injection.
 
-In taskiq, we try to make our libraries easy to use, and We have a dependency injection too. So we have created the library "[taskiq-fastapi](https://github.com/taskiq-python/taskiq-fastapi)" to make integration with FastAPI as smooth as possible.
+In taskiq, we try to make our libraries easy to use, and we have a dependency injection too. So we have created the library "[taskiq-fastapi](https://github.com/taskiq-python/taskiq-fastapi)" to make integration with FastAPI as smooth as possible.
 
 Let's see what we got here. In this library, we provide users with only one public function called `init`. It takes a broker and a string path (as in uvicorn) to the fastapi application (or factory function). People should call this function in their main broker file.
 

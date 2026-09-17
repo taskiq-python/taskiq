@@ -153,10 +153,10 @@ For example:
 
 :::
 
-In this code, the dependency `common_dep` is going to be evaluated only once and the `dep1` and the `dep2` are going to receive the same value. You can control this behavior by using the `use_cache=False` parameter to you dependency. This parameter will force the
-dependency to reevaluate all it's subdependencies.
+In this code, the dependency `common_dep` is going to be evaluated only once and the `dep1` and the `dep2` are going to receive the same value. You can control this behavior by using the `use_cache=False` parameter to your dependency. This parameter will force the
+dependency to reevaluate all its subdependencies.
 
-In this example we cannot predict the result. Since the `dep2` doesn't use cache for the `common_dep` function.
+In this example we cannot predict the result, since the `dep2` doesn't use cache for the `common_dep` function.
 ::: tabs
 
 @tab Annotated 3.10+
@@ -317,7 +317,7 @@ If you don't want to propagate exceptions in dependencies, you can add `--no-pro
 taskiq worker my_file:broker --no-propagate-errors
 ```
 
-In this case, no exception will ever going to be propagated to any dependency.
+In this case, no exception will ever be propagated to any dependency.
 
 ## Progress tracking
 
@@ -365,7 +365,7 @@ actually implements progress storage (`InMemoryBroker`'s built-in backend does),
 ## Generics
 
 Taskiq supports generic dependencies. You can create a generic class that is generic over
-another class and takskiq will be able to resolve generics based on type annotations.
+another class and taskiq will be able to resolve generics based on type annotations.
 
 ### Default dependencies
 
@@ -377,8 +377,8 @@ By default taskiq has only two dependencies:
 
 ### Adding first-level dependencies
 
-You can expand default list of available dependencies for you application.
-Taskiq have an ability to add new first-level dependencies using brokers.
+You can expand the default list of available dependencies for your application.
+Taskiq has the ability to add new first-level dependencies using brokers.
 
 The AsyncBroker interface has a function called `add_dependency_context` and you can add
 more default dependencies to the taskiq. This may be useful for libraries if you want to

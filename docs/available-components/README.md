@@ -6,7 +6,7 @@ dir:
 
 # Available components
 
-In this section, you can find a list of officially supported plugins for the taskiq.
+In this section, you can find a list of officially supported plugins for taskiq.
 
 - [Available brokers](./brokers.md)
 - [Available middlewares](./middlewares.md)

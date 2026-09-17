@@ -15,7 +15,7 @@ In the `exec` method, you should parse incoming arguments. But since all CLI arg
 
 Also, you can use your favorite tool to build CLI, like [click](https://click.palletsprojects.com/) or [typer](https://typer.tiangolo.com/).
 
-After you have such class, you need to add entrypoint that points to that class.
+After you have such class, you need to add an entrypoint that points to that class.
 
 ::: tabs
 

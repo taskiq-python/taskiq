@@ -25,7 +25,7 @@ If you choose this type of broker, please run taskiq with `-w 1` parameter,
 otherwise you may encounter undefined behavior.
 :::
 
-To run this broker please install the [pyzmq](https://pypi.org/project/pyzmq/) lib. Or you can taskiq with `zmq` extra.
+To run this broker please install the [pyzmq](https://pypi.org/project/pyzmq/) lib. Or you can install taskiq with `zmq` extra.
 
 ::: tabs
 
@@ -56,7 +56,7 @@ def my_task() -> bool:
     return True
 ```
 
-To kiq this task you have to options:
+To kiq this task you have two options:
 
 - Explicitly define broker using kicker for this kiq;
 - Add default broker for all shared tasks.
@@ -82,8 +82,8 @@ await my_task.kicker().with_broker(broker).kiq()
 
 ## Custom brokers
 
-These brokers are not parts of the core Taskiq lib. But they are maintained by Taskiq developers.
-You can install them as a separate packages.
+These brokers are not part of the core Taskiq lib. But they are maintained by Taskiq developers.
+You can install them as separate packages.
 
 You can read more about parameters and abilities of these brokers in README.md of each repo.
 
@@ -130,7 +130,7 @@ pip install taskiq-aio-kafka
 
 ## Third-party brokers
 
-These brokers are not part of the core Taskiq library. They are maintained by other open‑source contributors. You can install them as a separate packages.
+These brokers are not part of the core Taskiq library. They are maintained by other open‑source contributors. You can install them as separate packages.
 
 You can read more about parameters and abilities of these brokers in README.md of each repo.
 

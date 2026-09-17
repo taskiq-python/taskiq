@@ -26,7 +26,7 @@ import aiohttp_deps
 app = web.Application()
 
 # This startup event makes all the magic happen.
-# It parses current handlers and create dependency graphs for them.
+# It parses current handlers and creates dependency graphs for them.
 app.on_startup.append(aiohttp_deps.init)
 
 web.run_app(app)
@@ -91,7 +91,7 @@ async def my_task(app: web.Application = TaskiqDepends()):
 
 :::
 
-In this example, we depend on the current application. We can use its state in a current task or any other dependency. We can take db_pool from your application's state, which is the same pool, as the one you've created on AiohTTP's startup.
+In this example, we depend on the current application. We can use its state in a current task or any other dependency. We can take db_pool from your application's state, which is the same pool, as the one you've created on AioHTTP's startup.
 But this application is only a mock of your application. It has correct types and all your variables that you filled on startup, but it doesn't handle any request.
 This integration adds two main dependencies:
 * web.Application - current application.

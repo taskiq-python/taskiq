@@ -9,10 +9,10 @@ We have several rules for contributors:
 * Please do not add malware.
 * Please make sure that your request solves the problem.
 
-If you struggle with something or feel frustrated, you either create an issue, create a [discussions](https://github.com/orgs/taskiq-python/discussions).
+If you struggle with something or feel frustrated, you either create an issue, create a [discussions](https://github.com/orgs/taskiq-python/discussions)
 page or publish a draft PR and ask your question in the description.
 
-We have lots of tests in CI. But since CI runs from first-time contributors should be approved, you better test locally. It just takes less time to prepare PR for merging.
+We have lots of tests in CI. But since CI runs from first-time contributors need to be approved, you better test locally. It just takes less time to prepare PR for merging.
 
 ## Setting up environment
 
@@ -42,7 +42,7 @@ You can run `pytest` without any parameters and it will do the thing.
 pytest
 ```
 
-If you want to speedup testings, you can run it with `-n` option from [pytest-xdist](https://pypi.org/project/pytest-xdist/) to run tests in parallel.
+If you want to speed up testing, you can run it with `-n` option from [pytest-xdist](https://pypi.org/project/pytest-xdist/) to run tests in parallel.
 
 ```bash
 pytest -n 2
@@ -71,7 +71,7 @@ After that, you can run documentation server with hot-reloading using:
 pnpm docs:dev
 ```
 
-If you want to check how documentation looks like in production mode, you can build it and then serve using:
+If you want to check how documentation looks in production mode, you can build it and then serve using:
 
 ```bash
 pnpm docs:build

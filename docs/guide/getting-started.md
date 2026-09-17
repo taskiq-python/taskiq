@@ -59,7 +59,7 @@ And that's it. Now let's add some tasks and the main function. You can add tasks
 
 ::: warning Cool warning!
 
-Calling the `startup` method is necessary. If you don't call it, you may get an undefined behaviour.
+Calling the `startup` method is necessary. If you don't call it, you may get undefined behavior.
 
 :::
 
@@ -81,7 +81,7 @@ You can get more information about taskiq types, CLI and internal structure in t
 ## Distributed run
 
 Now let's change InMemoryBroker to some distributed broker instead. In this example we are going to use
-broker that works with rabbitMQ.
+broker that works with RabbitMQ.
 
 At first we must install the [taskiq-aio-pika](https://pypi.org/project/taskiq-aio-pika/) lib.
 
@@ -97,7 +97,7 @@ from taskiq_aio_pika import AioPikaBroker
 broker = AioPikaBroker('amqp://guest:guest@localhost:5672')
 ```
 
-Also, AioPika broker requires to call startup before using it. Add this line at the beginning of the
+Also, the AioPika broker requires calling startup before using it. Add this line at the beginning of the
 main function.
 
 ```python
@@ -112,7 +112,7 @@ That's all you need to do.
 
 :::
 
-Let's run the worker process. First of all, we need rabbitMQ up and running. I highly recommend you use docker.
+Let's run the worker process. First of all, we need RabbitMQ up and running. I highly recommend you use docker.
 
 ::: tabs
 
@@ -221,7 +221,7 @@ Continue reading to get more information about taskiq internals.
 
 ## Timeouts
 
-If you want to restrict amount of time you want to run task,
+If you want to restrict the amount of time you want to run a task,
 just add timeout label to the task.
 
 You can do it either with decorator or when calling the task.
