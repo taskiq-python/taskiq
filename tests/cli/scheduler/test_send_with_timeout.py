@@ -3,6 +3,7 @@ import logging
 from typing import Any
 
 import pytest
+from typing_extensions import override
 
 from taskiq.abc.schedule_source import ScheduleSource
 from taskiq.brokers.inmemory_broker import InMemoryBroker
@@ -30,7 +31,8 @@ class _HangingScheduler(TaskiqScheduler):
         self.hang_seconds = hang_seconds
         self.on_ready_calls = 0
 
-    async def on_ready(  # type: ignore[override]
+    @override
+    async def on_ready(
         self,
         source: ScheduleSource,
         task: ScheduledTask,
@@ -50,7 +52,6 @@ def _task() -> ScheduledTask:
     )
 
 
-@pytest.mark.anyio
 async def test_send_with_timeout_returns_on_timeout_without_raising(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -87,7 +88,6 @@ async def test_send_with_timeout_returns_on_timeout_without_raising(
     assert "dummy" in msg
 
 
-@pytest.mark.anyio
 async def test_send_with_timeout_does_not_log_on_success(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -99,7 +99,8 @@ async def test_send_with_timeout_does_not_log_on_success(
             super().__init__(broker=InMemoryBroker(), sources=[_StubSource()])
             self.calls = 0
 
-        async def on_ready(  # type: ignore[override]
+        @override
+        async def on_ready(
             self,
             source: ScheduleSource,
             task: ScheduledTask,
@@ -121,7 +122,6 @@ async def test_send_with_timeout_does_not_log_on_success(
     assert warnings == []
 
 
-@pytest.mark.anyio
 async def test_send_with_timeout_propagates_non_timeout_exceptions() -> None:
     """Errors inside on_ready that AREN'T a timeout must still propagate.
 
@@ -134,7 +134,8 @@ async def test_send_with_timeout_propagates_non_timeout_exceptions() -> None:
         def __init__(self) -> None:
             super().__init__(broker=InMemoryBroker(), sources=[_StubSource()])
 
-        async def on_ready(  # type: ignore[override]
+        @override
+        async def on_ready(
             self,
             source: ScheduleSource,
             task: ScheduledTask,
@@ -145,7 +146,6 @@ async def test_send_with_timeout_propagates_non_timeout_exceptions() -> None:
         await send_with_timeout(_BoomScheduler(), _StubSource(), _task(), timeout=5.0)
 
 
-@pytest.mark.anyio
 async def test_send_with_timeout_cancels_inner_send() -> None:
     """The inner ``send`` coroutine must actually be cancelled on timeout.
 
@@ -158,7 +158,8 @@ async def test_send_with_timeout_cancels_inner_send() -> None:
         def __init__(self) -> None:
             super().__init__(broker=InMemoryBroker(), sources=[_StubSource()])
 
-        async def on_ready(  # type: ignore[override]
+        @override
+        async def on_ready(
             self,
             source: ScheduleSource,
             task: ScheduledTask,
@@ -179,7 +180,6 @@ async def test_send_with_timeout_cancels_inner_send() -> None:
     await asyncio.wait_for(cancelled.wait(), timeout=2.0)
 
 
-@pytest.mark.anyio
 async def test_plain_send_still_works_unchanged() -> None:
     """The original ``send`` function must remain unchanged in behavior.
 
@@ -191,7 +191,8 @@ async def test_plain_send_still_works_unchanged() -> None:
             super().__init__(broker=InMemoryBroker(), sources=[_StubSource()])
             self.calls: list[Any] = []
 
-        async def on_ready(  # type: ignore[override]
+        @override
+        async def on_ready(
             self,
             source: ScheduleSource,
             task: ScheduledTask,
