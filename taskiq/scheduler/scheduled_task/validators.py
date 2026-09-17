@@ -1,4 +1,28 @@
 from datetime import timedelta
+from typing import Annotated, Any
+
+from pydantic import Discriminator, Tag, ValidationError
+
+from taskiq.compat import parse_obj_as
+
+
+def discriminate_offset(value: Any) -> str:
+    """Pick the union branch a raw cron offset value belongs to."""
+    if isinstance(value, timedelta):
+        return "timedelta"
+    if isinstance(value, str):
+        try:
+            parse_obj_as(timedelta, value)
+        except ValidationError:
+            return "str"
+        return "timedelta"
+    return "str"
+
+
+CronOffset = Annotated[
+    Annotated[timedelta, Tag("timedelta")] | Annotated[str, Tag("str")],
+    Discriminator(discriminate_offset),
+]
 
 
 def validate_interval_value(
