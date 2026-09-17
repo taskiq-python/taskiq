@@ -7,7 +7,6 @@ from pydantic import BaseModel
 from taskiq import serializers
 from taskiq.abc import AsyncResultBackend
 from taskiq.abc.serializer import TaskiqSerializer
-from taskiq.compat import model_dump, model_validate
 from taskiq.result import TaskiqResult
 from taskiq.task import AsyncTaskiqTask
 
@@ -25,7 +24,7 @@ class SerializingBackend(AsyncResultBackend[_ReturnType]):
         result: TaskiqResult[_ReturnType],  # type: ignore
     ) -> None:
         """Set result with dumping."""
-        self._results[task_id] = self._serializer.dumpb(model_dump(result))
+        self._results[task_id] = self._serializer.dumpb(result.model_dump(mode="json"))
 
     async def is_result_ready(self, task_id: str) -> bool:
         """Check if result is ready."""
@@ -38,7 +37,7 @@ class SerializingBackend(AsyncResultBackend[_ReturnType]):
     ) -> TaskiqResult[_ReturnType]:
         """Get result with loading."""
         data = self._results[task_id]
-        return model_validate(TaskiqResult, self._serializer.loadb(data))
+        return TaskiqResult.model_validate(self._serializer.loadb(data))
 
 
 @pytest.mark.parametrize(

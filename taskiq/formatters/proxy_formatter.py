@@ -1,7 +1,6 @@
 from typing import TYPE_CHECKING
 
 from taskiq.abc.formatter import TaskiqFormatter
-from taskiq.compat import model_dump, model_validate
 from taskiq.message import BrokerMessage, TaskiqMessage
 
 if TYPE_CHECKING:
@@ -24,7 +23,7 @@ class ProxyFormatter(TaskiqFormatter):
         return BrokerMessage(
             task_id=message.task_id,
             task_name=message.task_name,
-            message=self.broker.serializer.dumpb(model_dump(message)),
+            message=self.broker.serializer.dumpb(message.model_dump(mode="json")),
             labels=message.labels,
         )
 
@@ -35,4 +34,4 @@ class ProxyFormatter(TaskiqFormatter):
         :param message: broker's message.
         :return: parsed taskiq message.
         """
-        return model_validate(TaskiqMessage, self.broker.serializer.loadb(message))
+        return TaskiqMessage.model_validate(self.broker.serializer.loadb(message))

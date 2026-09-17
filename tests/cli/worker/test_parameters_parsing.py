@@ -5,7 +5,6 @@ from typing import Any, get_type_hints
 import pytest
 from pydantic import BaseModel
 
-from taskiq.compat import model_copy
 from taskiq.message import TaskiqMessage
 from taskiq.receiver.params_parser import parse_params
 
@@ -28,7 +27,7 @@ def test_parse_params_no_signature() -> None:
         args=[1, 2],
         kwargs={"a": 1},
     )
-    modify_msg = model_copy(src_msg, deep=True)
+    modify_msg = src_msg.model_copy(deep=True)
     parse_params(
         signature=None,
         type_hints={},
