@@ -4,7 +4,7 @@ order: 4
 
 # CLI
 
-Core library comes with CLI program called `taskiq`, which is used to run different subcommands.
+The core library comes with a CLI program called `taskiq`, which is used to run different subcommands.
 
 By default taskiq is shipped with only two commands: `worker` and `scheduler`. You can search for more taskiq plugins
 using pypi. Some plugins may add new commands to taskiq.
@@ -37,7 +37,7 @@ By default taskiq uses **threadpool**. Here are some worker CLI options that can
 ### Auto importing
 
 Enumerating all modules with tasks is not an option sometimes.
-That's why taskiq can auto-discover tasks in current directory recursively.
+That's why taskiq can auto-discover tasks in the current directory recursively.
 
 We have two options for this:
 
@@ -47,7 +47,7 @@ We have two options for this:
 
 ### Acknowledgements
 
-The taskiq supports four types of acknowledgements:
+Taskiq supports four types of acknowledgements:
 * `when_received` - task is acknowledged when it is **received** by the worker.
 * `when_executed` - task is acknowledged right after it is **executed** by the worker.
 * `when_saved` - task is acknowledged when the result of execution is saved in the result backend.
@@ -83,18 +83,18 @@ Manual acknowledgement requires a broker that yields `AckableMessage`.
 
 ### Type casts
 
-One of features taskiq have is automatic type casts. For example you have a type-hinted task like this:
+One of the features taskiq has is automatic type casts. For example you have a type-hinted task like this:
 
 ```python
 async def task(val: int) -> int:
     return val + 1
 ```
 
-If you'll call `task.kiq("2")` you'll get 3 as the returned value. Because we parse signatures of tasks and cast incoming parameters to target types.
-If type-cast fails you won't throw any error. It just leave the value as is. That functionality allows you to use pydantic models, or
+If you call `task.kiq("2")` you'll get 3 as the returned value. Because we parse signatures of tasks and cast incoming parameters to target types.
+If type-cast fails you won't throw any error. It just leaves the value as is. That functionality allows you to use pydantic models, or
 dataclasses as the input parameters.
 
-To disable this pass the `--no-parse` option to the taskiq.
+To disable this pass the `--no-parse` option to taskiq.
 
 ### Hot reload
 
@@ -126,14 +126,14 @@ uv add taskiq[reload]
 
 To enable this option simply pass the `--reload` or `-r` option to worker taskiq CLI.
 
-You can set `--reload-dir` to specify directory to watch for changes. It can be specified multiple times if you need to watch multiple directories.
+You can set `--reload-dir` to specify a directory to watch for changes. It can be specified multiple times if you need to watch multiple directories.
 
 Also this option supports `.gitignore` files. If you have such file in your directory, it won't reload worker
 when you modify ignored files. To disable this functionality pass `--do-not-use-gitignore` option.
 
 ### Graceful reload (available only on Unix systems)
 
-To perform graceful reload, send `SIGHUP` signal to the main worker process. This action will reload all workers with new code. It's useful for deployment that requires zero downtime, but without using heavy orchestration tools like Kubernetes.
+To perform graceful reload, send `SIGHUP` signal to the main worker process. This action will reload all workers with new code. It's useful for a deployment that requires zero downtime, but without using heavy orchestration tools like Kubernetes.
 
 
 ```bash

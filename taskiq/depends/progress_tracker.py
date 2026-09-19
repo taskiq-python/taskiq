@@ -1,9 +1,9 @@
 import enum
 from typing import Generic, TypeVar
 
+from pydantic import BaseModel, ConfigDict
 from taskiq_dependencies import Depends
 
-from taskiq.compat import IS_PYDANTIC2
 from taskiq.context import Context
 
 _ProgressType = TypeVar("_ProgressType")
@@ -18,18 +18,8 @@ class TaskState(str, enum.Enum):
     RETRY = "RETRY"
 
 
-if IS_PYDANTIC2:
-    from pydantic import BaseModel, ConfigDict
-
-    class _TaskProgressConfig(BaseModel):
-        model_config = ConfigDict(arbitrary_types_allowed=True)
-
-else:
-    from pydantic.generics import GenericModel
-
-    class _TaskProgressConfig(GenericModel):  # type: ignore[no-redef]
-        class Config:
-            arbitrary_types_allowed = True
+class _TaskProgressConfig(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class TaskProgress(_TaskProgressConfig, Generic[_ProgressType]):

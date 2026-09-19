@@ -7,7 +7,6 @@ from urllib.parse import urljoin
 import aiohttp
 
 from taskiq.abc.middleware import TaskiqMiddleware
-from taskiq.compat import model_dump
 from taskiq.message import TaskiqMessage
 from taskiq.result import TaskiqResult
 
@@ -126,7 +125,7 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
 
         :param message: kicked message.
         """
-        dict_message: dict[str, Any] = model_dump(message)
+        dict_message: dict[str, Any] = message.model_dump(mode="json")
         await self._spawn_request(
             f"/api/tasks/{message.task_id}/queued",
             {
@@ -149,7 +148,7 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
         :param message: incoming parsed taskiq message.
         :return: modified message.
         """
-        dict_message: dict[str, Any] = model_dump(message)
+        dict_message: dict[str, Any] = message.model_dump(mode="json")
         await self._spawn_request(
             f"/api/tasks/{message.task_id}/started",
             {
@@ -177,7 +176,7 @@ class TaskiqAdminMiddleware(TaskiqMiddleware):
         :param message: incoming message.
         :param result: result of execution for current task.
         """
-        dict_result: dict[str, Any] = model_dump(result)
+        dict_result: dict[str, Any] = result.model_dump(mode="json")
         await self._spawn_request(
             f"/api/tasks/{message.task_id}/executed",
             {

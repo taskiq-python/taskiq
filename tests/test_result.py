@@ -4,7 +4,6 @@ import pickle
 import pytest
 
 from taskiq import TaskiqResult
-from taskiq.compat import model_dump_json
 
 
 def test_json_serialization() -> None:
@@ -13,7 +12,7 @@ def test_json_serialization() -> None:
         return_value="some value",
         execution_time=0,
     )
-    data = json.loads(model_dump_json(task))
+    data = json.loads(task.model_dump_json())
     assert data["return_value"] == task.return_value
 
 
@@ -39,7 +38,7 @@ def test_json_error_serialization() -> None:
         execution_time=0,
         error=error,
     )
-    data = json.loads(model_dump_json(task))
+    data = json.loads(task.model_dump_json())
 
     assert len(data["error"]["exc_message"]) == 2
     args = list(task.error.args)  # type: ignore

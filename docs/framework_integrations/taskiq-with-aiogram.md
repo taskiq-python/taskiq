@@ -2,7 +2,7 @@
 
 [Taskiq-Aiogram](https://github.com/taskiq-python/taskiq-aiogram) is a nice integration with one of the best telegram bot libraries - [aiogram](https://docs.aiogram.dev/en/latest/).
 
-This integration allows you to easily send delayed messages or run intensive functions without blocking the message handing.
+This integration allows you to easily send delayed messages or run intensive functions without blocking the message handling.
 
 This integration adds three main dependencies which you can use in your taskiq functions:
 

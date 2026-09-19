@@ -82,7 +82,6 @@ def test_kicker_labels_modification() -> None:
     assert test_task.labels == old_labels
 
 
-@pytest.mark.anyio
 @pytest.mark.parametrize(
     ("is_worker_process", "startup", "shutdown"),
     [
@@ -120,7 +119,6 @@ async def test_async_context_manager_enter(
     assert shutdown_called is True
 
 
-@pytest.mark.anyio
 @pytest.mark.parametrize(
     ("is_worker_process", "startup", "shutdown"),
     [

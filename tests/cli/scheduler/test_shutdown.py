@@ -33,9 +33,13 @@ class PendingOperation:
             self.finished.set()
 
 
-@pytest.mark.parametrize("entrypoint", ["loop", "api", "cli"])
+@pytest.mark.parametrize(
+    ("entrypoint", "send_timeout"),
+    [("loop", None), ("api", None), ("cli", None), ("loop", 60), ("cli", 60)],
+)
 async def test_shutdown_drains_sends_and_updates(
     entrypoint: str,
+    send_timeout: float | None,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -88,12 +92,16 @@ async def test_shutdown_drains_sends_and_updates(
                 modules=[],
                 update_interval=0,
                 configure_logging=False,
+                send_timeout=send_timeout,
             ),
         )
     elif entrypoint == "api":
         coroutine = run_scheduler_task(scheduler, interval=timedelta(0))
     else:
-        coroutine = SchedulerLoop(scheduler).run(update_interval=timedelta(0))
+        coroutine = SchedulerLoop(scheduler).run(
+            update_interval=timedelta(0),
+            send_timeout=send_timeout,
+        )
 
     scheduler_task = asyncio.create_task(coroutine)
     cleanup_started = asyncio.gather(
