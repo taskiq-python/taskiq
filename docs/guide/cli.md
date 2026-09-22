@@ -146,10 +146,10 @@ kill -HUP <main pid>
 If you send `SIGINT` or `SIGTERM` to the main process by pressing <kbd>Ctrl</kbd>+<kbd>C</kbd> or using the `kill` command, it will initiate the shutdown process.
 By default, it will stop fetching new messages immediately after receiving the signal but will wait for the completion of all currently executing tasks.
 
-If you don't want to wait indefinitely for tasks to complete, configure `--wait-tasks-timeout` to set their graceful completion period. Once that period expires, the worker requests cancellation of asynchronous task callbacks that are still running and waits for their cleanup before continuing shutdown. Synchronous functions already running in a thread or process executor cannot be forcibly stopped by asyncio cancellation and may continue until the executor shuts down. This is not an absolute process deadline; repeat the termination signal until the configured hard-kill threshold is reached if the process must stop immediately.
+If you don't want to wait indefinitely for tasks to complete, configure `--wait-tasks-timeout` to set their graceful completion period. Once that period expires, the worker requests cancellation of asynchronous task callbacks that are still running and awaits their completion before continuing shutdown. Synchronous functions already running in a thread or process executor cannot be forcibly stopped by asyncio cancellation. Shutdown cancellation is deferred while awaiting such a call so that task dependencies remain usable until the function returns. This is not an absolute process deadline. Enforce a hard deadline through your process supervisor, with forced termination configured for the worker processes and their executor subprocesses; forced termination does not guarantee task cleanup.
 
 ::: tip Cool tip
-The number of signals before a hard kill can be configured with the `--hardkill-count` CLI argument.
+The `--hardkill-count` CLI argument counts termination signals received by each worker process. Additional signals sent only to the main process are not forwarded after shutdown begins.
 :::
 
 
@@ -172,7 +172,7 @@ The number of signals before a hard kill can be configured with the `--hardkill-
 * `--max-fails` - Maximum number of child process exits.
 * `--shutdown-timeout` - maximum amount of time for graceful broker's shutdown in seconds (default 5).
 * `--wait-tasks-timeout` - graceful completion period for current tasks during shutdown. Cancellation is requested for callbacks still running after the period, and their cleanup is awaited. The default `None` waits without a timeout.
-* `--hardkill-count` - Number of termination signals to the main process before performing a hardkill.
+* `--hardkill-count` - per-worker termination-signal threshold for the worker's hard-kill handling.
 
 ## Scheduler
 

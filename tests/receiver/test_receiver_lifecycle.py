@@ -1,16 +1,34 @@
 import asyncio
 import logging
+import multiprocessing
+import os
+from collections.abc import AsyncGenerator, Awaitable
+from concurrent.futures import ProcessPoolExecutor
+from io import StringIO
+from pathlib import Path
+from typing import Literal
 from unittest.mock import Mock
 
 import anyio
 import pytest
+from taskiq_dependencies import Depends
 
+from taskiq.brokers.inmemory_broker import InmemoryResultBackend
+from taskiq.exceptions import SendTaskError
+from taskiq.message import BrokerMessage, TaskiqMessage
+from taskiq.middlewares import SimpleRetryMiddleware
 from taskiq.receiver.receiver import Receiver, _PrefetchedMessage, _QueueSignal
 from tests.receiver.receiver_lifecycle_support import (
     ControlledReceiver,
+    DependencyCleanupProbe,
+    ProcessResourceProbe,
     ReceiverQueue,
     ShieldCallCounter,
+    SyncResourceProbe,
     assert_exact_capacity,
+    listen_in_scope,
+    process_resource_broker,
+    read_process_resource,
     start_callback,
     wait_for_signals,
 )
@@ -21,6 +39,585 @@ from tests.receiver.receiver_listener_support import (
 from tests.utils import AsyncQueueBroker
 
 RUNNER_PROBE_TASK_NAME = "receiver-drain-cancellation-probe"
+
+
+@pytest.mark.parametrize("stop", ["timeout", "cancel", "scope"])
+async def test_shutdown_waits_for_process_resource_owner(
+    stop: Literal["timeout", "cancel", "scope"],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context = multiprocessing.get_context("spawn")
+    with (
+        context.Manager() as manager,
+        ProcessPoolExecutor(max_workers=1, mp_context=context) as executor,
+    ):
+        probe = ProcessResourceProbe(
+            resource=tmp_path / "task-resource.txt",
+            started=manager.Event(),
+            release=manager.Event(),
+        )
+        probe.resource.write_text("completed")
+        backend = InmemoryResultBackend[tuple[int, str]]()
+        broker = process_resource_broker
+        monkeypatch.setattr(broker, "queue", asyncio.Queue())
+        monkeypatch.setattr(broker, "result_backend", backend)
+        monkeypatch.setitem(broker.state, "process_resource", probe)
+        task = await read_process_resource.kiq()
+        receiver = Receiver(
+            broker,
+            executor=executor,
+            max_async_tasks=1,
+            run_startup=False,
+            wait_tasks_timeout=0.01,
+        )
+        finish_event = asyncio.Event()
+        scope = anyio.CancelScope()
+        listener = asyncio.create_task(listen_in_scope(receiver, finish_event, scope))
+        try:
+            assert await asyncio.to_thread(probe.started.wait, 15)
+            if stop == "timeout":
+                finish_event.set()
+            elif stop == "cancel":
+                listener.cancel()
+            else:
+                scope.cancel()
+            done, _ = await asyncio.wait({listener}, timeout=0.05)
+            assert not done
+            assert probe.resource.exists()
+            assert not await backend.is_result_ready(task.task_id)
+            probe.release.set()
+            if stop == "cancel":
+                with pytest.raises(asyncio.CancelledError):
+                    await asyncio.wait_for(listener, timeout=5)
+            else:
+                await asyncio.wait_for(listener, timeout=5)
+            result = await backend.get_result(task.task_id)
+            assert not result.is_err
+            child_pid, value = result.return_value
+            assert child_pid != os.getpid()
+            assert value == "completed"
+            assert not probe.resource.exists()
+            await asyncio.wait_for(broker.wait_tasks(), timeout=1)
+            await assert_exact_capacity(receiver)
+        finally:
+            probe.release.set()
+            listener.cancel()
+            await asyncio.gather(listener, return_exceptions=True)
+
+
+@pytest.mark.parametrize("stop", ["timeout", "cancel", "scope"])
+@pytest.mark.parametrize("returns_awaitable", [False, True])
+async def test_shutdown_waits_for_sync_resource_owner(
+    stop: str,
+    returns_awaitable: bool,
+) -> None:
+    backend = InmemoryResultBackend[str]()
+    broker = AsyncQueueBroker().with_result_backend(backend)
+    probe = SyncResourceProbe()
+
+    @broker.task
+    def target(resource: StringIO = Depends(probe.dependency)) -> str | Awaitable[str]:
+        value = probe.run(resource)
+        return probe.continuation() if returns_awaitable else value
+
+    task = await target.kiq()
+    receiver = Receiver(
+        broker,
+        max_async_tasks=1,
+        run_startup=False,
+        wait_tasks_timeout=0.01,
+    )
+    finish_event = asyncio.Event()
+    scope = anyio.CancelScope()
+    listener = asyncio.create_task(listen_in_scope(receiver, finish_event, scope))
+    try:
+        await asyncio.wait_for(probe.started.wait(), timeout=1)
+        if stop == "timeout":
+            finish_event.set()
+        elif stop == "cancel":
+            listener.cancel()
+        else:
+            scope.cancel()
+        done, _ = await asyncio.wait({listener}, timeout=0.05)
+        assert not done
+        assert not probe.resource.closed
+        assert not await backend.is_result_ready(task.task_id)
+        probe.release.set()
+        if stop == "cancel":
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(listener, timeout=1)
+        else:
+            await asyncio.wait_for(listener, timeout=1)
+        assert probe.finished.is_set()
+        assert probe.resource.closed
+        result = await backend.get_result(task.task_id)
+        if returns_awaitable:
+            assert probe.continuation_started.is_set()
+            assert probe.continuation_finished.is_set()
+            assert isinstance(result.error, asyncio.CancelledError)
+        else:
+            assert not result.is_err
+            assert result.return_value == "completed"
+        await asyncio.wait_for(broker.wait_tasks(), timeout=1)
+        await assert_exact_capacity(receiver)
+    finally:
+        probe.release.set()
+        probe.release_continuation.set()
+        listener.cancel()
+        await asyncio.gather(listener, return_exceptions=True)
+        await asyncio.wait_for(probe.finished.wait(), timeout=1)
+
+
+@pytest.mark.parametrize("depth", [1, 2, 3])
+async def test_shutdown_cancels_every_running_nested_call(depth: int) -> None:
+    backend = InmemoryResultBackend[None]()
+    broker = AsyncQueueBroker().with_result_backend(backend)
+    started, release = asyncio.Event(), asyncio.Event()
+    resumed: list[int] = []
+
+    @broker.task
+    async def target(level: int) -> None:
+        if level:
+            await receiver.run_task(
+                target.original_func,
+                TaskiqMessage(
+                    task_id=f"nested-{level}",
+                    task_name=target.task_name,
+                    args=[level - 1],
+                    kwargs={},
+                    labels={},
+                ),
+            )
+            resumed.append(level)
+        else:
+            started.set()
+        await release.wait()
+
+    task = await target.kiq(depth)
+    receiver = Receiver(
+        broker,
+        max_async_tasks=1,
+        run_startup=False,
+        wait_tasks_timeout=0.01,
+    )
+    finish_event = asyncio.Event()
+    listener = asyncio.create_task(receiver.listen(finish_event))
+    try:
+        await asyncio.wait_for(started.wait(), timeout=1)
+        finish_event.set()
+        done, _ = await asyncio.wait({listener}, timeout=1)
+        assert listener in done
+        await listener
+        assert not resumed
+        result = await backend.get_result(task.task_id)
+        assert isinstance(result.error, asyncio.CancelledError)
+        await asyncio.wait_for(broker.wait_tasks(), timeout=1)
+        await assert_exact_capacity(receiver)
+    finally:
+        release.set()
+        listener.cancel()
+        await asyncio.gather(listener, return_exceptions=True)
+
+
+@pytest.mark.parametrize("stop", ["timeout", "cancel", "scope"])
+async def test_shutdown_preserves_nested_call_inside_target_cleanup(stop: str) -> None:
+    backend = InmemoryResultBackend[None]()
+    broker = AsyncQueueBroker().with_result_backend(backend)
+    started, release = asyncio.Event(), asyncio.Event()
+    cleanup_resumed, cleanup_finished = asyncio.Event(), asyncio.Event()
+
+    @broker.task
+    async def cleanup_step() -> None:
+        await asyncio.sleep(0)
+
+    @broker.task
+    async def target() -> None:
+        started.set()
+        try:
+            await release.wait()
+        finally:
+            await receiver.run_task(
+                cleanup_step.original_func,
+                TaskiqMessage(
+                    task_id="target-cleanup",
+                    task_name=cleanup_step.task_name,
+                    args=[],
+                    kwargs={},
+                    labels={},
+                ),
+            )
+            cleanup_resumed.set()
+            await release.wait()
+            cleanup_finished.set()
+
+    task = await target.kiq()
+    receiver = Receiver(
+        broker,
+        max_async_tasks=1,
+        run_startup=False,
+        wait_tasks_timeout=0.01,
+    )
+    finish_event = asyncio.Event()
+    scope = anyio.CancelScope()
+    listener = asyncio.create_task(listen_in_scope(receiver, finish_event, scope))
+    try:
+        await asyncio.wait_for(started.wait(), timeout=1)
+        if stop == "timeout":
+            finish_event.set()
+        elif stop == "cancel":
+            listener.cancel()
+        else:
+            scope.cancel()
+        await asyncio.wait_for(cleanup_resumed.wait(), timeout=1)
+        assert not listener.done()
+        assert not cleanup_finished.is_set()
+        release.set()
+        if stop == "cancel":
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(listener, timeout=1)
+        else:
+            await asyncio.wait_for(listener, timeout=1)
+        assert cleanup_finished.is_set()
+        result = await backend.get_result(task.task_id)
+        assert isinstance(result.error, asyncio.CancelledError)
+        await asyncio.wait_for(broker.wait_tasks(), timeout=1)
+        await assert_exact_capacity(receiver)
+    finally:
+        release.set()
+        listener.cancel()
+        await asyncio.gather(listener, return_exceptions=True)
+
+
+@pytest.mark.parametrize("stop", ["timeout", "cancel", "scope"])
+@pytest.mark.parametrize("error_type", [TimeoutError, ReceiverLifecycleError])
+async def test_shutdown_survives_replaced_nested_cancellation(
+    stop: str,
+    error_type: type[Exception],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    backend = InmemoryResultBackend[None]()
+    broker = AsyncQueueBroker().with_result_backend(backend)
+    started, release, resumed = asyncio.Event(), asyncio.Event(), asyncio.Event()
+
+    @broker.task
+    async def child() -> None:
+        started.set()
+        try:
+            await release.wait()
+        finally:
+            if error_type is TimeoutError:
+                await release.wait()
+            else:
+                raise ReceiverLifecycleError("target cleanup failed")
+
+    @broker.task
+    async def parent() -> None:
+        await receiver.run_task(
+            child.original_func,
+            TaskiqMessage(
+                task_id="replaced-cancellation",
+                task_name=child.task_name,
+                args=[],
+                kwargs={},
+                labels={"timeout": 0.2} if error_type is TimeoutError else {},
+            ),
+        )
+        resumed.set()
+        await release.wait()
+
+    task = await parent.kiq()
+    receiver = Receiver(
+        broker,
+        max_async_tasks=1,
+        run_startup=False,
+        wait_tasks_timeout=0.01,
+    )
+    finish_event = asyncio.Event()
+    scope = anyio.CancelScope()
+    listener = asyncio.create_task(listen_in_scope(receiver, finish_event, scope))
+    try:
+        await asyncio.wait_for(started.wait(), timeout=1)
+        if stop == "timeout":
+            finish_event.set()
+        elif stop == "cancel":
+            listener.cancel()
+        else:
+            scope.cancel()
+        done, _ = await asyncio.wait({listener}, timeout=1)
+        assert listener in done
+        if stop == "cancel":
+            with pytest.raises(asyncio.CancelledError):
+                await listener
+        else:
+            await listener
+        assert not resumed.is_set()
+        result = await backend.get_result(task.task_id)
+        assert isinstance(result.error, asyncio.CancelledError)
+        assert any(
+            record.exc_info and isinstance(record.exc_info[1], error_type)
+            for record in caplog.records
+        )
+        await asyncio.wait_for(broker.wait_tasks(), timeout=1)
+        await assert_exact_capacity(receiver)
+    finally:
+        release.set()
+        listener.cancel()
+        await asyncio.gather(listener, return_exceptions=True)
+
+
+@pytest.mark.parametrize("stop", ["timeout", "cancel", "scope"])
+@pytest.mark.parametrize("nested", [False, True])
+async def test_shutdown_preserves_started_dependency_teardown(
+    stop: str,
+    nested: bool,
+) -> None:
+    backend = InmemoryResultBackend[str]()
+    broker = AsyncQueueBroker().with_result_backend(backend)
+    probe = DependencyCleanupProbe()
+    resumed = asyncio.Event()
+
+    @broker.task
+    async def child(resource: None = Depends(probe.dependency)) -> str:
+        return "completed"
+
+    @broker.task
+    async def parent() -> None:
+        await receiver.run_task(
+            child.original_func,
+            TaskiqMessage(
+                task_id="nested-cleanup",
+                task_name=child.task_name,
+                args=[],
+                kwargs={},
+                labels={},
+            ),
+        )
+        resumed.set()
+        await asyncio.Event().wait()
+
+    task = await (parent if nested else child).kiq()
+    receiver = Receiver(
+        broker,
+        max_async_tasks=1,
+        run_startup=False,
+        wait_tasks_timeout=0.01,
+    )
+    finish_event = asyncio.Event()
+    scope = anyio.CancelScope()
+    listener = asyncio.create_task(listen_in_scope(receiver, finish_event, scope))
+    try:
+        await asyncio.wait_for(probe.started.wait(), timeout=1)
+        if stop == "timeout":
+            finish_event.set()
+        elif stop == "cancel":
+            listener.cancel()
+        else:
+            scope.cancel()
+        done, _ = await asyncio.wait({listener}, timeout=0.05)
+        assert not done
+        assert not probe.finished.is_set()
+        if stop == "cancel":
+            listener.cancel()
+        probe.release.set()
+        if stop == "cancel":
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(listener, timeout=1)
+        else:
+            await asyncio.wait_for(listener, timeout=1)
+        assert probe.finished.is_set()
+        assert not resumed.is_set()
+        result = await backend.get_result(task.task_id)
+        if nested:
+            assert isinstance(result.error, asyncio.CancelledError)
+        else:
+            assert not result.is_err
+            assert result.return_value == "completed"
+        await asyncio.wait_for(broker.wait_tasks(), timeout=1)
+        await assert_exact_capacity(receiver)
+    finally:
+        probe.release.set()
+        listener.cancel()
+        await asyncio.gather(listener, return_exceptions=True)
+
+
+async def test_shutdown_preserves_reentrant_dependency_teardown() -> None:
+    backend = InmemoryResultBackend[str]()
+    broker = AsyncQueueBroker().with_result_backend(backend)
+    probe = DependencyCleanupProbe()
+    outer_started, release_outer, outer_finished = (
+        asyncio.Event(),
+        asyncio.Event(),
+        asyncio.Event(),
+    )
+
+    @broker.task
+    async def child(resource: None = Depends(probe.dependency)) -> None:
+        pass
+
+    async def outer_dependency() -> AsyncGenerator[None, None]:
+        try:
+            yield
+        finally:
+            await receiver.run_task(
+                child.original_func,
+                TaskiqMessage(
+                    task_id="nested-close",
+                    task_name=child.task_name,
+                    args=[],
+                    kwargs={},
+                    labels={},
+                ),
+            )
+            outer_started.set()
+            await release_outer.wait()
+            outer_finished.set()
+
+    @broker.task
+    async def parent(resource: None = Depends(outer_dependency)) -> str:
+        return "completed"
+
+    task = await parent.kiq()
+    receiver = Receiver(broker, run_startup=False, wait_tasks_timeout=0.01)
+    finish_event = asyncio.Event()
+    listener = asyncio.create_task(receiver.listen(finish_event))
+    try:
+        await asyncio.wait_for(probe.started.wait(), timeout=1)
+        finish_event.set()
+        await asyncio.wait({listener}, timeout=0.05)
+        probe.release.set()
+        await asyncio.wait_for(outer_started.wait(), timeout=1)
+        assert probe.finished.is_set()
+        assert not listener.done()
+        release_outer.set()
+        await asyncio.wait_for(listener, timeout=1)
+        assert outer_finished.is_set()
+        assert not (await backend.get_result(task.task_id)).is_err
+        await asyncio.wait_for(broker.wait_tasks(), timeout=1)
+    finally:
+        probe.release.set()
+        release_outer.set()
+        listener.cancel()
+        await asyncio.gather(listener, return_exceptions=True)
+
+
+async def test_shutdown_finishes_nested_retry_before_cancelling_parent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    broker = AsyncQueueBroker().with_middlewares(SimpleRetryMiddleware())
+    probe = DependencyCleanupProbe()
+    send_started, release_send = asyncio.Event(), asyncio.Event()
+    original_kick = broker.kick
+
+    async def blocked_kick(message: BrokerMessage) -> None:
+        send_started.set()
+        await release_send.wait()
+        await original_kick(message)
+
+    @broker.task(retry_on_error=True)
+    async def child(resource: None = Depends(probe.dependency)) -> None:
+        raise ValueError("retry this task")
+
+    @broker.task
+    async def parent() -> None:
+        await receiver.run_task(
+            child.original_func,
+            TaskiqMessage(
+                task_id="nested-retry",
+                task_name=child.task_name,
+                args=[],
+                kwargs={},
+                labels={"retry_on_error": True},
+            ),
+        )
+
+    await parent.kiq()
+    monkeypatch.setattr(broker, "kick", blocked_kick)
+    receiver = Receiver(broker, run_startup=False, wait_tasks_timeout=0.01)
+    finish_event = asyncio.Event()
+    listener = asyncio.create_task(receiver.listen(finish_event))
+    try:
+        await asyncio.wait_for(probe.started.wait(), timeout=1)
+        finish_event.set()
+        await asyncio.wait({listener}, timeout=0.05)
+        probe.release.set()
+        await asyncio.wait_for(send_started.wait(), timeout=1)
+        assert not listener.done()
+        release_send.set()
+        await asyncio.wait_for(listener, timeout=1)
+        retry = broker.formatter.loads(await asyncio.wait_for(broker.queue.get(), 1))
+        retry.parse_labels()
+        assert retry.task_name == child.task_name
+        assert retry.task_id == "nested-retry"
+        assert retry.labels["_retries"] == 1
+        broker.queue.task_done()
+        await asyncio.wait_for(broker.wait_tasks(), timeout=1)
+    finally:
+        probe.release.set()
+        release_send.set()
+        listener.cancel()
+        await asyncio.gather(listener, return_exceptions=True)
+
+
+async def test_shutdown_delivers_cancellation_after_retry_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    broker = AsyncQueueBroker().with_middlewares(SimpleRetryMiddleware())
+    send_started, release_send, release_parent = (
+        asyncio.Event(),
+        asyncio.Event(),
+        asyncio.Event(),
+    )
+    failures: list[SendTaskError] = []
+
+    async def failing_kick(message: BrokerMessage) -> None:
+        send_started.set()
+        await release_send.wait()
+        raise ReceiverLifecycleError("retry send failed")
+
+    @broker.task(retry_on_error=True)
+    async def child() -> None:
+        raise ValueError("retry this task")
+
+    @broker.task
+    async def parent() -> None:
+        try:
+            await receiver.run_task(
+                child.original_func,
+                TaskiqMessage(
+                    task_id="nested-retry-failure",
+                    task_name=child.task_name,
+                    args=[],
+                    kwargs={},
+                    labels={"retry_on_error": True},
+                ),
+            )
+        except SendTaskError as error:
+            failures.append(error)
+            await release_parent.wait()
+
+    await parent.kiq()
+    monkeypatch.setattr(broker, "kick", failing_kick)
+    receiver = Receiver(broker, run_startup=False, wait_tasks_timeout=0.01)
+    finish_event = asyncio.Event()
+    listener = asyncio.create_task(receiver.listen(finish_event))
+    try:
+        await asyncio.wait_for(send_started.wait(), timeout=1)
+        finish_event.set()
+        done, _ = await asyncio.wait({listener}, timeout=0.05)
+        assert not done
+        release_send.set()
+        done, _ = await asyncio.wait({listener}, timeout=1)
+        assert listener in done
+        await listener
+        assert len(failures) == 1
+        assert isinstance(failures[0].__cause__, ReceiverLifecycleError)
+        await asyncio.wait_for(broker.wait_tasks(), timeout=1)
+    finally:
+        release_send.set()
+        release_parent.set()
+        listener.cancel()
+        await asyncio.gather(listener, return_exceptions=True)
 
 
 async def test_finite_timeout_cancels_and_drains_callback() -> None:

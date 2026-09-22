@@ -268,8 +268,7 @@ class WorkerArgs:
             "--hardkill-count",
             type=int,
             default=3,
-            help="Number of termination signals to the main "
-            "process before performing a hardkill.",
+            help="Per-worker termination-signal threshold for hard-kill handling.",
         )
         parser.add_argument(
             "--use-process-pool",

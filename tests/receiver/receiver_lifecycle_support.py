@@ -1,14 +1,129 @@
 import asyncio
-from collections.abc import Awaitable
+import contextvars
+import os
+import threading
+from collections.abc import AsyncGenerator, Awaitable
+from dataclasses import dataclass
+from io import StringIO
+from pathlib import Path
 from typing import Any
+
+import anyio
+from taskiq_dependencies import Depends
 
 from taskiq.abc.broker import AckableMessage
 from taskiq.brokers.inmemory_broker import InMemoryBroker
 from taskiq.receiver.receiver import Receiver, _PrefetchedMessage, _QueueSignal
+from taskiq.state import TaskiqState
 from tests.receiver.receiver_listener_support import (
     ReceiverLifecycleError,
     assert_semaphore_capacity,
 )
+from tests.utils import AsyncQueueBroker
+
+process_resource_broker = AsyncQueueBroker()
+
+
+@dataclass
+class ProcessResourceProbe:
+    """Share a resource path and explicit checkpoints with a spawned worker."""
+
+    resource: Path
+    started: threading.Event
+    release: threading.Event
+
+
+async def process_resource_dependency(
+    state: TaskiqState = Depends(),
+) -> AsyncGenerator[ProcessResourceProbe, None]:
+    """Keep the resource available until the receiver closes the dependency."""
+    probe: ProcessResourceProbe = state.process_resource
+    try:
+        yield probe
+    finally:
+        probe.resource.unlink()
+
+
+@process_resource_broker.task
+def read_process_resource(
+    probe: ProcessResourceProbe = Depends(process_resource_dependency),
+) -> tuple[int, str]:
+    """Read the resource in an importable, spawn-compatible task function."""
+    probe.started.set()
+    if not probe.release.wait(timeout=15):
+        raise TimeoutError("Process resource probe was not released")
+    return os.getpid(), probe.resource.read_text()
+
+
+class SyncResourceProbe:
+    """Keep a real executor function alive while its dependency is inspected."""
+
+    def __init__(self) -> None:
+        self.loop = asyncio.get_running_loop()
+        self.started = asyncio.Event()
+        self.finished = asyncio.Event()
+        self.release = threading.Event()
+        self.resource = StringIO("completed")
+        self.continuation_started = asyncio.Event()
+        self.continuation_finished = asyncio.Event()
+        self.release_continuation = asyncio.Event()
+
+    async def dependency(self) -> AsyncGenerator[StringIO, None]:
+        try:
+            yield self.resource
+        finally:
+            self.resource.close()
+
+    def run(self, resource: StringIO) -> str:
+        self.loop.call_soon_threadsafe(self.started.set)
+        try:
+            assert self.release.wait(timeout=10)
+            return resource.getvalue()
+        finally:
+            self.loop.call_soon_threadsafe(self.finished.set)
+
+    async def continuation(self) -> str:
+        self.continuation_started.set()
+        try:
+            await self.release_continuation.wait()
+            return self.resource.getvalue()
+        finally:
+            assert not self.resource.closed
+            self.continuation_finished.set()
+
+
+class DependencyCleanupProbe:
+    """Expose teardown checkpoints while enforcing the original task/context."""
+
+    def __init__(self) -> None:
+        self.started = asyncio.Event()
+        self.release = asyncio.Event()
+        self.finished = asyncio.Event()
+        self.context = contextvars.ContextVar("dependency-cleanup", default=False)
+
+    async def dependency(self) -> AsyncGenerator[None, None]:
+        owner = asyncio.current_task()
+        token = self.context.set(True)
+        try:
+            yield
+        finally:
+            self.started.set()
+            await self.release.wait()
+            for _ in range(20):
+                await asyncio.sleep(0)
+            assert asyncio.current_task() is owner
+            self.context.reset(token)
+            self.finished.set()
+
+
+async def listen_in_scope(
+    receiver: Receiver,
+    finish_event: asyncio.Event,
+    scope: anyio.CancelScope,
+) -> None:
+    """Expose listener cancellation through a real AnyIO scope."""
+    with scope:
+        await receiver.listen(finish_event)
 
 
 class ShieldCallCounter:
