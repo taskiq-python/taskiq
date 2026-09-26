@@ -237,6 +237,18 @@ class AsyncBroker(ABC):
         :param message: name of a task.
         """
 
+    async def _finish_kick(self) -> None:  # noqa: B027
+        """
+        Hook that runs after a message is sent and ``post_send`` fired.
+
+        Most brokers send messages elsewhere and have nothing to do here,
+        so this is a no-op by default. Brokers that execute tasks in-place
+        (like :class:`~taskiq.InMemoryBroker` with ``await_inplace``) can
+        override this method to await the in-place execution *after* the
+        ``post_send`` middleware hook has run, preserving the expected
+        ``pre_send -> post_send -> pre_execute -> ...`` ordering.
+        """
+
     @abstractmethod
     def listen(self) -> AsyncGenerator[bytes | AckableMessage, None]:
         """
