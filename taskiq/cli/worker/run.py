@@ -119,6 +119,9 @@ def start_listen(args: WorkerArgs) -> None:
     signal.signal(signal.SIGTERM, interrupt_handler)
     if sys.platform != "win32":
         signal.signal(signal.SIGHUP, interrupt_handler)
+    else:
+        # Windows requires the selector event loop policy.
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     if uvloop is not None:
         logger.debug("UVLOOP found. Using it as async runner")
