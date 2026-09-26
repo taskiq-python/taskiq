@@ -70,25 +70,6 @@ def get_receiver_type(args: WorkerArgs) -> type[Receiver]:
     return receiver_type
 
 
-def configure_child_logging(args: WorkerArgs) -> None:
-    """
-    Configure logging in a worker process.
-
-    A process started with the ``fork`` start method inherits
-    the logging configuration of the main process.
-    Processes started with ``spawn`` or ``forkserver``
-    (the default on Linux since Python 3.14) begin with
-    a fresh interpreter, so logging has to be configured again.
-
-    :param args: CLI arguments.
-    """
-    if args.configure_logging and get_start_method() != "fork":
-        logging.basicConfig(
-            level=args.log_level,
-            format=args.log_format,
-        )
-
-
 def start_listen(args: WorkerArgs) -> None:
     """
     This function starts actual listening process.
@@ -105,7 +86,11 @@ def start_listen(args: WorkerArgs) -> None:
     """
     shutdown_event = asyncio.Event()
     hardkill_counter = 0
-    configure_child_logging(args)
+    if args.configure_logging and get_start_method() != "fork":
+        logging.basicConfig(
+            level=args.log_level,
+            format=args.log_format,
+        )
 
     def interrupt_handler(signum: int, _frame: Any) -> None:
         """
