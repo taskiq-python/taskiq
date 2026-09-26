@@ -137,6 +137,8 @@ async def my_async_task() -> None:
 
 Result backend is used to store and get results of the execution.
 Results have type `TaskiqResult` from [taskiq.result](https://github.com/taskiq-python/taskiq/blob/master/taskiq/result.py).
+It holds the returned value, the execution time and the exception, if the task has failed.
+See [Error handling](./error-handling.md) for more info about failed tasks.
 
 Every ResultBackend must implement `AsyncResultBackend` from [taskiq.abc.result_backend](https://github.com/taskiq-python/taskiq/blob/master/taskiq/abc/result_backend.py). By default, brokers use `DummyResultBackend`. It doesn't do anything and cannot be used
 in real-world scenarios. But some brokers can override it. For example `InMemoryBroker` by default uses `InMemoryResultBackend` and returns correct results.
@@ -223,7 +225,7 @@ Here are methods you can implement in the order they are executed:
 - `pre_send` - executed on the client side before the message is sent. Here you can modify the message.
 - `post_send` - executed right after the message was sent.
 - `pre_execute` - executed on the worker side after the message was received by a worker and before its execution.
-- `on_error` - executed after the task was executed if an exception was found.
+- `on_error` - executed after the task was executed if an exception was found. See [Error handling](./error-handling.md).
 - `post_execute` - executed after the message was executed.
 - `post_save` - executed after the result was saved in the result backend.
 
