@@ -54,3 +54,37 @@ def test_metrics_still_work_after_reuse() -> None:
     assert first.success_tasks.labels(message.task_name)._value.get() >= 1
     assert first.found_errors.labels(message.task_name)._value.get() >= 1
     assert first.saved_results.labels(message.task_name)._value.get() >= 1
+
+
+def test_counter_type_mismatch_reraises() -> None:
+    """Wrong-type collector for a Counter name must re-raise ValueError."""
+    from prometheus_client import REGISTRY, Histogram  # noqa: PLC0415
+
+    existing = REGISTRY._names_to_collectors.get("found_errors")
+    if existing is not None:
+        REGISTRY.unregister(existing)
+    wrong = Histogram("found_errors", "Number of found errors", ["task_name"])
+    try:
+        with pytest.raises(ValueError):
+            PrometheusMiddleware(server_port=19003)
+    finally:
+        REGISTRY.unregister(wrong)
+        # Restore healthy state for other tests.
+        PrometheusMiddleware(server_port=19003)
+
+
+def test_histogram_type_mismatch_reraises() -> None:
+    """Wrong-type collector for a Histogram name must re-raise ValueError."""
+    from prometheus_client import REGISTRY, Counter  # noqa: PLC0415
+
+    existing = REGISTRY._names_to_collectors.get("execution_time")
+    if existing is not None:
+        REGISTRY.unregister(existing)
+    wrong = Counter("execution_time", "Time of function execution", ["task_name"])
+    try:
+        with pytest.raises(ValueError):
+            PrometheusMiddleware(server_port=19004)
+    finally:
+        REGISTRY.unregister(wrong)
+        # Restore healthy state for other tests.
+        PrometheusMiddleware(server_port=19004)
