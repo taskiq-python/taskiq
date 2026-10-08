@@ -86,7 +86,7 @@ def start_listen(args: WorkerArgs) -> None:
     """
     shutdown_event = asyncio.Event()
     hardkill_counter = 0
-    if args.configure_logging and get_start_method() == "spawn":
+    if args.configure_logging and get_start_method() != "fork":
         logging.basicConfig(
             level=args.log_level,
             format=args.log_format,
