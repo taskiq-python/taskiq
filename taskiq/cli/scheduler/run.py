@@ -234,6 +234,8 @@ class SchedulerLoop:
         self._update_schedules_task_future: asyncio.Task[Any] | None = None
 
     def _update_schedules_task_future_callback(self, task_: asyncio.Task[Any]) -> None:
+        if task_.cancelled():
+            return
         self.scheduled_tasks = task_.result()
 
         new_schedules_ids: set[ScheduleId] = set()
@@ -266,6 +268,18 @@ class SchedulerLoop:
             self._update_schedules_task_future.add_done_callback(
                 self._update_schedules_task_future_callback,
             )
+
+    async def _cancel_pending_tasks(
+        self,
+        running_schedules: dict[ScheduleId, asyncio.Task[Any]],
+    ) -> None:
+        # Stop owned operations before callers close the broker and sources.
+        pending_tasks = list(running_schedules.values())
+        if self._update_schedules_task_future is not None:
+            pending_tasks.append(self._update_schedules_task_future)
+        for pending_task in pending_tasks:
+            pending_task.cancel()
+        await asyncio.gather(*pending_tasks, return_exceptions=True)
 
     def _mark_cron_tasks_as_already_run(self) -> None:
         current_minute = datetime.now(tz=timezone.utc).replace(second=0, microsecond=0)
@@ -361,51 +375,57 @@ class SchedulerLoop:
 
         await _sleep_until_next_second()
 
-        while True:
-            now = datetime.now(tz=timezone.utc)
-            next_run = (now + loop_interval).replace(microsecond=0)
+        try:
+            while True:
+                now = datetime.now(tz=timezone.utc)
+                next_run = (now + loop_interval).replace(microsecond=0)
 
-            if now - self.scheduled_tasks_updated_at >= update_interval:
-                await self._update_scheduled_tasks()
-                self.scheduled_tasks_updated_at = now
+                if now - self.scheduled_tasks_updated_at >= update_interval:
+                    await self._update_scheduled_tasks()
+                    self.scheduled_tasks_updated_at = now
 
-            for source, task_list in self.scheduled_tasks:
-                for task in task_list:
-                    is_ready_to_send: bool = self._is_schedule_ready_to_send(
-                        task=task,
-                        now=now,
-                    )
+                for source, task_list in self.scheduled_tasks:
+                    for task in task_list:
+                        is_ready_to_send: bool = self._is_schedule_ready_to_send(
+                            task=task,
+                            now=now,
+                        )
 
-                    if is_ready_to_send and task.schedule_id not in running_schedules:
-                        if send_timeout is not None:
-                            send_coro = send_with_timeout(
-                                self.scheduler,
-                                source,
-                                task,
-                                timeout=send_timeout,
+                        if (
+                            is_ready_to_send
+                            and task.schedule_id not in running_schedules
+                        ):
+                            if send_timeout is not None:
+                                send_coro = send_with_timeout(
+                                    self.scheduler,
+                                    source,
+                                    task,
+                                    timeout=send_timeout,
+                                )
+                            else:
+                                send_coro = send(self.scheduler, source, task)
+                            send_task = self._event_loop.create_task(
+                                send_coro,
+                                # We need to set the name of the task
+                                # to be able to discard its reference
+                                # after it is done.
+                                name=f"schedule_{task.schedule_id}",
                             )
-                        else:
-                            send_coro = send(self.scheduler, source, task)
-                        send_task = self._event_loop.create_task(
-                            send_coro,
-                            # We need to set the name of the task
-                            # to be able to discard its reference
-                            # after it is done.
-                            name=f"schedule_{task.schedule_id}",
-                        )
-                        running_schedules[task.schedule_id] = send_task
-                        send_task.add_done_callback(
-                            lambda task_future: running_schedules.pop(
-                                task_future.get_name().removeprefix("schedule_"),
-                            ),
-                        )
+                            running_schedules[task.schedule_id] = send_task
+                            send_task.add_done_callback(
+                                lambda task_future: running_schedules.pop(
+                                    task_future.get_name().removeprefix("schedule_"),
+                                ),
+                            )
 
-            delay = next_run - datetime.now(tz=timezone.utc)
-            logger.debug(
-                "Sleeping for %.3f seconds before getting schedules.",
-                delay.total_seconds(),
-            )
-            await asyncio.sleep(delay.total_seconds())
+                delay = next_run - datetime.now(tz=timezone.utc)
+                logger.debug(
+                    "Sleeping for %.3f seconds before getting schedules.",
+                    delay.total_seconds(),
+                )
+                await asyncio.sleep(delay.total_seconds())
+        finally:
+            await self._cancel_pending_tasks(running_schedules)
 
 
 async def _startup_scheduler(scheduler: TaskiqScheduler) -> None:
