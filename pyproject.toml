@@ -62,7 +62,7 @@ opentelemetry = [
   "psutil>=7",
 ]
 orjson = ["orjson>=3"]
-reload = ["watchdog>=4", "gitignore-parser>=0"]
+reload = ["watchdog>=4.0.2", "gitignore-parser>=0"]
 uv = ["uvloop>=0.16.0,<1; sys_platform != 'win32'"]
 zmq = ["pyzmq>=26"]
 
