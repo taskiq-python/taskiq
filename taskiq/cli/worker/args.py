@@ -259,14 +259,16 @@ class WorkerArgs:
             "--wait-tasks-timeout",
             type=float,
             default=None,
-            help="Maximum time to wait for all current tasks to finish before exiting.",
+            help=(
+                "Grace period for current task callbacks before cancellation is "
+                "requested during shutdown."
+            ),
         )
         parser.add_argument(
             "--hardkill-count",
             type=int,
             default=3,
-            help="Number of termination signals to the main "
-            "process before performing a hardkill.",
+            help="Per-worker termination-signal threshold for hard-kill handling.",
         )
         parser.add_argument(
             "--use-process-pool",

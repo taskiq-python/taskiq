@@ -5,6 +5,7 @@ import functools
 import inspect
 import random
 import sys
+from collections import Counter
 from collections.abc import AsyncGenerator, Callable
 from concurrent.futures import Executor, ProcessPoolExecutor
 from dataclasses import dataclass
@@ -111,6 +112,11 @@ class Receiver:
         self.known_tasks: set[str] = set()
         self.max_tasks_to_execute = max_tasks_to_execute
         self.wait_tasks_timeout = wait_tasks_timeout
+        self._executing_tasks: Counter[asyncio.Task[Any]] = Counter()
+        self._finishing_tasks: Counter[asyncio.Task[Any]] = Counter()
+        self._sync_tasks: set[asyncio.Task[Any]] = set()
+        # Execution depth receiving cancellation, or None for a deferred request.
+        self._shutdown_cancellations: dict[asyncio.Task[Any], int | None] = {}
         self._listen_error: BaseException | None = None
         if max_prefetch < 0:
             raise ValueError("max_prefetch cannot be negative.")
@@ -312,6 +318,9 @@ class Receiver:
             if PY_VERSION <= (3, 13)
             else inspect.iscoroutinefunction
         )
+        execution_task = asyncio.current_task()
+        if execution_task is not None:
+            self._executing_tasks[execution_task] += 1
         try:
             # We put kwargs resolving here,
             # to be able to catch any exception (for example ),
@@ -348,6 +357,7 @@ class Receiver:
                         ctx.run,
                         func,
                     )
+                target_future = self._await_sync_result(target_future)
             timeout = message.labels.get("timeout")
             if timeout is not None:
                 if not is_coroutine:
@@ -374,40 +384,98 @@ class Receiver:
         except BaseException as exc:
             found_exception = exc
             logger.exception("Exception found while executing function.")
+        finally:
+            if execution_task is not None:
+                if self._shutdown_cancellations.get(execution_task) == (
+                    self._executing_tasks[execution_task]
+                ):
+                    self._shutdown_cancellations[execution_task] = None
+                self._executing_tasks[execution_task] -= 1
+                if not self._executing_tasks[execution_task]:
+                    del self._executing_tasks[execution_task]
         # Stop the timer.
         execution_time = time() - start_time
-        if dep_ctx:
-            args = (None, None, None)
-            if found_exception and self.propagate_exceptions:
-                args = (  # type: ignore
-                    type(found_exception),
-                    found_exception,
-                    found_exception.__traceback__,
-                )
-            await dep_ctx.close(*args)
-
-        # Assemble result.
-        result: TaskiqResult[Any] = TaskiqResult(
-            is_err=found_exception is not None,
-            log=None,
-            return_value=returned,
-            execution_time=round(execution_time, 2),
-            error=found_exception,
-            labels=message.labels,
-        )
-        # If exception is found we execute middlewares.
-        if found_exception is not None:
-            for middleware in reversed(self.broker.middlewares):
-                if middleware.__class__.on_error != TaskiqMiddleware.on_error:
-                    await maybe_awaitable(
-                        middleware.on_error(
-                            message,
-                            result,
-                            found_exception,
-                        ),
+        if execution_task is not None:
+            self._finishing_tasks[execution_task] += 1
+        try:
+            if dep_ctx:
+                args = (None, None, None)
+                if found_exception and self.propagate_exceptions:
+                    args = (  # type: ignore
+                        type(found_exception),
+                        found_exception,
+                        found_exception.__traceback__,
                     )
+                await dep_ctx.close(*args)
 
+            # Assemble result.
+            result: TaskiqResult[Any] = TaskiqResult(
+                is_err=found_exception is not None,
+                log=None,
+                return_value=returned,
+                execution_time=round(execution_time, 2),
+                error=found_exception,
+                labels=message.labels,
+            )
+            # If exception is found we execute middlewares.
+            if found_exception is not None:
+                for middleware in reversed(self.broker.middlewares):
+                    if middleware.__class__.on_error != TaskiqMiddleware.on_error:
+                        await maybe_awaitable(
+                            middleware.on_error(
+                                message,
+                                result,
+                                found_exception,
+                            ),
+                        )
+        finally:
+            if execution_task is not None:
+                self._finishing_tasks[execution_task] -= 1
+                if not self._finishing_tasks[execution_task]:
+                    del self._finishing_tasks[execution_task]
+                    if execution_task in self._shutdown_cancellations:
+                        asyncio.get_running_loop().call_soon(
+                            self._deliver_deferred_cancellation,
+                            execution_task,
+                        )
+
+        if execution_task is not None and self._deliver_deferred_cancellation(
+            execution_task,
+        ):
+            await asyncio.sleep(0)
         return result
+
+    def _deliver_deferred_cancellation(self, task: asyncio.Task[Any]) -> bool:
+        """Deliver pending shutdown only when the task resumes execution."""
+        if (
+            task not in self._shutdown_cancellations
+            or task in self._finishing_tasks
+            or task in self._sync_tasks
+        ):
+            return False
+        if task not in self._executing_tasks or task.done():
+            del self._shutdown_cancellations[task]
+            return False
+        if self._shutdown_cancellations[task] is None:
+            self._shutdown_cancellations[task] = self._executing_tasks[task]
+            return task.cancel()
+        return False
+
+    async def _await_sync_result(self, future: asyncio.Future[Any]) -> Any:
+        """Defer receiver shutdown while the executor still uses dependencies."""
+        task = asyncio.current_task()
+        if task is not None:
+            self._sync_tasks.add(task)
+        try:
+            return await future
+        finally:
+            if task is not None:
+                self._sync_tasks.discard(task)
+                if task in self._shutdown_cancellations:
+                    asyncio.get_running_loop().call_soon(
+                        self._deliver_deferred_cancellation,
+                        task,
+                    )
 
     async def listen(self, finish_event: asyncio.Event) -> None:  # pragma: no cover
         """
@@ -656,19 +724,12 @@ class Receiver:
         :param queue: queue with prefetched data.
         """
         tasks: set[asyncio.Task[Any]] = set()
-
-        while True:
-            try:
+        graceful_shutdown = False
+        try:
+            while True:
                 queued_message = await queue.get()
                 if queued_message is _QueueSignal.DONE:
-                    # asyncio.wait will throw an error if there is nothing to wait for
-                    if tasks:
-                        logger.info(
-                            "Waiting for %d running tasks to complete...",
-                            len(tasks),
-                        )
-                        await asyncio.wait(tasks, timeout=self.wait_tasks_timeout)
-                        logger.info("No more tasks to wait for. Shutting down.")
+                    graceful_shutdown = True
                     break
                 execution_semaphore = self.sem
                 owns_execution_slot = execution_semaphore is not None
@@ -684,12 +745,6 @@ class Receiver:
                 )
                 tasks.add(started_callback.task)
 
-                # We want the task to remove itself from the set when it's done.
-                #
-                # Because if we won't save it anywhere,
-                # python's GC can silently cancel task
-                # and this behaviour considered to be a Hisenbug.
-                # https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/
                 started_callback.task.add_done_callback(
                     functools.partial(
                         self._on_callback_done,
@@ -697,10 +752,74 @@ class Receiver:
                         owns_delivery_slot=started_callback.owns_delivery_slot,
                     ),
                 )
+        except asyncio.CancelledError:
+            pass
+        finally:
+            await self._drain_active_tasks(
+                tasks,
+                cancel_immediately=not graceful_shutdown,
+            )
+            logger.info("The runner is stopped.")
 
+    async def _run_owned_callback(self, message: bytes | AckableMessage) -> None:
+        """Run one callback outside repeated listener-scope cancellation."""
+        with anyio.CancelScope(shield=True):
+            await self.callback(message=message, raise_err=False)
+
+    async def _drain_active_tasks(
+        self,
+        tasks: set[asyncio.Task[Any]],
+        *,
+        cancel_immediately: bool,
+    ) -> None:
+        """Wait for callbacks and cancel work beyond the graceful boundary."""
+        tasks = set(tasks)
+        if not tasks:
+            return
+
+        logger.info("Waiting for %d running tasks to complete...", len(tasks))
+        if cancel_immediately:
+            pending = {task for task in tasks if not task.done()}
+        else:
+            try:
+                _, pending = await asyncio.wait(
+                    tasks,
+                    timeout=self.wait_tasks_timeout,
+                )
             except asyncio.CancelledError:
-                break
-        logger.info("The runner is stopped.")
+                pending = {task for task in tasks if not task.done()}
+
+        if pending:
+            with anyio.CancelScope(shield=True):
+                await self._cancel_callback_tasks(pending)
+        logger.info("No more tasks to wait for. Shutting down.")
+
+    async def _cancel_callback_tasks(
+        self,
+        tasks: set[asyncio.Task[Any]],
+    ) -> None:
+        """Cancel execution without interrupting task finalization."""
+        cancellable_tasks = tasks.difference(self._finishing_tasks, self._sync_tasks)
+        self._shutdown_cancellations.update(
+            (task, self._executing_tasks[task] if task in cancellable_tasks else None)
+            for task in tasks
+        )
+        if cancellable_tasks:
+            logger.warning(
+                "Cancelling %d running callback tasks.",
+                len(cancellable_tasks),
+            )
+        for task in cancellable_tasks:
+            task.cancel()
+        waiter = asyncio.gather(*tasks, return_exceptions=True)
+        try:
+            while not waiter.done():
+                with contextlib.suppress(asyncio.CancelledError):
+                    await asyncio.shield(waiter)
+            waiter.result()
+        finally:
+            for task in tasks:
+                self._shutdown_cancellations.pop(task, None)
 
     def _start_callback(
         self,
@@ -716,7 +835,7 @@ class Receiver:
                 owns_delivery_slot = False
             return _StartedCallback(
                 task=asyncio.create_task(
-                    self.callback(message=message.data, raise_err=False),
+                    self._run_owned_callback(message=message.data),
                 ),
                 owns_delivery_slot=owns_delivery_slot,
             )
@@ -737,12 +856,24 @@ class Receiver:
         active_tasks: set[asyncio.Task[Any]],
         owns_delivery_slot: bool,
     ) -> None:
-        """Release capacity transferred to a completed callback task."""
+        """Release callback capacity and retrieve unexpected failures."""
         active_tasks.discard(task)
         if self.sem is not None:
             self.sem.release()
         if owns_delivery_slot:
             self.sem_prefetch.release()
+        if task.cancelled():
+            return
+        task_exception = task.exception()
+        if task_exception is not None:
+            logger.error(
+                "Receiver callback failed outside task execution handling.",
+                exc_info=(
+                    type(task_exception),
+                    task_exception,
+                    task_exception.__traceback__,
+                ),
+            )
 
     def _record_listen_error(self, error: BaseException) -> None:
         """Preserve the first listener error and report cleanup failures."""

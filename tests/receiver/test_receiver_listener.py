@@ -551,7 +551,7 @@ async def test_callback_handoff_failure_releases_capacity(
     def fail_callback_handoff(**_: object) -> None:
         raise handoff_error
 
-    monkeypatch.setattr(receiver, "callback", fail_callback_handoff)
+    monkeypatch.setattr(receiver, "_run_owned_callback", fail_callback_handoff)
     await task.kiq()
 
     with (
