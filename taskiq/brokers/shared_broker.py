@@ -1,4 +1,5 @@
 from collections.abc import AsyncGenerator
+from copy import copy
 from typing import Any, ParamSpec, TypeVar
 
 from taskiq.abc.broker import AsyncBroker
@@ -28,7 +29,7 @@ class SharedDecoratedTask(AsyncTaskiqDecoratedTask[_Params, _ReturnType]):
         return AsyncKicker(
             task_name=self.task_name,
             broker=broker,
-            labels=self.labels,
+            labels=copy(self.labels),
             return_type=self.return_type,
         )
 
