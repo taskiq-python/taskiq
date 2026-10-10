@@ -120,3 +120,54 @@ def test_worker_process_logs_listening_started(
         assert wait_for_output(process, "Listening started.")
     finally:
         stop(process)
+
+
+@pytest.mark.parametrize("reload", [False, True])
+@pytest.mark.parametrize("configure_logging", [False, True])
+def test_reload_respects_logging_configuration(
+    reload: bool,
+    configure_logging: bool,
+) -> None:
+    process = subprocess.run(  # noqa: S603
+        [
+            sys.executable,
+            "-c",
+            """
+import logging
+import sys
+from unittest.mock import patch
+
+from taskiq.cli.worker.args import WorkerArgs
+from taskiq.cli.worker.process_manager import ShutdownAction
+from taskiq.cli.worker.run import run_worker
+
+reload = sys.argv[1] == "True"
+configure_logging = sys.argv[2] == "True"
+assert not logging.getLogger().handlers
+with (
+    patch(
+        "taskiq.cli.worker.process_manager.ProcessManager.prepare_workers",
+        autospec=True,
+    ) as prepare_workers,
+    patch("taskiq.cli.worker.run.Observer"),
+):
+    prepare_workers.side_effect = lambda manager: manager.action_queue.put(
+        ShutdownAction(),
+    )
+    run_worker(WorkerArgs(
+        broker="unused:broker",
+        modules=[],
+        reload=reload,
+        configure_logging=configure_logging,
+    ))
+assert bool(logging.getLogger().handlers) == configure_logging
+""",
+            str(reload),
+            str(configure_logging),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=STARTUP_TIMEOUT,
+        check=False,
+    )
+    assert process.returncode == 0, process.stderr
