@@ -35,3 +35,11 @@ def test_max_prefetch_rejects_negative_default(
 
     assert exc_info.value.code == 2
     assert "max_prefetch cannot be negative" in capsys.readouterr().err
+
+
+def test_loop_factory_accepts_import_string() -> None:
+    args = WorkerArgs.from_cli(
+        ["example:broker", "--loop-factory", "asyncio:SelectorEventLoop"],
+    )
+
+    assert args.loop_factory == "asyncio:SelectorEventLoop"

@@ -10,7 +10,12 @@ from sys import platform
 from typing import Any
 
 from taskiq.abc.broker import AsyncBroker
-from taskiq.cli.utils import import_object, import_tasks
+from taskiq.cli.utils import (
+    create_event_loop,
+    import_object,
+    import_tasks,
+    resolve_loop_factory,
+)
 from taskiq.cli.worker.args import WorkerArgs
 from taskiq.cli.worker.process_manager import ProcessManager
 from taskiq.receiver import Receiver
@@ -27,6 +32,16 @@ except ImportError:
     Observer = None  # type: ignore
 
 logger = logging.getLogger("taskiq.worker")
+
+
+def _create_worker_event_loop(args: WorkerArgs) -> asyncio.AbstractEventLoop:
+    if args.loop_factory is not None:
+        loop_factory = resolve_loop_factory(args.loop_factory, app_dir=args.app_dir)
+        return create_event_loop(loop_factory)
+    if uvloop is not None:
+        logger.debug("UVLOOP found. Using it as async runner")
+        return uvloop.new_event_loop()  # type: ignore
+    return asyncio.new_event_loop()
 
 
 async def shutdown_broker(broker: AsyncBroker, timeout: float) -> None:
@@ -120,11 +135,7 @@ def start_listen(args: WorkerArgs) -> None:
     if sys.platform != "win32":
         signal.signal(signal.SIGHUP, interrupt_handler)
 
-    if uvloop is not None:
-        logger.debug("UVLOOP found. Using it as async runner")
-        loop = uvloop.new_event_loop()  # type: ignore
-    else:
-        loop = asyncio.new_event_loop()
+    loop = _create_worker_event_loop(args)
 
     asyncio.set_event_loop(loop)
 
