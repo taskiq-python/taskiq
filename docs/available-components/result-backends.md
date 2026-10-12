@@ -10,6 +10,32 @@ This includes:
 - return value;
 - Execution time in seconds.
 
+## Skipping result storage
+
+Sometimes you don't need task results at all (fire-and-forget jobs, notifications, side effects only).
+You can skip writing to the result backend for selected tasks with the `skip_result` label:
+
+```python
+@broker.task(skip_result=True)
+async def push_notification(user_id: int) -> None:
+    ...
+```
+
+Or only for a single call:
+
+```python
+await push_notification.kicker().with_labels(skip_result=True).kiq(user_id=1)
+```
+
+When `skip_result` is enabled:
+
+- worker does **not** call `result_backend.set_result`;
+- `post_save` middleware hooks are **not** executed;
+- callers that use `wait_result()` will time out, because nothing is stored.
+
+This is complementary to raising `NoResultError` from inside a task.
+Use the label when the decision is static; raise `NoResultError` when you decide at runtime.
+
 ## Built-in result backends
 
 ### DummyResultBackend
