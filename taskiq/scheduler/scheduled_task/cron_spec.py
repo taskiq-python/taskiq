@@ -1,5 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
+from taskiq.scheduler.scheduled_task.cron import Cron
 from taskiq.scheduler.scheduled_task.validators import CronOffset
 
 
@@ -14,6 +15,13 @@ class CronSpec(BaseModel):
 
     offset: CronOffset | None = None
 
-    def to_cron(self) -> str:  # pragma: no cover
-        """Converts cron spec to cron string."""
-        return f"{self.minutes} {self.hours} {self.days} {self.months} {self.weekdays}"
+    @model_validator(mode="after")
+    def _validate_cron(self) -> "CronSpec":
+        self.to_cron()
+        return self
+
+    def to_cron(self) -> Cron:
+        """Converts cron spec to a validated cron object."""
+        return Cron.parse(
+            f"{self.minutes} {self.hours} {self.days} {self.months} {self.weekdays}",
+        )
