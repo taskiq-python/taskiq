@@ -20,7 +20,7 @@ from taskiq.exceptions import SendTaskError
 from taskiq.labels import prepare_label
 from taskiq.message import TaskiqMessage
 from taskiq.scheduler.created_schedule import CreatedSchedule
-from taskiq.scheduler.scheduled_task import CronSpec, ScheduledTask
+from taskiq.scheduler.scheduled_task import Cron, CronSpec, ScheduledTask
 from taskiq.task import AsyncTaskiqTask
 from taskiq.utils import maybe_awaitable
 
@@ -180,7 +180,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
     async def schedule_by_cron(
         self,
         source: "ScheduleSource",
-        cron: Union[str, "CronSpec"],
+        cron: Union[str, "CronSpec", "Cron"],
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
     ) -> CreatedSchedule[_ReturnType]:
@@ -188,7 +188,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         Function to schedule task with cron.
 
         :param source: schedule source.
-        :param cron: cron expression.
+        :param cron: cron string, Cron or CronSpec instance.
         :param args: function's args.
         :param kwargs: function's kwargs.
 
@@ -200,10 +200,10 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         message = self._prepare_message(*args, **kwargs)
         cron_offset = None
         if isinstance(cron, CronSpec):
-            cron_str = cron.to_cron()
+            cron_value = cron.to_cron()
             cron_offset = cron.offset
         else:
-            cron_str = cron
+            cron_value = Cron.parse(cron) if isinstance(cron, str) else cron
         scheduled = ScheduledTask(
             schedule_id=schedule_id,
             task_name=message.task_name,
@@ -211,7 +211,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
             args=message.args,
             kwargs=message.kwargs,
             task_id=self.custom_task_id,
-            cron=cron_str,
+            cron=cron_value,
             cron_offset=cron_offset,
         )
         await source.add_schedule(scheduled)

@@ -20,7 +20,7 @@ from taskiq.task import AsyncTaskiqTask
 if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.broker import AsyncBroker
     from taskiq.abc.schedule_source import ScheduleSource
-    from taskiq.scheduler.scheduled_task import CronSpec
+    from taskiq.scheduler.scheduled_task import Cron, CronSpec
 
 _T = TypeVar("_T")
 _FuncParams = ParamSpec("_FuncParams")
@@ -139,7 +139,7 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
     async def schedule_by_cron(
         self,
         source: "ScheduleSource",
-        cron: Union[str, "CronSpec"],
+        cron: Union[str, "CronSpec", "Cron"],
         *args: _FuncParams.args,
         **kwargs: _FuncParams.kwargs,
     ) -> CreatedSchedule[_ReturnType]:
@@ -150,7 +150,7 @@ class AsyncTaskiqDecoratedTask(Generic[_FuncParams, _ReturnType]):
         which is capable of dynamically adding new schedules.
 
         :param source: schedule source.
-        :param cron: cron string or a CronSpec instance.
+        :param cron: cron string, Cron or CronSpec instance.
         :param args: function's arguments.
         :param kwargs: function's key word arguments.
         :return: schedule id.

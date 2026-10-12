@@ -11,7 +11,7 @@ import pycron
 from taskiq.abc.schedule_source import ScheduleSource
 from taskiq.cli.scheduler.args import SchedulerArgs
 from taskiq.cli.utils import import_object, import_tasks
-from taskiq.scheduler.scheduled_task import ScheduledTask
+from taskiq.scheduler.scheduled_task import Cron, CronError, ScheduledTask
 from taskiq.scheduler.scheduler import TaskiqScheduler
 
 logger = getLogger(__name__)
@@ -77,7 +77,7 @@ class CronValueError(Exception):
 
 
 def is_cron_task_now(
-    cron_value: str,
+    cron_value: str | Cron,
     now: datetime,
     offset: str | timedelta | None = None,
     last_run: datetime | None = None,
@@ -108,8 +108,10 @@ def is_cron_task_now(
             raise CronValueError(e) from e
 
     try:
-        return pycron.is_now(cron_value, now)
-    except ValueError as e:
+        if isinstance(cron_value, str):
+            cron_value = Cron.parse(cron_value)
+        return pycron.is_now(cron_value.to_pycron(), now)
+    except (CronError, ValueError) as e:
         raise CronValueError(e) from e
 
 
