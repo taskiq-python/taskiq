@@ -34,14 +34,18 @@ class LabelScheduleSource(ScheduleSource):
         """
         self.schedules.clear()
         for task_name, task in self.broker.get_all_tasks().items():
-            if task.broker != self.broker:
-                # if task broker doesn't match self, something is probably wrong
-                logger.warning(
-                    "Broker for %s `%s` doesn't match scheduler's broker `%s`",
-                    task_name,
-                    task.broker,
-                    self.broker,
-                )
+            # Shared tasks are bound to the shared broker,
+            # but they are sent using its default broker.
+            task_broker = getattr(task.broker, "_default_broker", None) or task.broker
+            if task_broker != self.broker:
+                if task.labels.get("schedule"):
+                    # task has schedules, but they are going to be ignored
+                    logger.warning(
+                        "Broker for %s `%s` doesn't match scheduler's broker `%s`",
+                        task_name,
+                        task_broker,
+                        self.broker,
+                    )
                 continue
             for schedule in task.labels.get("schedule", []):
                 if not {"cron", "interval", "time"} & schedule.keys():
