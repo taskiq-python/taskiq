@@ -1,5 +1,5 @@
 import asyncio
-from time import time
+from time import monotonic
 from typing import Any
 
 from taskiq.exceptions import TaskiqResultTimeoutError
@@ -30,7 +30,7 @@ async def gather(
     :return: list of TaskiqResults.
     """
     loop = asyncio.get_event_loop()
-    start_time = time()
+    start_time = monotonic()
     ordered_ids = [task.task_id for task in tasks]
     task_ids = {task.task_id for task in tasks}
     results = {}
@@ -46,7 +46,7 @@ async def gather(
             results[task.task_id] = await task.get_result(with_logs=with_logs)
 
     while task_ids:
-        if 0 < timeout < time() - start_time:
+        if 0 < timeout < monotonic() - start_time:
             raise TaskiqResultTimeoutError(timeout=timeout)
         check_tasks = []
         for task in tasks:
