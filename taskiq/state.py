@@ -41,3 +41,7 @@ class TaskiqState(_Base):
 
     def __str__(self) -> str:
         return f"TaskiqState({super().__str__()})"
+
+    def copy(self) -> "TaskiqState":
+        """Return a shallow copy without changing the original state."""
+        return self.__copy__()
