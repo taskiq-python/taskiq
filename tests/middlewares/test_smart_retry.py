@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from taskiq import InMemoryBroker, ScheduleSource, ScheduledTask, SmartRetryMiddleware
+from taskiq import InMemoryBroker, ScheduledTask, ScheduleSource, SmartRetryMiddleware
 from taskiq.formatters.json_formatter import JSONFormatter
 from taskiq.message import TaskiqMessage
 from taskiq.result import TaskiqResult
