@@ -52,6 +52,7 @@ async def gather(
         for task in tasks:
             check_tasks.append(loop.create_task(check_task(task)))
         await asyncio.gather(*check_tasks)
-        await asyncio.sleep(periodicity)
+        if task_ids:
+            await asyncio.sleep(periodicity)
 
     return tuple(results[task_id] for task_id in ordered_ids)
