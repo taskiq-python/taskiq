@@ -8,6 +8,10 @@ from taskiq.instrumentation import TaskiqInstrumentor
 
 
 class TestTaskiqAutoInstrumentation(TestBase):
+    def tearDown(self) -> None:
+        TaskiqInstrumentor().uninstrument()
+        super().tearDown()
+
     def test_auto_instrument(self) -> None:
         TaskiqInstrumentor().instrument()
 
