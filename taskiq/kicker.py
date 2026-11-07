@@ -165,7 +165,7 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         try:
             await self.broker.kick(self.broker.formatter.dumps(message))
         except Exception as exc:
-            raise SendTaskError from exc
+            raise SendTaskError(reason=f"{type(exc).__name__}: {exc}") from exc
 
         for middleware in reversed(self.broker.middlewares):
             if middleware.__class__.post_send != TaskiqMiddleware.post_send:
