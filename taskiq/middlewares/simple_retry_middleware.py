@@ -24,7 +24,9 @@ class SimpleRetryMiddleware(TaskiqMiddleware):
         self.default_retry_count = default_retry_count
         self.default_retry_label = default_retry_label
         self.no_result_on_retry = no_result_on_retry
-        self.types_of_exceptions = types_of_exceptions
+        self.types_of_exceptions = (
+            tuple(types_of_exceptions) if types_of_exceptions is not None else None
+        )
 
     def _get_types_of_exceptions(
         self,

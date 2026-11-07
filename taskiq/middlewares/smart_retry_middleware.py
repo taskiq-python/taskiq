@@ -61,7 +61,9 @@ class SmartRetryMiddleware(TaskiqMiddleware):
         self.use_delay_exponent = use_delay_exponent
         self.max_delay_exponent = max_delay_exponent
         self.schedule_source = schedule_source
-        self.types_of_exceptions = types_of_exceptions
+        self.types_of_exceptions = (
+            tuple(types_of_exceptions) if types_of_exceptions is not None else None
+        )
 
         if not isinstance(schedule_source, (ScheduleSource, type(None))):
             raise TypeError(
