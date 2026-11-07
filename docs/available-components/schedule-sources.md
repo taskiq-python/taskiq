@@ -36,7 +36,7 @@ The format of the schedule label is the following:
 @broker.task(
     schedule=[
         {
-            "cron": "* * * * *", # type: str | None, either cron, interval or time should be specified.
+            "cron": "* * * * *", # type: str | Cron | None, either cron, interval or time should be specified.
             "cron_offset": None, # type: str | timedelta | None, can be omitted.
             "interval": None,  # type: int | timedelta | None, either cron, interval or time should be specified.
             "time": None,  # type: datetime | None, either cron, interval or time should be specified.
@@ -53,7 +53,7 @@ async def my_task():
 
 Parameters:
 
-- `cron` - crontab string when to run the task.
+- `cron` - crontab string (5 fields; names like `MON`/`JAN` are allowed) when to run the task. Invalid values are rejected when the schedule is created.
 - `cron_offset` - timezone offset for cron values. Explained [here](../guide/scheduling-tasks.md#working-with-timezones)
 - `interval` - Interval to run periodic tasks. Must be at least 1 second and cannot have fractional seconds.
 - `time` - specific time when to send the task.
