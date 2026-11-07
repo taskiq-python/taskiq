@@ -1,5 +1,6 @@
+import logging
 import uuid
-from typing import TypeVar
+from typing import Any, TypeVar
 
 import pytest
 from pydantic import BaseModel
@@ -68,3 +69,41 @@ async def test_res_parsing_success(serializer: TaskiqSerializer) -> None:
     sent_task = AsyncTaskiqTask(test_id, res_back, MyResult)
     parsed = await sent_task.wait_result()
     assert isinstance(parsed.return_value, MyResult)
+
+
+async def test_res_parsing_skipped_on_error(caplog: pytest.LogCaptureFixture) -> None:
+    res_back: AsyncResultBackend[Any] = SerializingBackend(serializers.JSONSerializer())
+    test_id = str(uuid.uuid4())
+    await res_back.set_result(
+        test_id,
+        TaskiqResult(
+            is_err=True,
+            return_value=None,
+            execution_time=0.0,
+        ),
+    )
+    sent_task: AsyncTaskiqTask[Any] = AsyncTaskiqTask(test_id, res_back, int)
+    with caplog.at_level(logging.WARNING, logger="taskiq.task"):
+        parsed = await sent_task.wait_result()
+    assert parsed.is_err
+    assert parsed.return_value is None
+    assert "Cannot parse return type" not in caplog.text
+
+
+async def test_res_parsing_failure(caplog: pytest.LogCaptureFixture) -> None:
+    res_back: AsyncResultBackend[Any] = SerializingBackend(serializers.JSONSerializer())
+    test_id = str(uuid.uuid4())
+    await res_back.set_result(
+        test_id,
+        TaskiqResult(
+            is_err=False,
+            return_value="not-an-int",
+            execution_time=0.0,
+        ),
+    )
+    sent_task: AsyncTaskiqTask[Any] = AsyncTaskiqTask(test_id, res_back, int)
+    with caplog.at_level(logging.WARNING, logger="taskiq.task"):
+        parsed = await sent_task.wait_result()
+    assert not parsed.is_err
+    assert parsed.return_value == "not-an-int"
+    assert "Cannot parse return type" in caplog.text
