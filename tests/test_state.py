@@ -56,3 +56,28 @@ def test_state_del_attr() -> None:
     del state.a
 
     assert state.get("a") is None
+
+
+def test_state_copy() -> None:
+    state = TaskiqState()
+    values = [1]
+    state.items_list = values
+
+    copied = state.copy()
+
+    assert isinstance(copied, TaskiqState)
+    assert dict(state) == dict(copied) == {"items_list": values}
+    assert copied["items_list"] is values
+    copied.other = 2
+    assert "other" not in state
+
+
+def test_state_copy_preserves_data_key() -> None:
+    state = TaskiqState()
+    state["data"] = "user value"
+
+    copied = state.copy()
+
+    assert dict(state) == dict(copied) == {"data": "user value"}
+    copied["data"] = "copied value"
+    assert state["data"] == "user value"
