@@ -1,6 +1,6 @@
 import asyncio
 from logging import getLogger
-from time import time
+from time import monotonic
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from taskiq.compat import parse_obj_as
@@ -96,9 +96,9 @@ class AsyncTaskiqTask(Generic[_ReturnType]):
             become ready in provided period of time.
         :return: task's return value.
         """
-        start_time = time()
+        start_time = monotonic()
         while not await self.is_ready():
-            if 0 < timeout < time() - start_time:
+            if 0 < timeout < monotonic() - start_time:
                 raise TaskiqResultTimeoutError(timeout=timeout)
             await asyncio.sleep(check_interval)
         return await self.get_result(with_logs=with_logs)
