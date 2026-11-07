@@ -117,3 +117,50 @@ async def test_task_scheduled_at_time_runs_only_once(mock_sleep: None) -> None:
         tasks = [task.args for task in await scheduler.sources[0].get_schedules()]
         assert tasks == [[2], [3]]  # [1] not in a list as it was enqueued above
     sched_task.cancel()
+
+
+async def test_schedule_discovery_keeps_shared_labels_isolated() -> None:
+    broker = InMemoryBroker()
+    schedule = {"cron": "* * * * *", "labels": {"origin": "nightly"}}
+
+    @broker.task(task_name="dedicated_task", schedule=[schedule], queue="dedicated")
+    async def dedicated_task() -> None:
+        pass
+
+    @broker.task(task_name="default_task", schedule=[schedule])
+    async def default_task() -> None:
+        pass
+
+    source = LabelScheduleSource(broker)
+    for _ in range(2):
+        await source.startup()
+        schedules = {
+            task.task_name: task.labels for task in await source.get_schedules()
+        }
+        assert schedules == {
+            "dedicated_task": {"origin": "nightly", "queue": "dedicated"},
+            "default_task": {"origin": "nightly"},
+        }
+        assert schedule["labels"] == {"origin": "nightly"}
+
+    await broker.shutdown()
+
+
+async def test_schedule_discovery_preserves_task_label_precedence() -> None:
+    broker = InMemoryBroker()
+    schedule = {
+        "cron": "* * * * *",
+        "labels": {"queue": "schedule", "origin": "nightly"},
+    }
+
+    @broker.task(task_name="task", schedule=[schedule], queue="task")
+    async def task() -> None:
+        pass
+
+    source = LabelScheduleSource(broker)
+    await source.startup()
+    schedules = await source.get_schedules()
+
+    assert schedules[0].labels == {"queue": "task", "origin": "nightly"}
+    assert schedule["labels"] == {"queue": "schedule", "origin": "nightly"}
+    await broker.shutdown()
