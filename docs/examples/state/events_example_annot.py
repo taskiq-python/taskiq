@@ -53,10 +53,9 @@ async def main() -> None:
     await broker.startup()
 
     set_task = await set_val.kiq("key", "value")
-    set_result = await set_task.wait_result(with_logs=True)
+    set_result = await set_task.wait_result()
     if set_result.is_err:
-        print(set_result.log)
-        raise ValueError("Cannot set value in redis. See logs.")
+        raise ValueError("Cannot set value in redis.") from set_result.error
 
     get_task = await get_val.kiq("key")
     get_res = await get_task.wait_result()
