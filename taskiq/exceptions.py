@@ -102,6 +102,13 @@ class ScheduledTaskCancelledError(TaskiqError):
     __template__ = "Cannot send scheduled task to the queue."
 
 
+class SkipSendError(TaskiqError):
+    """Middleware asked to skip sending the task."""
+
+    __template__ = "Task was not sent to the queue"
+    task_id: str | None = None
+
+
 class TaskBrokerMismatchError(TaskRejectedError):
     """Task has a different broker than the one it was registered to."""
 

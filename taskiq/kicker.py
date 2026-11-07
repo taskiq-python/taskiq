@@ -16,7 +16,7 @@ from typing import (
 from pydantic import BaseModel
 
 from taskiq.abc.middleware import TaskiqMiddleware
-from taskiq.exceptions import SendTaskError
+from taskiq.exceptions import SendTaskError, SkipSendError
 from taskiq.labels import prepare_label
 from taskiq.message import TaskiqMessage
 from taskiq.scheduler.created_schedule import CreatedSchedule
@@ -145,6 +145,8 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         It gets current broker and calls it's kick method,
         returning what it returns.
 
+        Returns without sending if a pre_send hook raises SkipSendError.
+
         :param args: function's arguments.
         :param kwargs: function's key word arguments.
 
@@ -159,20 +161,26 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
             kwargs,
         )
         message = self._prepare_message(*args, **kwargs)
-        for middleware in self.broker.middlewares:
-            if middleware.__class__.pre_send != TaskiqMiddleware.pre_send:
-                message = await maybe_awaitable(middleware.pre_send(message))
         try:
-            await self.broker.kick(self.broker.formatter.dumps(message))
-        except Exception as exc:
-            raise SendTaskError from exc
+            for middleware in self.broker.middlewares:
+                if middleware.__class__.pre_send != TaskiqMiddleware.pre_send:
+                    message = await maybe_awaitable(middleware.pre_send(message))
+        except SkipSendError as exc:
+            logger.debug("Task %s has been skipped.", self.task_name)
+            task_id = exc.task_id or message.task_id
+        else:
+            try:
+                await self.broker.kick(self.broker.formatter.dumps(message))
+            except Exception as exc:
+                raise SendTaskError from exc
 
-        for middleware in reversed(self.broker.middlewares):
-            if middleware.__class__.post_send != TaskiqMiddleware.post_send:
-                await maybe_awaitable(middleware.post_send(message))
+            for middleware in reversed(self.broker.middlewares):
+                if middleware.__class__.post_send != TaskiqMiddleware.post_send:
+                    await maybe_awaitable(middleware.post_send(message))
+            task_id = message.task_id
 
         return AsyncTaskiqTask(
-            task_id=message.task_id,
+            task_id=task_id,
             result_backend=self.broker.result_backend,
             return_type=self.return_type,  # type: ignore # (pyright issue)
         )
