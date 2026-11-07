@@ -106,6 +106,24 @@ class SmartRetryMiddleware(TaskiqMiddleware):
             retry_on_error = self.default_retry_label
         return retry_on_error
 
+    def _get_initial_delay(self, message: TaskiqMessage) -> float:
+        """
+        Resolve the initial base delay for a task.
+
+        If a private `_initial_delay` label was recorded on a previous retry,
+        it is reused to prevent compounding delays. Otherwise, it falls back
+        to the task's `delay` label or the middleware's `default_delay`.
+
+        :param message: Task message.
+        :return: Initial delay in seconds.
+        """
+        initial_delay = message.labels.get("_initial_delay")
+        if initial_delay is None:
+            initial_delay = message.labels.get("delay")
+        if initial_delay is None:
+            initial_delay = self.default_delay
+        return float(initial_delay)
+
     def make_delay(self, message: TaskiqMessage, retries: int) -> float:
         """
         Calculate retry delay.
@@ -116,7 +134,7 @@ class SmartRetryMiddleware(TaskiqMiddleware):
         :param retries: Current retry count.
         :return: Delay in seconds.
         """
-        delay = float(message.labels.get("delay", self.default_delay))
+        delay = self._get_initial_delay(message)
         if self.use_delay_exponent:
             delay = min(delay * retries, self.max_delay_exponent)
 
@@ -200,7 +218,10 @@ class SmartRetryMiddleware(TaskiqMiddleware):
                     labels=message.labels,
                 )
                 .with_task_id(message.task_id)
-                .with_labels(_retries=retries)
+                .with_labels(
+                    _retries=retries,
+                    _initial_delay=self._get_initial_delay(message),
+                )
             )
 
             await self.on_send(kicker, message, delay)
