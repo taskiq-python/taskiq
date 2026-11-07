@@ -12,6 +12,12 @@ from time import sleep
 from typing import Any
 
 try:
+    from watchdog.events import (
+        FileCreatedEvent,
+        FileDeletedEvent,
+        FileModifiedEvent,
+        FileMovedEvent,
+    )
     from watchdog.observers import Observer
 
     from taskiq.cli.watcher import FileWatcher
@@ -181,6 +187,13 @@ class ProcessManager:
                     ),
                     path=path_to_watch,
                     recursive=True,
+                    # Filter open/close events before watchdog queues them.
+                    event_filter=[
+                        FileModifiedEvent,
+                        FileCreatedEvent,
+                        FileDeletedEvent,
+                        FileMovedEvent,
+                    ],
                 )
 
         shutdown_handler = get_signal_handler(self.action_queue, ShutdownAction())
