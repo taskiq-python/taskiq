@@ -102,3 +102,4 @@ async def run_receiver_task(
                     exc,
                     exc_info=True,
                 )
+                await asyncio.sleep(0.1)
