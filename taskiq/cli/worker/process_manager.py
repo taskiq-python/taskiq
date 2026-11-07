@@ -271,7 +271,7 @@ class ProcessManager:
             # We bulk_process all pending events.
             while not self.action_queue.empty():
                 action = self.action_queue.get()
-                logging.debug("Got event: %s", action)
+                logger.debug("Got event: %s", action)
                 if isinstance(action, ReloadAllAction):
                     action.handle(
                         workers_num=len(self.workers),
