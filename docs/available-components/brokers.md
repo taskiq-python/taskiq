@@ -80,6 +80,91 @@ await my_task.kicker().with_broker(broker).kiq()
 :::
 
 
+## MultiBroker
+
+This broker combines multiple real brokers into one, so a single worker
+can consume messages from all of them at the same time.
+Every inner broker keeps its own connection and queue. The `MultiBroker`
+only merges the listening and routes kicks.
+
+This is useful when you want multiple queues but a single worker deployment
+that processes all of them.
+
+Tasks can be registered on inner brokers directly:
+
+```python
+from taskiq import MultiBroker
+from taskiq_aio_pika import AioPikaBroker, Queue
+
+fast_broker = AioPikaBroker(
+    "amqp://guest:guest@localhost:5672/",
+    task_queues=[Queue(name="fast_tasks")],
+)
+slow_broker = AioPikaBroker(
+    "amqp://guest:guest@localhost:5672/",
+    task_queues=[Queue(name="slow_tasks")],
+)
+broker = MultiBroker(fast_broker, slow_broker)
+```
+
+```python
+# tasks.py
+from my_project.broker import fast_broker, slow_broker
+
+@fast_broker.task
+async def fast_task() -> None:
+    ...
+
+@slow_broker.task
+async def slow_task() -> None:
+    ...
+```
+
+With this setup a single worker command consumes messages from both queues:
+
+```bash
+taskiq worker my_project.broker:broker my_project.tasks
+```
+
+It's also possible to register tasks on the `MultiBroker` itself.
+In this case pass a `routing` mapping and mark tasks with the `queue_name` label:
+
+```python
+broker = MultiBroker(
+    fast_broker,
+    slow_broker,
+    routing={"fast": fast_broker, "slow": slow_broker},
+)
+
+@broker.task(queue_name="slow")
+async def slow_task() -> None:
+    ...
+```
+
+Messages without the routing label are kicked using the default broker
+(the first one, unless `default_broker` is passed).
+
+::: caution Be careful!
+The worker side uses formatters and serializers of the `MultiBroker`,
+while kicks go through inner brokers. Default settings are compatible,
+but if you customize them, make sure they match on both sides.
+
+Also, middlewares of inner brokers work only on the kick side,
+and middlewares of the `MultiBroker` — only on the execution side.
+
+Use `MultiBroker.with_result_backend()` to set a result backend:
+it propagates the backend to all inner brokers, keeping client-side
+polling and worker-side saving in sync.
+:::
+
+If all of your queues live in a single RabbitMQ broker, prefer the native
+multi-queue support of [taskiq-aio-pika](https://github.com/taskiq-python/taskiq-aio-pika)
+(it listens to all `task_queues` over a single connection).
+The `MultiBroker` is useful when queues are served by different brokers,
+or by brokers without native multi-queue support. Note that it opens
+one connection per inner broker in every worker process.
+
+
 ## Custom brokers
 
 These brokers are not part of the core Taskiq lib. But they are maintained by Taskiq developers.
