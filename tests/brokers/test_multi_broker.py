@@ -4,6 +4,7 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from taskiq import MultiBroker
+from taskiq.acks import AckableMessage
 from taskiq.brokers.inmemory_broker import InmemoryResultBackend
 from taskiq.events import TaskiqEvents
 from taskiq.message import BrokerMessage
@@ -271,7 +272,7 @@ async def test_get_all_tasks_aggregates_inner_brokers() -> None:
 async def test_with_result_backend_propagates_to_inner_brokers() -> None:
     first, second = AsyncQueueBroker(), AsyncQueueBroker()
     broker = MultiBroker(first, second)
-    backend = InmemoryResultBackend()
+    backend = InmemoryResultBackend[None]()
 
     broker.with_result_backend(backend)
 
@@ -322,10 +323,11 @@ class DyingBroker(AsyncQueueBroker):
         super().__init__()
         self.messages_before_death = messages_before_death
 
-    async def listen(self) -> AsyncGenerator[object, None]:
+    async def listen(self) -> AsyncGenerator[AckableMessage, None]:
         while self.messages_before_death > 0:
             self.messages_before_death -= 1
-            yield await self.queue.get()
+            data = await self.queue.get()
+            yield AckableMessage(data=data, ack=self.queue.task_done)
         raise RuntimeError("cluster is down")
 
 

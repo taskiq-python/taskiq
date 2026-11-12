@@ -1,5 +1,6 @@
 import asyncio
 from collections.abc import AsyncGenerator
+from typing import cast
 
 import pytest
 
@@ -39,7 +40,10 @@ async def test_merge_async_iterables_merges_all_iterables() -> None:
 
 
 async def test_merge_async_iterables_without_iterables() -> None:
-    assert [item async for item in merge_async_iterables()] == []
+    # The TypeVar cannot be inferred from an empty argument list,
+    # so the return type is provided explicitly.
+    merged = cast("AsyncGenerator[int, None]", merge_async_iterables())
+    assert [item async for item in merged] == []
 
 
 async def test_merge_async_iterables_propagates_inner_errors() -> None:
