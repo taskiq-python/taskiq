@@ -1,3 +1,4 @@
+import contextlib
 import sys
 from collections.abc import AsyncGenerator
 from logging import getLogger
@@ -143,14 +144,52 @@ class MultiBroker(AsyncBroker):
         into a single generator, so the worker receives messages
         from every broker at the same time.
 
+        If one of the inner brokers fails, it's excluded from
+        listening, but all remaining brokers keep working. Only when
+        every inner broker is down, this generator ends and the worker
+        restarts.
+
         :yield: incoming messages from all inner brokers.
         :return: nothing.
         """
         merged = merge_async_iterables(
-            *(inner_broker.listen() for inner_broker in self.brokers),
+            *(self._listen_one(inner_broker) for inner_broker in self.brokers),
         )
         async for message in merged:
             yield message
+
+    async def _listen_one(
+        self,
+        inner_broker: AsyncBroker,
+    ) -> AsyncGenerator["bytes | AckableMessage", None]:
+        """
+        Listen to a single inner broker, degrading on its failure.
+
+        If the inner broker's listen fails, the error is logged
+        and this generator ends, so the failed broker is excluded
+        from the merged listening, but doesn't stop the whole worker.
+
+        :param inner_broker: broker to listen to.
+        :yield: incoming messages from the inner broker.
+        :return: nothing.
+        """
+        iterator = inner_broker.listen()
+        try:
+            async for message in iterator:
+                yield message
+        except Exception as exc:
+            logger.exception(
+                "Inner broker %s failed: %r. "
+                "It's excluded from listening, "
+                "continuing with remaining brokers.",
+                inner_broker,
+                exc,
+            )
+        finally:
+            # Catches both the failure case and the outer shutdown:
+            # a suspended generator must run its cleanup logic.
+            with contextlib.suppress(RuntimeError):
+                await iterator.aclose()
 
     async def startup(self) -> None:
         """

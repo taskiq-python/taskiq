@@ -315,14 +315,48 @@ async def test_receiver_processes_tasks_from_all_brokers() -> None:
     await broker.shutdown()
 
 
-async def test_inner_broker_errors_propagate_to_consumer() -> None:
-    class FailingBroker(AsyncQueueBroker):
-        async def listen(self) -> AsyncGenerator[object, None]:
-            raise RuntimeError("listen failed")
-            yield  # pragma: no cover
+class DyingBroker(AsyncQueueBroker):
+    """Broker that yields N messages and then fails like a dead cluster."""
 
-    broker = MultiBroker(FailingBroker(), AsyncQueueBroker())
+    def __init__(self, messages_before_death: int) -> None:
+        super().__init__()
+        self.messages_before_death = messages_before_death
 
-    with pytest.raises(RuntimeError, match="listen failed"):
-        async for _ in broker.listen():
-            pass
+    async def listen(self) -> AsyncGenerator[object, None]:
+        while self.messages_before_death > 0:
+            self.messages_before_death -= 1
+            yield await self.queue.get()
+        raise RuntimeError("cluster is down")
+
+
+async def test_failed_broker_does_not_stop_healthy_brokers(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    dying = DyingBroker(messages_before_death=2)
+    healthy = AsyncQueueBroker()
+    broker = MultiBroker(dying, healthy)
+
+    for _ in range(2):
+        await dying.kick(build_message())
+    for _ in range(3):
+        await healthy.kick(build_message())
+
+    received = 0
+    iterator = broker.listen()
+    for _ in range(5):
+        await asyncio.wait_for(iterator.__anext__(), timeout=1)
+        received += 1
+    await iterator.aclose()
+
+    assert received == 5
+    assert "cluster is down" in caplog.text
+
+
+async def test_listen_ends_when_all_inner_brokers_fail() -> None:
+    broker = MultiBroker(
+        DyingBroker(messages_before_death=0),
+        DyingBroker(messages_before_death=0),
+    )
+
+    with pytest.raises(StopAsyncIteration):
+        await asyncio.wait_for(broker.listen().__anext__(), timeout=1)

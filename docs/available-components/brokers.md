@@ -144,6 +144,13 @@ async def slow_task() -> None:
 Messages without the routing label are kicked using the default broker
 (the first one, unless `default_broker` is passed).
 
+If one of the inner brokers fails (for example, its cluster is down),
+it's excluded from listening: the error is logged and the worker keeps
+consuming messages from the remaining brokers. Only when every inner
+broker is down does the worker process stop. Since the default
+`--max-fails` value is `-1`, the supervisor restarts the worker
+indefinitely, so it picks the brokers back up as soon as they recover.
+
 ::: caution Be careful!
 The worker side uses formatters and serializers of the `MultiBroker`,
 while kicks go through inner brokers. Default settings are compatible,
