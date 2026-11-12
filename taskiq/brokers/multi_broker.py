@@ -29,6 +29,12 @@ class MultiBroker(AsyncBroker):
     Every inner broker keeps its own connection and queue,
     this broker only merges the listening and routes kicks.
 
+    If an inner broker fails, it's excluded from listening
+    and the worker keeps consuming the remaining brokers.
+    The exclusion lasts until the worker process restarts.
+    When all inner brokers are down, the worker stops
+    and is restarted by the supervisor.
+
     Example of running one worker for multiple queues:
 
     >>> fast_broker = AioPikaBroker(url, queue_name="fast")

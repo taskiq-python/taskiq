@@ -87,8 +87,11 @@ can consume messages from all of them at the same time.
 Every inner broker keeps its own connection and queue. The `MultiBroker`
 only merges the listening and routes kicks.
 
-This is useful when you want multiple queues but a single worker deployment
-that processes all of them.
+This is useful when queues live in different clusters or even different
+technologies (two RabbitMQ clusters, RabbitMQ and Kafka, etc.), but you
+want a single worker deployment processing all of them.
+
+### Usage
 
 Tasks can be registered on inner brokers directly:
 
@@ -144,12 +147,74 @@ async def slow_task() -> None:
 Messages without the routing label are kicked using the default broker
 (the first one, unless `default_broker` is passed).
 
-If one of the inner brokers fails (for example, its cluster is down),
-it's excluded from listening: the error is logged and the worker keeps
-consuming messages from the remaining brokers. Only when every inner
-broker is down does the worker process stop. Since the default
-`--max-fails` value is `-1`, the supervisor restarts the worker
-indefinitely, so it picks the brokers back up as soon as they recover.
+### How it works
+
+- Every inner broker is a full broker with its own connection, queue
+  declarations and settings (for example, its own `qos` when using
+  taskiq-aio-pika). The composite opens one connection per inner broker
+  in every worker process.
+- `listen()` of all inner brokers run concurrently and are merged into
+  a single stream for the worker. There are no ordering or fairness
+  guarantees between queues: messages are processed as they arrive.
+- Tasks registered on inner brokers are kicked directly by their broker;
+  the composite is not involved. Only tasks registered on the
+  `MultiBroker` itself are routed by the `queue_name` label.
+- Startup and shutdown are delegated to all inner brokers. A failing
+  shutdown of one broker is logged and doesn't prevent the others
+  from stopping. The `is_worker_process` and `is_scheduler_process`
+  flags propagate, so inner brokers fire their WORKER_* events.
+- Task lookup aggregates registries of all inner brokers, so tasks can
+  be registered on any of them and the worker finds them all.
+- On shutdown the merged listening and all inner generators are closed
+  deterministically: every inner broker runs its cleanup logic, and
+  running tasks are awaited (bounded by `--wait-tasks-timeout`).
+
+### Failure handling
+
+The MultiBroker fails soft: an error of one broker doesn't stop the others.
+
+- **Connection flaps are handled by brokers themselves.** For example,
+  taskiq-aio-pika uses aio-pika's RobustConnection and reconnects
+  automatically. Such errors never reach the MultiBroker and change
+  nothing in the worker.
+- **If an inner broker's listening fails anyway** (an unrecoverable
+  error, or a dead cluster for brokers without built-in reconnection),
+  the error is logged with a traceback, the failed broker is excluded
+  from listening, and the worker keeps consuming the remaining brokers.
+- **Exclusion is permanent for the lifetime of the worker process.**
+  The MultiBroker doesn't re-subscribe failed brokers in place. Restart
+  the worker (or let the supervisor do it) to re-enable all brokers;
+  messages accumulated in the recovered queues are picked up after that.
+- **If every inner broker is down**, the listening ends and the worker
+  process stops. The supervisor restarts it: with the default
+  `--max-fails -1` it restarts indefinitely until the brokers come back.
+- **In-flight messages keep processing.** Messages already handed over
+  to the worker before the failure complete normally. Messages that
+  stayed in the failed broker follow that broker's delivery semantics
+  (see the guarantees table below).
+- **Kicks are not affected by worker-side degradation.** Exclusion only
+  stops consuming. If the target cluster is down, a kick fails on the
+  caller side with the inner broker's own error.
+- **Task-level errors don't degrade anything.** As with any taskiq
+  broker, an exception inside a task is logged and saved to the result
+  backend, the message is acknowledged, and the worker keeps running.
+
+### Guarantees
+
+The composite only merges brokers. All delivery guarantees come from
+the inner brokers:
+
+| Aspect | MultiBroker | Inner brokers |
+| --- | --- | --- |
+| One worker consuming all queues | yes | |
+| Kick routing by `queue_name` label | yes | |
+| Partial degradation on broker failure | yes | |
+| Graceful shutdown of all brokers | yes | |
+| Reconnection of a failed broker | no | broker's own (aio-pika reconnects; Redis list queues don't) |
+| Delivery guarantee (at-least/at-most once) | no | broker's own: RabbitMQ requeues unacked messages; Redis list queues lose popped messages on crash |
+| Message redelivery, dead-lettering | no | broker's own |
+| Per-queue concurrency limits | no | configured per inner broker (e.g. `qos` of taskiq-aio-pika) |
+| Cross-queue ordering or fairness | no (messages arrive interleaved) | per-queue ordering per broker |
 
 ::: caution Be careful!
 The worker side uses formatters and serializers of the `MultiBroker`,
