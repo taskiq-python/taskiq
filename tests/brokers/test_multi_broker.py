@@ -315,18 +315,14 @@ async def test_receiver_processes_tasks_from_all_brokers() -> None:
     await broker.shutdown()
 
 
-async def test_inner_broker_errors_stop_listener() -> None:
+async def test_inner_broker_errors_propagate_to_consumer() -> None:
     class FailingBroker(AsyncQueueBroker):
         async def listen(self) -> AsyncGenerator[object, None]:
             raise RuntimeError("listen failed")
             yield  # pragma: no cover
 
-    first = FailingBroker()
-    broker = MultiBroker(first, AsyncQueueBroker())
-    receiver = Receiver(broker=broker)
-    finish_event = asyncio.Event()
+    broker = MultiBroker(FailingBroker(), AsyncQueueBroker())
 
     with pytest.raises(RuntimeError, match="listen failed"):
-        await receiver.listen(finish_event)
-
-    finish_event.set()
+        async for _ in broker.listen():
+            pass
