@@ -92,6 +92,14 @@ def start_listen(args: WorkerArgs) -> None:
             format=args.log_format,
         )
 
+    if uvloop is not None:
+        logger.debug("UVLOOP found. Using it as async runner")
+        loop = uvloop.new_event_loop()  # type: ignore
+    else:
+        loop = asyncio.new_event_loop()
+
+    asyncio.set_event_loop(loop)
+
     def interrupt_handler(signum: int, _frame: Any) -> None:
         """
         Signal handler.
@@ -107,7 +115,7 @@ def start_listen(args: WorkerArgs) -> None:
         nonlocal shutdown_event
         nonlocal hardkill_counter
         # Soft kill is a signal to start shutdown.
-        shutdown_event.set()
+        loop.call_soon_threadsafe(shutdown_event.set)
         # Hard kill is a signal that we should stop
         # everything immediately.
         if hardkill_counter > args.hardkill_count:
@@ -119,14 +127,6 @@ def start_listen(args: WorkerArgs) -> None:
     signal.signal(signal.SIGTERM, interrupt_handler)
     if sys.platform != "win32":
         signal.signal(signal.SIGHUP, interrupt_handler)
-
-    if uvloop is not None:
-        logger.debug("UVLOOP found. Using it as async runner")
-        loop = uvloop.new_event_loop()  # type: ignore
-    else:
-        loop = asyncio.new_event_loop()
-
-    asyncio.set_event_loop(loop)
 
     # This option signals that current
     # broker is running as a worker.
