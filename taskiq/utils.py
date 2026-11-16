@@ -1,9 +1,18 @@
 import asyncio
 import contextlib
 import inspect
+import sys
 from collections.abc import AsyncGenerator, Awaitable, Coroutine
 from types import CoroutineType
 from typing import Any, TypeVar, Union
+
+import anyio
+from anyio.streams.memory import MemoryObjectSendStream
+
+if sys.version_info >= (3, 11):
+    from builtins import BaseExceptionGroup
+else:
+    from exceptiongroup import BaseExceptionGroup
 
 _T = TypeVar("_T")
 
@@ -33,6 +42,44 @@ async def maybe_awaitable(
     return possible_coroutine  # type: ignore
 
 
+async def _start_producer(
+    stream: AsyncGenerator[_T, None],
+    send_stream: MemoryObjectSendStream[_T],
+) -> None:
+    """
+    Forward all values of one stream to the shared send stream.
+
+    The source generator is closed even if the producer
+    was cancelled while waiting in `send()` and not inside
+    the generator itself.
+    """
+    try:
+        async with send_stream:
+            async for val in stream:
+                await send_stream.send(val)
+    finally:
+        await stream.aclose()
+
+
+async def _run_producers(
+    iterables: "tuple[AsyncGenerator[_T, None], ...]",
+    send_stream: MemoryObjectSendStream[_T],
+) -> None:
+    """
+    Pump every iterable into the send stream in a task group.
+
+    This coroutine runs as a dedicated task, so its task group
+    is always entered and exited in the same task, no matter
+    which task iterates over or closes the merged generator.
+    """
+    async with send_stream, anyio.create_task_group() as tg:
+        for iterable in iterables:
+            tg.start_soon(_start_producer, iterable, send_stream.clone())
+        # The original send stream is closed, so only clones remain.
+        # When all of them are closed, the receive stream ends.
+        send_stream.close()
+
+
 async def merge_async_iterables(
     *iterables: AsyncGenerator[_T, None],
 ) -> AsyncGenerator[_T, None]:
@@ -43,7 +90,8 @@ async def merge_async_iterables(
     as soon as they arrive, in no particular order.
 
     If any of the inner generators raises an exception,
-    this exception is re-raised for the consumer.
+    all other generators are cancelled and the error is
+    re-raised for the consumer wrapped in an exception group.
 
     When the merged generator is closed or cancelled,
     all inner generators are closed as well.
@@ -51,49 +99,16 @@ async def merge_async_iterables(
     :param iterables: async generators to merge.
     :return: single generator with values from all generators.
     """
-    if not iterables:
-        return
-
-    queue: asyncio.Queue[Any] = asyncio.Queue()
-    pumps = [
-        asyncio.create_task(_pump_iterable(iterable, queue)) for iterable in iterables
-    ]
-    stopped_count = 0
+    send_stream, receive_stream = anyio.create_memory_object_stream[_T]()
+    producers = asyncio.create_task(_run_producers(iterables, send_stream))
     try:
-        while stopped_count < len(iterables):
-            value = await queue.get()
-            if value is _MERGE_STOP:
-                stopped_count += 1
-                continue
-            if isinstance(value, BaseException):
-                raise value
-            yield value
+        async for message in receive_stream:
+            yield message
+        # The receive stream ended, so every producer finished.
+        # If any of them failed, its error surfaces now.
+        await producers
     finally:
-        for pump_task in pumps:
-            pump_task.cancel()
-        await asyncio.gather(*pumps, return_exceptions=True)
-        for iterable in iterables:
-            # A generator is already closed if its pump was
-            # cancelled in the middle of iteration. For others
-            # this triggers their cleanup logic.
-            with contextlib.suppress(RuntimeError):
-                await iterable.aclose()
-
-
-_MERGE_STOP = object()
-
-
-async def _pump_iterable(
-    iterable: AsyncGenerator[_T, None],
-    queue: "asyncio.Queue[Any]",
-) -> None:
-    """Forward all values from a single iterable to the shared queue."""
-    try:
-        async for value in iterable:
-            await queue.put(value)
-    except asyncio.CancelledError:
-        raise
-    except BaseException as exc:
-        await queue.put(exc)
-    else:
-        await queue.put(_MERGE_STOP)
+        producers.cancel()
+        with contextlib.suppress(asyncio.CancelledError, BaseExceptionGroup):
+            await producers
+        receive_stream.close()

@@ -22,74 +22,73 @@ def build_message(labels: dict[str, str] | None = None) -> BrokerMessage:
     )
 
 
-def test_multi_broker_requires_at_least_one_broker() -> None:
-    with pytest.raises(ValueError, match="at least one broker"):
+def test_multi_broker_requires_non_empty_routing() -> None:
+    with pytest.raises(ValueError, match="non-empty routing"):
         MultiBroker()
 
+    with pytest.raises(ValueError, match="non-empty routing"):
+        MultiBroker(routing={})
 
-def test_multi_broker_validates_broker_types() -> None:
+
+def test_multi_broker_validates_routed_broker_types() -> None:
     with pytest.raises(ValueError, match="AsyncBroker"):
-        MultiBroker(42)  # type: ignore[arg-type]
+        MultiBroker(routing={"fast": 42})  # type: ignore[dict-item]
 
 
-def test_multi_broker_validates_default_broker_type() -> None:
-    with pytest.raises(ValueError, match="AsyncBroker"):
-        MultiBroker(AsyncQueueBroker(), default_broker=42)  # type: ignore[arg-type]
+def test_multi_broker_validates_default_routing_label() -> None:
+    with pytest.raises(ValueError, match="no broker mapped"):
+        MultiBroker(
+            routing={"fast": AsyncQueueBroker()},
+            default_routing_label="slow",
+        )
 
 
-async def test_kick_uses_first_broker_as_default() -> None:
-    first, second = AsyncQueueBroker(), AsyncQueueBroker()
-    broker = MultiBroker(first, second)
+def test_task_registration_on_inner_broker_raises() -> None:
+    first = AsyncQueueBroker()
+    MultiBroker(routing={"first": first})
 
-    await broker.kick(build_message())
+    with pytest.raises(ValueError, match="MultiBroker itself"):
 
-    assert first.queue.qsize() == 1
-    assert second.queue.qsize() == 0
+        @first.task
+        async def inner_task() -> None: ...
 
-
-async def test_kick_uses_explicit_default_broker() -> None:
-    first, second = AsyncQueueBroker(), AsyncQueueBroker()
-    broker = MultiBroker(first, second, default_broker=second)
-
-    await broker.kick(build_message())
-
-    assert first.queue.qsize() == 0
-    assert second.queue.qsize() == 1
+    with pytest.raises(ValueError, match="MultiBroker itself"):
+        first.task()
 
 
 async def test_kick_routes_by_queue_name_label() -> None:
     first, second = AsyncQueueBroker(), AsyncQueueBroker()
-    broker = MultiBroker(first, second, routing={"slow": second})
+    broker = MultiBroker(routing={"first": first, "second": second})
 
-    await broker.kick(build_message(labels={"queue_name": "slow"}))
+    await broker.kick(build_message(labels={"queue_name": "second"}))
 
     assert first.queue.qsize() == 0
     assert second.queue.qsize() == 1
 
 
-async def test_kick_without_label_goes_to_default_broker() -> None:
+async def test_kick_without_label_uses_default_routing_label() -> None:
     first, second = AsyncQueueBroker(), AsyncQueueBroker()
-    broker = MultiBroker(first, second, routing={"slow": second})
+    broker = MultiBroker(
+        routing={"first": first, "second": second},
+        default_routing_label="second",
+    )
 
     await broker.kick(build_message())
 
-    assert first.queue.qsize() == 1
-    assert second.queue.qsize() == 0
+    assert first.queue.qsize() == 0
+    assert second.queue.qsize() == 1
 
 
-async def test_kick_ignores_label_when_routing_not_configured() -> None:
-    first, second = AsyncQueueBroker(), AsyncQueueBroker()
-    broker = MultiBroker(first, second)
+async def test_kick_without_label_and_default_raises() -> None:
+    broker = MultiBroker(routing={"first": AsyncQueueBroker()})
 
-    await broker.kick(build_message(labels={"queue_name": "slow"}))
-
-    assert first.queue.qsize() == 1
-    assert second.queue.qsize() == 0
+    with pytest.raises(ValueError, match="default_routing_label"):
+        await broker.kick(build_message())
 
 
 async def test_kick_with_unknown_queue_name_raises() -> None:
     first, second = AsyncQueueBroker(), AsyncQueueBroker()
-    broker = MultiBroker(first, second, routing={"slow": second})
+    broker = MultiBroker(routing={"first": first, "second": second})
 
     with pytest.raises(ValueError, match="no broker mapped for queue 'fast'"):
         await broker.kick(build_message(labels={"queue_name": "fast"}))
@@ -98,9 +97,8 @@ async def test_kick_with_unknown_queue_name_raises() -> None:
 async def test_kick_uses_custom_routing_label() -> None:
     first, second = AsyncQueueBroker(), AsyncQueueBroker()
     broker = MultiBroker(
-        first,
-        second,
-        routing={"emails": second},
+        routing={"first": first, "emails": second},
+        default_routing_label="first",
         routing_label="topic",
     )
 
@@ -110,9 +108,34 @@ async def test_kick_uses_custom_routing_label() -> None:
     assert second.queue.qsize() == 1
 
 
+async def test_same_broker_under_two_labels_is_listened_once() -> None:
+    class ListenCountingBroker(AsyncQueueBroker):
+        def __init__(self) -> None:
+            super().__init__()
+            self.listen_calls = 0
+
+        async def listen(self) -> AsyncGenerator[AckableMessage, None]:
+            self.listen_calls += 1
+            async for message in super().listen():
+                yield message
+
+    shared, other = ListenCountingBroker(), AsyncQueueBroker()
+    broker = MultiBroker(
+        routing={"a": shared, "b": shared, "other": other},
+        default_routing_label="a",
+    )
+    await other.kick(build_message())
+
+    iterator = broker.listen()
+    await asyncio.wait_for(iterator.__anext__(), timeout=1)
+    await iterator.aclose()
+
+    assert shared.listen_calls == 1
+
+
 async def test_listen_yields_messages_from_all_brokers() -> None:
     first, second = AsyncQueueBroker(), AsyncQueueBroker()
-    broker = MultiBroker(first, second)
+    broker = MultiBroker(routing={"first": first, "second": second})
     await first.kick(build_message())
     await second.kick(build_message())
     await second.kick(build_message())
@@ -131,7 +154,7 @@ async def test_listen_yields_messages_from_all_brokers() -> None:
 
 async def test_listen_with_single_broker() -> None:
     first = AsyncQueueBroker()
-    broker = MultiBroker(first)
+    broker = MultiBroker(routing={"first": first})
     await first.kick(build_message())
 
     iterator = broker.listen()
@@ -143,7 +166,7 @@ async def test_listen_with_single_broker() -> None:
 
 def test_process_flags_propagate_to_inner_brokers() -> None:
     first, second = AsyncQueueBroker(), AsyncQueueBroker()
-    broker = MultiBroker(first, second)
+    broker = MultiBroker(routing={"first": first, "second": second})
 
     broker.is_worker_process = True
     assert first.is_worker_process is True
@@ -168,7 +191,7 @@ async def test_startup_delegates_to_inner_brokers() -> None:
         TaskiqEvents.WORKER_STARTUP,
         lambda _: started.append("second"),
     )
-    broker = MultiBroker(first, second)
+    broker = MultiBroker(routing={"first": first, "second": second})
     broker.add_event_handler(
         TaskiqEvents.WORKER_STARTUP,
         lambda _: started.append("composite"),
@@ -191,7 +214,7 @@ async def test_shutdown_delegates_to_inner_brokers() -> None:
         TaskiqEvents.WORKER_SHUTDOWN,
         lambda _: shut_down.append("second"),
     )
-    broker = MultiBroker(first, second)
+    broker = MultiBroker(routing={"first": first, "second": second})
     broker.add_event_handler(
         TaskiqEvents.WORKER_SHUTDOWN,
         lambda _: shut_down.append("composite"),
@@ -216,7 +239,7 @@ async def test_shutdown_tolerates_failing_inner_brokers() -> None:
         TaskiqEvents.CLIENT_SHUTDOWN,
         lambda _: shut_down.append("ok"),
     )
-    broker = MultiBroker(failing, ok_broker)
+    broker = MultiBroker(routing={"bad": failing, "ok": ok_broker})
     broker.add_event_handler(
         TaskiqEvents.CLIENT_SHUTDOWN,
         lambda _: shut_down.append("composite"),
@@ -228,24 +251,8 @@ async def test_shutdown_tolerates_failing_inner_brokers() -> None:
     assert "composite" in shut_down
 
 
-async def test_find_task_searches_inner_brokers() -> None:
-    first, second = AsyncQueueBroker(), AsyncQueueBroker()
-
-    @first.task
-    async def task_one() -> None: ...
-
-    @second.task
-    async def task_two() -> None: ...
-
-    broker = MultiBroker(first, second)
-
-    assert broker.find_task(task_one.task_name) is task_one
-    assert broker.find_task(task_two.task_name) is task_two
-    assert broker.find_task("missing:task") is None
-
-
 async def test_find_task_finds_tasks_registered_on_composite() -> None:
-    broker = MultiBroker(AsyncQueueBroker())
+    broker = MultiBroker(routing={"first": AsyncQueueBroker()})
 
     @broker.task
     async def composite_task() -> None: ...
@@ -253,25 +260,18 @@ async def test_find_task_finds_tasks_registered_on_composite() -> None:
     assert broker.find_task(composite_task.task_name) is composite_task
 
 
-async def test_get_all_tasks_aggregates_inner_brokers() -> None:
-    first, second = AsyncQueueBroker(), AsyncQueueBroker()
+async def test_get_all_tasks_returns_tasks_registered_on_composite() -> None:
+    broker = MultiBroker(routing={"first": AsyncQueueBroker()})
 
-    @first.task
-    async def task_one() -> None: ...
+    @broker.task
+    async def composite_task() -> None: ...
 
-    @second.task
-    async def task_two() -> None: ...
-
-    broker = MultiBroker(first, second)
-
-    all_tasks = broker.get_all_tasks()
-    assert all_tasks[task_one.task_name] is task_one
-    assert all_tasks[task_two.task_name] is task_two
+    assert broker.get_all_tasks()[composite_task.task_name] is composite_task
 
 
 async def test_with_result_backend_propagates_to_inner_brokers() -> None:
     first, second = AsyncQueueBroker(), AsyncQueueBroker()
-    broker = MultiBroker(first, second)
+    broker = MultiBroker(routing={"first": first, "second": second})
     backend = InmemoryResultBackend[None]()
 
     broker.with_result_backend(backend)
@@ -283,16 +283,19 @@ async def test_with_result_backend_propagates_to_inner_brokers() -> None:
 
 async def test_receiver_processes_tasks_from_all_brokers() -> None:
     first, second = AsyncQueueBroker(), AsyncQueueBroker()
-    broker = MultiBroker(first, second)
+    broker = MultiBroker(
+        routing={"first": first, "second": second},
+        default_routing_label="first",
+    )
     broker.with_result_backend(InmemoryResultBackend())
     executed: list[str] = []
 
-    @first.task
+    @broker.task(labels={"queue_name": "first"})
     async def task_one() -> str:
         executed.append("one")
         return "one"
 
-    @second.task
+    @broker.task(labels={"queue_name": "second"})
     async def task_two() -> str:
         executed.append("two")
         return "two"
@@ -336,7 +339,7 @@ async def test_failed_broker_does_not_stop_healthy_brokers(
 ) -> None:
     dying = DyingBroker(messages_before_death=2)
     healthy = AsyncQueueBroker()
-    broker = MultiBroker(dying, healthy)
+    broker = MultiBroker(routing={"dying": dying, "healthy": healthy})
 
     for _ in range(2):
         await dying.kick(build_message())
@@ -356,8 +359,10 @@ async def test_failed_broker_does_not_stop_healthy_brokers(
 
 async def test_listen_ends_when_all_inner_brokers_fail() -> None:
     broker = MultiBroker(
-        DyingBroker(messages_before_death=0),
-        DyingBroker(messages_before_death=0),
+        routing={
+            "first": DyingBroker(messages_before_death=0),
+            "second": DyingBroker(messages_before_death=0),
+        },
     )
 
     with pytest.raises(StopAsyncIteration):

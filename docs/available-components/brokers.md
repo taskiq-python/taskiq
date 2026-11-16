@@ -93,9 +93,11 @@ want a single worker deployment processing all of them.
 
 ### Usage
 
-Tasks can be registered on inner brokers directly:
+Tasks are registered on the `MultiBroker` itself and routed to inner
+brokers with a `routing` mapping and the `queue_name` label:
 
 ```python
+# broker.py
 from taskiq import MultiBroker
 from taskiq_aio_pika import AioPikaBroker, Queue
 
@@ -107,18 +109,21 @@ slow_broker = AioPikaBroker(
     "amqp://guest:guest@localhost:5672/",
     task_queues=[Queue(name="slow_tasks")],
 )
-broker = MultiBroker(fast_broker, slow_broker)
+broker = MultiBroker(
+    routing={"fast": fast_broker, "slow": slow_broker},
+    default_routing_label="fast",
+)
 ```
 
 ```python
 # tasks.py
-from my_project.broker import fast_broker, slow_broker
+from my_project.broker import broker
 
-@fast_broker.task
+@broker.task(labels={"queue_name": "fast"})
 async def fast_task() -> None:
     ...
 
-@slow_broker.task
+@broker.task(labels={"queue_name": "slow"})
 async def slow_task() -> None:
     ...
 ```
@@ -129,23 +134,13 @@ With this setup a single worker command consumes messages from both queues:
 taskiq worker my_project.broker:broker my_project.tasks
 ```
 
-It's also possible to register tasks on the `MultiBroker` itself.
-In this case pass a `routing` mapping and mark tasks with the `queue_name` label:
+Messages without the `queue_name` label are kicked using the broker mapped
+to `default_routing_label`. If no default label is configured, unlabeled
+messages are rejected with an error.
 
-```python
-broker = MultiBroker(
-    fast_broker,
-    slow_broker,
-    routing={"fast": fast_broker, "slow": slow_broker},
-)
-
-@broker.task(queue_name="slow")
-async def slow_task() -> None:
-    ...
-```
-
-Messages without the routing label are kicked using the default broker
-(the first one, unless `default_broker` is passed).
+Tasks cannot be registered on inner brokers directly: the `MultiBroker`
+disables the `task` decorator of every broker it manages, so such mistakes
+fail loudly instead of silently breaking task lookup in the worker.
 
 ### How it works
 
@@ -156,15 +151,15 @@ Messages without the routing label are kicked using the default broker
 - `listen()` of all inner brokers run concurrently and are merged into
   a single stream for the worker. There are no ordering or fairness
   guarantees between queues: messages are processed as they arrive.
-- Tasks registered on inner brokers are kicked directly by their broker;
-  the composite is not involved. Only tasks registered on the
-  `MultiBroker` itself are routed by the `queue_name` label.
+- Kicks are routed by the `queue_name` label of the message: the composite
+  looks the label value up in the `routing` mapping and kicks the message
+  with the mapped broker.
 - Startup and shutdown are delegated to all inner brokers. A failing
   shutdown of one broker is logged and doesn't prevent the others
   from stopping. The `is_worker_process` and `is_scheduler_process`
   flags propagate, so inner brokers fire their WORKER_* events.
-- Task lookup aggregates registries of all inner brokers, so tasks can
-  be registered on any of them and the worker finds them all.
+- All tasks live in the registry of the `MultiBroker`, since only it
+  accepts task registration. The worker finds every task there.
 - On shutdown the merged listening and all inner generators are closed
   deterministically: every inner broker runs its cleanup logic, and
   running tasks are awaited (bounded by `--wait-tasks-timeout`).

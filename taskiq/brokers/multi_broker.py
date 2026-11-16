@@ -2,10 +2,9 @@ import contextlib
 import sys
 from collections.abc import AsyncGenerator
 from logging import getLogger
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NoReturn
 
 from taskiq.abc.broker import AckableMessage, AsyncBroker
-from taskiq.decor import AsyncTaskiqDecoratedTask
 from taskiq.message import BrokerMessage
 from taskiq.utils import merge_async_iterables
 
@@ -18,6 +17,14 @@ if TYPE_CHECKING:  # pragma: no cover
     from taskiq.abc.result_backend import AsyncResultBackend
 
 logger = getLogger(__name__)
+
+
+def _task_registration_disabled(*args: Any, **kwargs: Any) -> NoReturn:
+    """Replace the `task` method of brokers managed by a MultiBroker."""
+    raise ValueError(
+        "Cannot register tasks on brokers managed by a MultiBroker. "
+        "Register tasks on the MultiBroker itself.",
+    )
 
 
 class MultiBroker(AsyncBroker):
@@ -35,65 +42,70 @@ class MultiBroker(AsyncBroker):
     When all inner brokers are down, the worker stops
     and is restarted by the supervisor.
 
-    Example of running one worker for multiple queues:
+    Tasks are registered on the MultiBroker itself and routed
+    to inner brokers with the routing label:
 
     >>> fast_broker = AioPikaBroker(url, queue_name="fast")
     >>> slow_broker = AioPikaBroker(url, queue_name="slow")
-    >>> broker = MultiBroker(fast_broker, slow_broker)
-
-    Tasks must be registered on inner brokers in this case,
-    and a single `taskiq worker` command will consume
-    messages from both queues.
-
-    It's also possible to register tasks on the MultiBroker
-    itself. To route such tasks, pass a `routing` mapping and
-    mark tasks with the `queue_name` label:
-
     >>> broker = MultiBroker(
-    ...     fast_broker,
-    ...     slow_broker,
     ...     routing={"fast": fast_broker, "slow": slow_broker},
+    ...     default_routing_label="fast",
     ... )
 
-    :param brokers: brokers to combine, at least one is required.
-    :param default_broker: broker used to kick messages
-        without a routing label, defaults to the first broker.
-    :param routing: mapping of routing label values to brokers.
-    :param routing_label: message label used for routing, defaults to `queue_name`.
-    :raises ValueError: if no brokers are provided,
-        or any of them has a wrong type.
+    >>> @broker.task(labels={"queue_name": "slow"})
+    ... async def my_task() -> None: ...
+
+    A single `taskiq worker` command consumes messages
+    from all inner brokers this way.
+
+    :param routing: mapping of routing label values to brokers,
+        at least one entry is required. Brokers are deduplicated,
+        every unique broker is listened to once.
+    :param default_routing_label: label used to kick messages
+        without the routing label, must be a key of `routing`.
+        If it's not set, unlabeled messages are rejected.
+    :param routing_label: message label used for routing,
+        defaults to `queue_name`.
+    :raises ValueError: if `routing` is empty or has values
+        of a wrong type, or if `default_routing_label`
+        has no mapped broker.
     """
 
     def __init__(
         self,
-        *brokers: AsyncBroker,
-        default_broker: AsyncBroker | None = None,
         routing: "dict[str, AsyncBroker] | None" = None,
+        default_routing_label: str | None = None,
         routing_label: str = "queue_name",
     ) -> None:
-        if not brokers:
-            raise ValueError("MultiBroker requires at least one broker.")
-        for inner_broker in brokers:
+        if not routing:
+            raise ValueError(
+                "MultiBroker requires a non-empty routing mapping "
+                "of queue names to brokers.",
+            )
+        for queue_name, inner_broker in routing.items():
             if not isinstance(inner_broker, AsyncBroker):
                 raise ValueError(
-                    "All brokers must be AsyncBroker instances, "
-                    f"got {type(inner_broker).__name__}.",
+                    "All routed brokers must be AsyncBroker instances, "
+                    f"got {type(inner_broker).__name__} for queue '{queue_name}'.",
                 )
-        if default_broker is not None and not isinstance(
-            default_broker,
-            AsyncBroker,
-        ):
+        if default_routing_label is not None and default_routing_label not in routing:
             raise ValueError(
-                "default_broker must be an AsyncBroker instance, "
-                f"got {type(default_broker).__name__}.",
+                "There is no broker mapped for the default queue "
+                f"'{default_routing_label}'. Known queues: {sorted(routing)}.",
             )
         # Inner brokers must be saved before calling super().__init__(),
         # since it sets the is_worker_process flag,
         # which propagates to all inner brokers.
-        self.brokers: list[AsyncBroker] = list(brokers)
-        self.default_broker = default_broker or self.brokers[0]
-        self.routing: dict[str, AsyncBroker] = routing or {}
+        # Several labels can point to the same broker,
+        # so brokers are deduplicated to listen to each of them once.
+        self.brokers: list[AsyncBroker] = list(dict.fromkeys(routing.values()))
+        self.routing: dict[str, AsyncBroker] = dict(routing)
+        self.default_routing_label = default_routing_label
         self.routing_label = routing_label
+        for inner_broker in self.brokers:
+            # Tasks must live in the registry of this broker,
+            # so accidental registration on inner brokers is loud.
+            inner_broker.task = _task_registration_disabled  # type: ignore[method-assign]
         super().__init__()
 
     @property
@@ -122,24 +134,29 @@ class MultiBroker(AsyncBroker):
         """
         Kick a message using one of the inner brokers.
 
-        If the message has a routing label and a routing mapping
-        is configured, then the broker mapped to the label value
-        is used. In any other case the default broker is used.
+        The broker is selected by the routing label of the message.
+        Messages without the label go to the broker mapped
+        to the default routing label.
 
         :param message: message to send.
-        :raises ValueError: if the routing label value
+        :raises ValueError: if the message has no routing label
+            and no default is configured, or the label value
             has no mapped broker.
         """
         label_value = message.labels.get(self.routing_label)
-        if label_value is not None and self.routing:
-            target_broker = self.routing.get(label_value)
-            if target_broker is None:
+        if label_value is None:
+            if self.default_routing_label is None:
                 raise ValueError(
-                    f"There is no broker mapped for queue '{label_value}'. "
-                    f"Known queues: {sorted(self.routing)}.",
+                    f"Message has no '{self.routing_label}' label and the "
+                    "MultiBroker has no default_routing_label, cannot route it.",
                 )
-        else:
-            target_broker = self.default_broker
+            label_value = self.default_routing_label
+        target_broker = self.routing.get(label_value)
+        if target_broker is None:
+            raise ValueError(
+                f"There is no broker mapped for queue '{label_value}'. "
+                f"Known queues: {sorted(self.routing)}.",
+            )
         await target_broker.kick(message)
 
     async def listen(self) -> AsyncGenerator["bytes | AckableMessage", None]:
@@ -226,40 +243,6 @@ class MultiBroker(AsyncBroker):
                     exc_info=True,
                 )
         await super().shutdown()
-
-    def find_task(
-        self,
-        task_name: str,
-    ) -> "AsyncTaskiqDecoratedTask[Any, Any] | None":
-        """
-        Search for a task in the composite broker and inner brokers.
-
-        :param task_name: name of a task.
-        :returns: found task or None.
-        """
-        task = self.local_task_registry.get(task_name)
-        if task is not None:
-            return task
-        for inner_broker in self.brokers:
-            task = inner_broker.find_task(task_name)
-            if task is not None:
-                return task
-        return self.global_task_registry.get(task_name)
-
-    def get_all_tasks(self) -> "dict[str, AsyncTaskiqDecoratedTask[Any, Any]]":
-        """
-        Fetch all tasks available in the composite and inner brokers.
-
-        :return: dict of all tasks. Keys are task names,
-            values are tasks.
-        """
-        all_tasks = {
-            **self.global_task_registry,
-            **self.local_task_registry,
-        }
-        for inner_broker in self.brokers:
-            all_tasks.update(inner_broker.get_all_tasks())
-        return all_tasks
 
     def with_result_backend(
         self,

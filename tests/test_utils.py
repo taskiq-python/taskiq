@@ -1,10 +1,16 @@
 import asyncio
+import sys
 from collections.abc import AsyncGenerator
 from typing import cast
 
 import pytest
 
 from taskiq.utils import maybe_awaitable, merge_async_iterables
+
+if sys.version_info >= (3, 11):
+    from builtins import BaseExceptionGroup
+else:
+    from exceptiongroup import BaseExceptionGroup
 
 
 async def test_maybe_awaitable_coroutine() -> None:
@@ -51,9 +57,11 @@ async def test_merge_async_iterables_propagates_inner_errors() -> None:
         yield 1
         raise ValueError("inner generator failed")
 
-    with pytest.raises(ValueError, match="inner generator failed"):
+    with pytest.raises(BaseExceptionGroup) as exc_info:
         async for _ in merge_async_iterables(failing()):
             pass
+
+    assert isinstance(exc_info.value.exceptions[0], ValueError)
 
 
 async def test_merge_async_iterables_closes_inner_iterables() -> None:
@@ -72,6 +80,9 @@ async def test_merge_async_iterables_closes_inner_iterables() -> None:
 
     merged = merge_async_iterables(tracking("first"), tracking("second"))
     await merged.__anext__()
+    # At this point one producer is blocked in send() and the other
+    # waits for its next value. Closing must be clean and run the
+    # cleanup of every inner generator.
     await merged.aclose()
 
     assert sorted(closed) == ["first", "second"]
