@@ -1,4 +1,5 @@
 from collections.abc import Coroutine
+from collections.abc import Set as AbstractSet
 from types import CoroutineType
 from typing import TYPE_CHECKING, Any, Union
 
@@ -140,3 +141,16 @@ class TaskiqMiddleware:  # pragma: no cover
         :param result: returned value.
         :param exception: found exception.
         """
+
+    @classmethod
+    def task_only_labels(cls) -> AbstractSet[str]:
+        """
+        Returns labels that should not be sent over the wire.
+
+        Implementations can add labels here when their values are not suitable
+        for serialization. The labels remain on the registered task but are
+        omitted from outgoing messages.
+
+        :return: Names of the task-only labels.
+        """
+        return frozenset()

@@ -1,6 +1,7 @@
 import datetime
 import random
 from collections.abc import Iterable
+from collections.abc import Set as AbstractSet
 from logging import getLogger
 from typing import Any
 
@@ -213,3 +214,13 @@ class SmartRetryMiddleware(TaskiqMiddleware):
                 "Task '%s' invocation failed. Maximum retries count is reached.",
                 message.task_name,
             )
+
+    @classmethod
+    def task_only_labels(cls) -> AbstractSet[str]:
+        """
+        Adds ``types_of_exceptions`` to the set of task-only labels.
+
+        Per-task ``types_of_exceptions`` set via the task decorator is read
+        from the registered task object and cannot be properly serialized.
+        """
+        return super().task_only_labels() | {"types_of_exceptions"}

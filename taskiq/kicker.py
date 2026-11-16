@@ -323,12 +323,13 @@ class AsyncKicker(Generic[_FuncParams, _ReturnType]):
         for kwarg_name, kwarg_val in kwargs.items():
             formatted_kwargs[kwarg_name] = self._prepare_arg(kwarg_val)
 
+        task_only_labels = {
+            label
+            for middleware in self.broker.middlewares
+            for label in middleware.task_only_labels()
+        }
         for label, label_val in self.labels.items():
-            # `types_of_exceptions` is only ever read back from the
-            # locally registered task's labels (see retry middlewares),
-            # never from the wire. It holds exception classes, which
-            # can't be faithfully serialized, so don't ship it at all.
-            if label == "types_of_exceptions":
+            if label in task_only_labels:
                 continue
             labels[label], labels_types[label] = prepare_label(label_val)
 
