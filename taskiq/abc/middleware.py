@@ -60,6 +60,8 @@ class TaskiqMiddleware:  # pragma: no cover
         This is a client-side hook, that executes right before
         the message is sent to broker.
 
+        This method may raise SkipSendError to drop the message.
+
         :param message: message to send.
         :return: modified message.
         """

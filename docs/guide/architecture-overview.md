@@ -220,7 +220,7 @@ class MyMiddleware(TaskiqMiddleware):
 
 Here are methods you can implement in the order they are executed:
 
-- `pre_send` - executed on the client side before the message is sent. Here you can modify the message.
+- `pre_send` - executed on the client side before the message is sent. Here you can modify the message, or drop it by raising `SkipSendError`.
 - `post_send` - executed right after the message was sent.
 - `pre_execute` - executed on the worker side after the message was received by a worker and before its execution.
 - `on_error` - executed after the task was executed if an exception was found.
