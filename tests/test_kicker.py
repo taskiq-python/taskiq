@@ -1,6 +1,9 @@
 from typing import Any
 
+import pytest
+
 from taskiq import InMemoryBroker
+from taskiq.exceptions import SendTaskError
 from taskiq.kicker import AsyncKicker
 
 
@@ -43,3 +46,23 @@ async def test_other_labels_still_serialized() -> None:
 
     assert message.labels["retries"] == "3"
     assert message.labels["queue"] == "high_priority"
+
+
+async def test_send_task_error_includes_broker_failure() -> None:
+    """SendTaskError message names the underlying broker exception."""
+    broker = InMemoryBroker()
+
+    async def failing_kick(message: Any) -> None:
+        raise ConnectionError("queue is unreachable")
+
+    broker.kick = failing_kick  # type: ignore[method-assign]
+
+    @broker.task
+    async def run_task() -> None:
+        pass
+
+    with pytest.raises(SendTaskError) as exc_info:
+        await run_task.kiq()
+
+    assert "ConnectionError: queue is unreachable" in str(exc_info.value)
+    assert isinstance(exc_info.value.__cause__, ConnectionError)
