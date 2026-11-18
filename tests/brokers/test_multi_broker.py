@@ -269,7 +269,7 @@ async def test_get_all_tasks_returns_tasks_registered_on_composite() -> None:
     assert broker.get_all_tasks()[composite_task.task_name] is composite_task
 
 
-async def test_with_result_backend_propagates_to_inner_brokers() -> None:
+async def test_with_result_backend_is_not_shared_with_inner_brokers() -> None:
     first, second = AsyncQueueBroker(), AsyncQueueBroker()
     broker = MultiBroker(routing={"first": first, "second": second})
     backend = InmemoryResultBackend[None]()
@@ -277,8 +277,46 @@ async def test_with_result_backend_propagates_to_inner_brokers() -> None:
     broker.with_result_backend(backend)
 
     assert broker.result_backend is backend
-    assert first.result_backend is backend
-    assert second.result_backend is backend
+    assert first.result_backend is not backend
+    assert second.result_backend is not backend
+
+
+class LifecycleCountingBackend(InmemoryResultBackend[None]):
+    """Result backend that counts startup and shutdown calls."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.startup_calls = 0
+        self.shutdown_calls = 0
+
+    async def startup(self) -> None:
+        self.startup_calls += 1
+
+    async def shutdown(self) -> None:
+        self.shutdown_calls += 1
+
+
+async def test_shared_result_backend_started_once() -> None:
+    backend = LifecycleCountingBackend()
+    broker = MultiBroker(
+        routing={"first": AsyncQueueBroker(), "second": AsyncQueueBroker()},
+    ).with_result_backend(backend)
+
+    await broker.startup()
+
+    assert backend.startup_calls == 1
+
+
+async def test_shared_result_backend_shut_down_once() -> None:
+    backend = LifecycleCountingBackend()
+    broker = MultiBroker(
+        routing={"first": AsyncQueueBroker(), "second": AsyncQueueBroker()},
+    ).with_result_backend(backend)
+    await broker.startup()
+
+    await broker.shutdown()
+
+    assert backend.shutdown_calls == 1
 
 
 async def test_receiver_processes_tasks_from_all_brokers() -> None:
