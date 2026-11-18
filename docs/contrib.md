@@ -26,12 +26,12 @@ uv sync --all-extras
 
 ## Linting
 
-We have `pre-commit` configured with all our settings. We highly recommend you to install it as a git hook using `pre-commit install` command.
+We have `prek` configured with all our settings. We highly recommend you to install it as a git hook using `prek install` command.
 
 But even without installation, you can run all lints manually:
 
 ```bash
-pre-commit run -a
+prek run -a
 ```
 
 ## Testing
