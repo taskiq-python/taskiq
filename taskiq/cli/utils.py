@@ -1,6 +1,7 @@
+import asyncio
 import os
 import sys
-from collections.abc import Generator, Sequence
+from collections.abc import Callable, Generator, Sequence
 from contextlib import contextmanager
 from importlib import import_module
 from logging import getLogger
@@ -8,6 +9,8 @@ from pathlib import Path
 from typing import Any
 
 logger = getLogger("taskiq.worker")
+
+LoopFactory = Callable[[], asyncio.AbstractEventLoop]
 
 
 @contextmanager
@@ -53,6 +56,38 @@ def import_object(object_spec: str, app_dir: str | None = None) -> Any:
             sys.path.insert(0, app_dir)
         module = import_module(import_spec[0])
     return getattr(module, import_spec[1])
+
+
+def resolve_loop_factory(
+    loop_factory: str,
+    app_dir: str | None = None,
+) -> LoopFactory:
+    """
+    Resolve an event loop factory from a callable or import string.
+
+    :param loop_factory: path in `module:variable` format.
+    :param app_dir: directory to add in sys.path for importing.
+    :raises ValueError: if the resolved object is not callable.
+    :return: event loop factory.
+    """
+    factory = import_object(loop_factory, app_dir=app_dir)
+    if not callable(factory):
+        raise ValueError("Event loop factory must be callable.")
+    return factory
+
+
+def create_event_loop(loop_factory: LoopFactory) -> asyncio.AbstractEventLoop:
+    """
+    Create and validate an event loop from a factory.
+
+    :param loop_factory: event loop factory.
+    :raises ValueError: if the factory does not return an event loop.
+    :return: created event loop.
+    """
+    loop = loop_factory()
+    if not isinstance(loop, asyncio.AbstractEventLoop):
+        raise ValueError("Event loop factory must return an event loop.")
+    return loop
 
 
 def import_from_modules(modules: list[str]) -> None:

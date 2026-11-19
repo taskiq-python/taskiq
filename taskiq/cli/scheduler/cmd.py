@@ -1,9 +1,13 @@
 import asyncio
 from collections.abc import Sequence
+from functools import partial
+
+import anyio
 
 from taskiq.abc.cmd import TaskiqCMD
 from taskiq.cli.scheduler.args import SchedulerArgs
 from taskiq.cli.scheduler.run import run_scheduler
+from taskiq.cli.utils import create_event_loop, resolve_loop_factory
 
 
 class SchedulerCMD(TaskiqCMD):
@@ -23,4 +27,17 @@ class SchedulerCMD(TaskiqCMD):
         :param args: CLI arguments.
         """
         parsed = SchedulerArgs.from_cli(args)
-        asyncio.run(run_scheduler(parsed))
+        if parsed.loop_factory is None:
+            asyncio.run(run_scheduler(parsed))
+            return
+        loop_factory = resolve_loop_factory(
+            parsed.loop_factory,
+            app_dir=parsed.app_dir,
+        )
+        anyio.run(
+            run_scheduler,
+            parsed,
+            backend_options={
+                "loop_factory": partial(create_event_loop, loop_factory),
+            },
+        )

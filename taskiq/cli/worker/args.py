@@ -55,6 +55,7 @@ class WorkerArgs:
     wait_tasks_timeout: float | None = None
     hardkill_count: int = 3
     use_process_pool: bool = False
+    loop_factory: str | None = None
 
     @classmethod
     def from_cli(
@@ -280,6 +281,15 @@ class WorkerArgs:
             dest="max_process_pool_processes",
             default=None,
             help="Maximum number of processes in process pool.",
+        )
+        parser.add_argument(
+            "--loop-factory",
+            default=None,
+            help=(
+                "Where to search for an event loop factory. "
+                "This string must be specified in "
+                "'module.module:variable' format."
+            ),
         )
 
         namespace = parser.parse_args(
