@@ -115,6 +115,8 @@ def start_listen(args: WorkerArgs) -> None:
         nonlocal shutdown_event
         nonlocal hardkill_counter
         # Soft kill is a signal to start shutdown.
+        # Not call_soon: only call_soon_threadsafe writes to the loop's
+        # self-pipe, so an idle loop waiting in select() wakes up.
         loop.call_soon_threadsafe(shutdown_event.set)
         # Hard kill is a signal that we should stop
         # everything immediately.
