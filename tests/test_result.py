@@ -64,6 +64,30 @@ def test_pickle_error_serialization() -> None:
     assert type(data.error) == type(task.error)  # noqa: E721
 
 
+def test_pickle_unpickleable_error_does_not_mutate_result() -> None:
+    class LocalError(Exception):
+        pass
+
+    error = LocalError("boom")
+    result: TaskiqResult[None] = TaskiqResult(
+        is_err=True,
+        return_value=None,
+        execution_time=0,
+        error=error,
+    )
+
+    serialized = pickle.dumps(result)
+
+    restored = pickle.loads(serialized)
+    assert restored.is_err
+    assert isinstance(restored.error, BaseException)
+    assert str(restored.error) == repr(error)
+    assert result.error is error
+    with pytest.raises(LocalError) as exc:
+        result.raise_for_error()
+    assert exc.value is error
+
+
 def test_result_raise_for_error_exc() -> None:
     error = ValueError("Error")
     res: TaskiqResult[None] = TaskiqResult(
