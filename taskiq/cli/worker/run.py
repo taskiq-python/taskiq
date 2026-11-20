@@ -10,6 +10,7 @@ from sys import platform
 from typing import Any
 
 from taskiq.abc.broker import AsyncBroker
+from taskiq.brokers.zmq_broker import ZeroMQBroker
 from taskiq.cli.utils import import_object, import_tasks
 from taskiq.cli.worker.args import WorkerArgs
 from taskiq.cli.worker.process_manager import ProcessManager
@@ -70,7 +71,7 @@ def get_receiver_type(args: WorkerArgs) -> type[Receiver]:
     return receiver_type
 
 
-def start_listen(args: WorkerArgs) -> None:
+def start_listen(args: WorkerArgs) -> None:  # noqa: C901, PLR0915
     """
     This function starts actual listening process.
 
@@ -144,6 +145,18 @@ def start_listen(args: WorkerArgs) -> None:
                 "Unknown broker type. Please use AsyncBroker instance "
                 "or pass broker factory function that returns an AsyncBroker instance.",
             )
+
+    if (
+        sys.platform == "win32"
+        and isinstance(loop, asyncio.ProactorEventLoop)
+        and isinstance(broker, ZeroMQBroker)
+    ):
+        # Without tornado, pyzmq can't wait for sockets on ProactorEventLoop.
+        # The broker type is known only after the import, so the loop is replaced
+        # here to keep subprocess support on ProactorEventLoop for other brokers.
+        loop.close()
+        loop = asyncio.SelectorEventLoop()
+        asyncio.set_event_loop(loop)
 
     broker.is_worker_process = True
     import_tasks(args.modules, args.tasks_pattern, args.fs_discover)
