@@ -5,6 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
+from taskiq.scheduler.scheduled_task.cron import CronExpression
 from taskiq.scheduler.scheduled_task.validators import (
     CronOffset,
     validate_interval_value,
@@ -25,7 +26,7 @@ class ScheduledTask(BaseModel):
     kwargs: dict[str, Any]
     task_id: str | None = None
     schedule_id: str = Field(default_factory=lambda: uuid.uuid4().hex)
-    cron: str | None = None
+    cron: CronExpression | None = None
     cron_offset: CronOffset | None = None
     time: datetime | None = None
     interval: int | timedelta | None = None
