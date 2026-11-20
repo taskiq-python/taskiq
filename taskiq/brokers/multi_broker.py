@@ -1,20 +1,11 @@
 import contextlib
-import sys
 from collections.abc import AsyncGenerator
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, NoReturn
+from typing import Any, NoReturn
 
 from taskiq.abc.broker import AckableMessage, AsyncBroker
 from taskiq.message import BrokerMessage
 from taskiq.utils import merge_async_iterables
-
-if sys.version_info >= (3, 11):
-    from typing import Self
-else:
-    from typing_extensions import Self
-
-if TYPE_CHECKING:  # pragma: no cover
-    from taskiq.abc.result_backend import AsyncResultBackend
 
 logger = getLogger(__name__)
 
@@ -243,23 +234,3 @@ class MultiBroker(AsyncBroker):
                     exc_info=True,
                 )
         await super().shutdown()
-
-    def with_result_backend(
-        self,
-        result_backend: "AsyncResultBackend[Any]",
-    ) -> Self:
-        """
-        Set a result backend for the composite and all inner brokers.
-
-        Inner brokers use their result backend to serve
-        `wait_result` calls on the client side, while the worker
-        saves results using the result backend of this broker.
-        Setting the same backend everywhere keeps them in sync.
-
-        :param result_backend: new result backend.
-        :return: self
-        """
-        self.result_backend = result_backend
-        for inner_broker in self.brokers:
-            inner_broker.result_backend = result_backend
-        return self
