@@ -46,7 +46,7 @@ class LabelScheduleSource(ScheduleSource):
             for schedule in task.labels.get("schedule", []):
                 if not {"cron", "interval", "time"} & schedule.keys():
                     continue
-                labels = schedule.get("labels", {})
+                labels = schedule.get("labels", {}).copy()
 
                 task_labels = {k: v for k, v in task.labels.items() if k != "schedule"}
 
