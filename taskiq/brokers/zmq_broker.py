@@ -54,6 +54,9 @@ class ZeroMQBroker(AsyncBroker):
         sockets. if current process is worker,
         it subscribes, otherwise it becomes publisher.
         """
+        if self.context.closed:
+            self.context = Context()
+
         if self.is_worker_process:
             self.socket = self.context.socket(zmq.SUB)
             self.socket.setsockopt(zmq.SUBSCRIBE, b"")
@@ -68,9 +71,14 @@ class ZeroMQBroker(AsyncBroker):
 
         This function closes actual connections to sockets
         """
-        if not self.is_worker_process:
-            self.socket.unbind(self.pub_host)
-        return await super().shutdown()
+        try:
+            if not self.is_worker_process:
+                # Unbind can start terminating TCP sessions with the current linger.
+                self.socket.setsockopt(zmq.LINGER, 0)
+                self.socket.unbind(self.pub_host)
+            await super().shutdown()
+        finally:
+            self.context.destroy(linger=0)
 
     async def kick(self, message: BrokerMessage) -> None:
         """
