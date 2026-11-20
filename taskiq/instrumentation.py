@@ -87,7 +87,7 @@ class TaskiqInstrumentor(BaseInstrumentor):
         if not hasattr(broker, "_is_instrumented_by_opentelemetry"):
             broker._is_instrumented_by_opentelemetry = False  # type: ignore[attr-defined] # noqa: SLF001
 
-        if not getattr(broker, "is_instrumented_by_opentelemetry", False):
+        if not getattr(broker, "_is_instrumented_by_opentelemetry", False):
             broker.middlewares.insert(
                 0,
                 OpenTelemetryMiddleware(

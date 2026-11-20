@@ -9,7 +9,10 @@ class TestUtils(unittest.TestCase):
     @staticmethod
     def test_duplicate_instrumentation() -> None:
         first = TaskiqInstrumentor()
-        first.instrument_broker(broker)
-        second = TaskiqInstrumentor()
-        second.instrument_broker(broker)
-        TaskiqInstrumentor().uninstrument()
+        try:
+            first.instrument_broker(broker)
+            second = TaskiqInstrumentor()
+            second.instrument_broker(broker)
+            assert len(broker.middlewares) == 1
+        finally:
+            first.uninstrument_broker(broker)
