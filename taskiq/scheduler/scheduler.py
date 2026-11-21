@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 from taskiq.exceptions import ScheduledTaskCancelledError
 from taskiq.kicker import AsyncKicker
+from taskiq.labels import parse_label
 from taskiq.scheduler.scheduled_task import ScheduledTask
 from taskiq.utils import maybe_awaitable
 
@@ -47,8 +48,16 @@ class TaskiqScheduler:
         except ScheduledTaskCancelledError:
             logger.info("Scheduled task %s has been cancelled.", task.task_name)
         else:
+            labels = (
+                {
+                    label: parse_label(val, task.labels_types.get(label))
+                    for label, val in task.labels.items()
+                }
+                if task.labels_types is not None
+                else dict(task.labels)
+            )
             await (
-                AsyncKicker(task.task_name, self.broker, task.labels)
+                AsyncKicker(task.task_name, self.broker, labels)
                 .with_labels(
                     schedule_id=task.schedule_id,
                 )
