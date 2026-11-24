@@ -228,7 +228,8 @@ class ProcessManager:
                         worker.name,
                         worker.pid,
                     )
-                except ProcessLookupError:
+                # On Windows os.kill raises PermissionError for an exited process.
+                except (ProcessLookupError, PermissionError):
                     logger.info(
                         "Process %s (pid %s) already terminated",
                         worker.name,
