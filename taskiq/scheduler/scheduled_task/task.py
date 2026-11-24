@@ -21,6 +21,7 @@ class ScheduledTask(BaseModel):
 
     task_name: str
     labels: dict[str, Any]
+    labels_types: dict[str, int] | None = None
     args: list[Any]
     kwargs: dict[str, Any]
     task_id: str | None = None
