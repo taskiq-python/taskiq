@@ -202,3 +202,5 @@ Path to scheduler is the only required argument.
 - `--log-level` is used to set a log level (default `INFO`).
 - `--skip-first-run` - skip first run of scheduler. This option skips running tasks immediately after scheduler start.
 - `--update-interval` - interval in seconds to check for new tasks. By default scheduler will check for new scheduled tasks every first second of the minute.
+- `--loop-interval` - interval in seconds to check tasks to send. By default scheduler will check tasks to send once a second.
+- `--send-timeout` - optional per-send timeout in seconds. If set, each send is cancelled after this timeout, a warning is logged and the next scheduled tick will retry. By default there is no timeout.
