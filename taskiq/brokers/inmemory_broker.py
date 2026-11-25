@@ -44,7 +44,8 @@ class InmemoryResultBackend(AsyncResultBackend[_ReturnType]):
         :param result: result of an execution.
         """
         if (
-            self.max_stored_results != -1
+            task_id not in self.results
+            and self.max_stored_results != -1
             and len(self.results) >= self.max_stored_results
         ):
             self.results.popitem(last=False)
@@ -95,7 +96,8 @@ class InmemoryResultBackend(AsyncResultBackend[_ReturnType]):
         :param progress: task execution progress
         """
         if (
-            self.max_stored_results != -1
+            task_id not in self.progress
+            and self.max_stored_results != -1
             and len(self.progress) >= self.max_stored_results
         ):
             self.progress.popitem(last=False)
