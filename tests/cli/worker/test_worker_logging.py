@@ -120,3 +120,43 @@ def test_worker_process_logs_listening_started(
         assert wait_for_output(process, "Listening started.")
     finally:
         stop(process)
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Worker processes can't be stopped with SIGTERM on Windows.",
+)
+def test_idle_worker_stops_on_sigterm(tmp_path: Path) -> None:
+    """
+    An idle worker shuts down when the main process gets SIGTERM.
+
+    Without uvloop, the event loop waiting for a message doesn't wake up
+    on its own, so the worker's signal handler has to wake it up.
+    """
+    (tmp_path / "idle_broker.py").write_text(BROKER_MODULE)
+    (tmp_path / "run_cli.py").write_text(CLI_RUNNER)
+    # Shadows uvloop, so the worker uses the default asyncio event loop.
+    (tmp_path / "uvloop.py").write_text("raise ImportError")
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            "run_cli.py",
+            "default",
+            "worker",
+            "idle_broker:broker",
+            "--workers",
+            "1",
+            "--log-level",
+            "INFO",
+        ],
+        cwd=tmp_path,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    try:
+        assert wait_for_output(process, "Listening started.")
+        process.send_signal(signal.SIGTERM)
+        assert process.wait(timeout=10) == 0
+    finally:
+        stop(process)
