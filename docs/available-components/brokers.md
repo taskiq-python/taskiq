@@ -219,9 +219,9 @@ but if you customize them, make sure they match on both sides.
 Also, middlewares of inner brokers work only on the kick side,
 and middlewares of the `MultiBroker` — only on the execution side.
 
-Use `MultiBroker.with_result_backend()` to set a result backend:
-it propagates the backend to all inner brokers, keeping client-side
-polling and worker-side saving in sync.
+Set the result backend on the `MultiBroker` with `with_result_backend()`:
+both kicked tasks and the worker use the backend of the `MultiBroker`,
+inner brokers don't need one.
 :::
 
 If all of your queues live in a single RabbitMQ broker, prefer the native
