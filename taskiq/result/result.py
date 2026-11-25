@@ -55,8 +55,9 @@ class TaskiqResult(BaseModel, Generic[_ReturnType]):
         return self
 
     def __getstate__(self) -> dict[Any, Any]:
-        dict = super().__getstate__()
-        vals: builtins.dict[str, Any] = dict["__dict__"]
+        state = super().__getstate__()
+        vals: builtins.dict[str, Any] = state["__dict__"].copy()
+        state["__dict__"] = vals
 
         if "error" in vals and vals["error"] is not None:
             vals["error"] = prepare_exception(
@@ -64,7 +65,7 @@ class TaskiqResult(BaseModel, Generic[_ReturnType]):
                 pickle,
             )
 
-        return dict
+        return state
 
     @field_validator("error", mode="before")
     @classmethod
