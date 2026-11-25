@@ -35,7 +35,8 @@ class SharedBrokerListenError(ListenError):
 class SendTaskError(BrokerError):
     """Error if the broker was unable to send the task to the queue."""
 
-    __template__ = "Cannot send task to the queue"
+    __template__ = "Cannot send task to the queue: {reason}"
+    reason: str = "unknown reason"
 
 
 class SharedBrokerSendTaskError(SendTaskError):
