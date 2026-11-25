@@ -18,9 +18,15 @@ class PrometheusMiddleware(TaskiqMiddleware):
     This middleware starts wsgi server with prometheus metrics.
     Also it updates metrics on events.
 
+    The middleware is import-safe: creating multiple instances
+    in the same process (e.g. when the broker module is imported
+    more than once during task discovery) reuses already registered
+    collectors instead of raising
+    ``ValueError: Duplicated timeseries in CollectorRegistry``.
+
     :param server_port: The port to listen on.
     :param server_addr: The address to listen on.
-    :paam metrics_path: The path to store metrics for multiproc env.
+    :param metrics_path: The path to store metrics for multiproc env.
     """
 
     def __init__(
@@ -43,33 +49,65 @@ class PrometheusMiddleware(TaskiqMiddleware):
         logger.debug("Initializing metrics")
 
         try:
-            from prometheus_client import Counter, Histogram  # noqa: PLC0415
+            from prometheus_client import (  # noqa: PLC0415
+                REGISTRY,
+                Counter,
+                Histogram,
+            )
         except ImportError as exc:
             raise ImportError(
                 "Cannot initialize metrics. Please install 'taskiq[metrics]'.",
             ) from exc
 
-        self.found_errors = Counter(
+        def _get_or_create_counter(
+            name: str,
+            documentation: str,
+            labelnames: list[str],
+        ) -> Counter:
+            """Return existing counter or create a new one."""
+            try:
+                return Counter(name, documentation, labelnames)
+            except ValueError:
+                existing = REGISTRY._names_to_collectors.get(name)  # noqa: SLF001
+                if existing is None or not isinstance(existing, Counter):
+                    raise
+                return existing
+
+        def _get_or_create_histogram(
+            name: str,
+            documentation: str,
+            labelnames: list[str],
+        ) -> Histogram:
+            """Return existing histogram or create a new one."""
+            try:
+                return Histogram(name, documentation, labelnames)
+            except ValueError:
+                existing = REGISTRY._names_to_collectors.get(name)  # noqa: SLF001
+                if existing is None or not isinstance(existing, Histogram):
+                    raise
+                return existing
+
+        self.found_errors = _get_or_create_counter(
             "found_errors",
             "Number of found errors",
             ["task_name"],
         )
-        self.received_tasks = Counter(
+        self.received_tasks = _get_or_create_counter(
             "received_tasks",
             "Number of received tasks",
             ["task_name"],
         )
-        self.success_tasks = Counter(
+        self.success_tasks = _get_or_create_counter(
             "success_tasks",
             "Number of successfully executed tasks",
             ["task_name"],
         )
-        self.saved_results = Counter(
+        self.saved_results = _get_or_create_counter(
             "saved_results",
             "Number of saved results in result backend",
             ["task_name"],
         )
-        self.execution_time = Histogram(
+        self.execution_time = _get_or_create_histogram(
             "execution_time",
             "Time of function execution",
             ["task_name"],
