@@ -211,7 +211,7 @@ def run_worker(args: WorkerArgs) -> int | None:
         observer = Observer()
         observer.start()
         args.workers = 1
-        logging.warning(
+        logger.warning(
             "Reload on change enabled. Number of worker processes set to 1.",
         )
 
