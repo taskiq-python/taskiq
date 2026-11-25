@@ -33,7 +33,7 @@ from taskiq.middlewares import (
     SmartRetryMiddleware,
 )
 from taskiq.result import TaskiqResult
-from taskiq.scheduler.scheduled_task import ScheduledTask
+from taskiq.scheduler.scheduled_task import Cron, ScheduledTask
 from taskiq.scheduler.scheduler import TaskiqScheduler
 from taskiq.state import TaskiqState
 from taskiq.task import AsyncTaskiqTask
@@ -49,6 +49,7 @@ __all__ = [
     "AsyncTaskiqTask",
     "BrokerMessage",
     "Context",
+    "Cron",
     "InMemoryBroker",
     "MultiBroker",
     "NoResultError",
