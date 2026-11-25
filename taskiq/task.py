@@ -61,7 +61,9 @@ class AsyncTaskiqTask(Generic[_ReturnType]):
                 self.task_id,
                 with_logs=with_logs,
             )
-            if self.return_type is not None:
+            # Errored tasks have no return value to validate,
+            # so parsing would only produce a misleading warning.
+            if self.return_type is not None and not res.is_err:
                 try:
                     res.return_value = parse_obj_as(
                         self.return_type,
