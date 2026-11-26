@@ -8,7 +8,11 @@ from pydantic import BaseModel
 from taskiq import serializers
 from taskiq.abc import AsyncResultBackend
 from taskiq.abc.serializer import TaskiqSerializer
-from taskiq.exceptions import ResultIsReadyError, TaskiqResultTimeoutError
+from taskiq.exceptions import (
+    ResultGetError,
+    ResultIsReadyError,
+    TaskiqResultTimeoutError,
+)
 from taskiq.result import TaskiqResult
 from taskiq.task import AsyncTaskiqTask
 
@@ -191,3 +195,41 @@ async def test_wait_result_backoff_does_not_overshoot_timeout(
         )
 
     assert all(delay <= 0.1 for delay in delays)
+
+
+async def test_wait_result_fails_fast_on_get_result_error_by_default() -> None:
+    backend = FlakyResultBackend(get_failures=1)
+    task = AsyncTaskiqTask("task-id", backend)
+
+    with pytest.raises(ResultGetError):
+        await task.wait_result(check_interval=0.001)
+
+    assert backend.get_calls == 1
+
+
+async def test_wait_result_retries_get_result_backend_error() -> None:
+    backend = FlakyResultBackend(get_failures=2)
+    task = AsyncTaskiqTask("task-id", backend)
+
+    result = await task.wait_result(
+        check_interval=0.001,
+        timeout=5,
+        retry_on_backend_error=True,
+    )
+
+    assert result.return_value == 42
+    assert backend.get_calls == 3
+
+
+async def test_wait_result_timeout_after_get_result_errors() -> None:
+    backend = FlakyResultBackend(get_failures=10**9)
+    task = AsyncTaskiqTask("task-id", backend)
+
+    with pytest.raises(TaskiqResultTimeoutError) as exc_info:
+        await task.wait_result(
+            check_interval=0.001,
+            timeout=0.05,
+            retry_on_backend_error=True,
+        )
+
+    assert isinstance(exc_info.value.__cause__, ResultGetError)

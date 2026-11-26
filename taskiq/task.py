@@ -99,7 +99,8 @@ class AsyncTaskiqTask(Generic[_ReturnType]):
         immediately. A failed poll says nothing about the task itself,
         so for network-backed result backends it may be preferable to
         keep waiting. Pass `retry_on_backend_error=True` to treat
-        result backend errors as "not ready yet": the poll is retried
+        result backend errors, both when checking readiness and when
+        fetching the result, as "not ready yet": the poll is retried
         with an increasing delay until the timeout expires.
 
         :param check_interval: How often checks are performed.
@@ -113,6 +114,8 @@ class AsyncTaskiqTask(Generic[_ReturnType]):
             failed with a result backend error, it is set as the cause.
         :raises ResultIsReadyError: if the readiness check failed and
             `retry_on_backend_error` is disabled.
+        :raises ResultGetError: if fetching the result failed and
+            `retry_on_backend_error` is disabled.
         :return: task's return value.
         """
         start_time = time()
@@ -121,15 +124,15 @@ class AsyncTaskiqTask(Generic[_ReturnType]):
         while True:
             try:
                 if await self.is_ready():
-                    break
+                    return await self.get_result(with_logs=with_logs)
                 last_error = None
                 delay = check_interval
-            except ResultIsReadyError as exc:
+            except ResultBackendError as exc:
                 if not retry_on_backend_error:
                     raise
                 logger.warning(
-                    "Result backend failed to report readiness of task %s, "
-                    "retrying: %r",
+                    "Result backend failed while waiting for the result of "
+                    "task %s, retrying: %r",
                     self.task_id,
                     exc.__cause__ or exc,
                 )
@@ -143,7 +146,6 @@ class AsyncTaskiqTask(Generic[_ReturnType]):
                 # Don't sleep past the deadline because of the backoff.
                 sleep_for = min(delay, max(timeout - elapsed, 0))
             await asyncio.sleep(sleep_for)
-        return await self.get_result(with_logs=with_logs)
 
     async def get_progress(self) -> "TaskProgress[Any] | None":
         """
